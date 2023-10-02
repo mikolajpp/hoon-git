@@ -1,7 +1,7 @@
 /+  default-agent, dbug
 /+  git
 |%
-+$  versioned-state  
++$  versioned-state
   $%  state-0
   ==
 +$  repositories  (map @tas repository:git)
@@ -20,16 +20,16 @@
 ++  on-init
   ^-  (quip card _this)
   `this(state [%0 ~])
-++  on-save    
+++  on-save
   ^-  vase
   !>(state)
-++  on-load  
+++  on-load
   |=  old-state=vase
   ^-  (quip card _this)
   =/  state  !<(state-0 old-state)
   `this(state state)
 ::
-++  on-poke    
+++  on-poke
   |=  [=mark =vase]
   ^-  (quip card _this)
   |^
@@ -74,21 +74,23 @@
   ~&  ~(key by repos)
   `state
 ::
+::  XX should accept byts
+::
 ++  cmd-hash-object
   |=  [repository=(unit @tas) type=object-type:git data=@]
   ^-  (quip card _state)
-  ?~  repository 
-    =/  hax  (make-hash-raw:obj:git %sha-1 [type data])
+  ?~  repository
+    =/  hax  (make-hash-raw:obj:git %sha-1 [type [(met 3 data) data]])
       ~&  +.hax
     `state
   =/  repo  (~(got by repos) u.repository)
-  =.  repo  (~(put go:git repo) [%blob data])
+  =.  repo  (~(put go:git repo) [%blob [(met 3 data) data]])
   `state(repos (~(put by repos) u.repository repo))
 ::
 ++  cmd-cat-file
   |=  [repository=@tas hash=@ta]
   ^-  (quip card _state)
-  ?:  (lth (met 3 hash) 4) 
+  ?:  (lth (met 3 hash) 4)
     ~|  "Not a valid object name {<hash>}"  !!
   =/  repo  (~(got by repos) repository)
   =/  keys  (~(find-key go:git repo) hash)

@@ -10,14 +10,16 @@
 ::
 +$  accumulator      [hold=@ux bits=@ud]
 +$  bit-stream       [acu=accumulator pos=@ud stream=byts]
++$  stream           [pos=@ud =byts]
 ::
 ::  Expand Zlib stream
 ::
 ::  This is a jet stub for now
 ++  expand
   ~/  %expand
-  |=  sea=byts
-  ^-  byts
+  |=  sea=stream
+  ^-  [byts stream]
+  :_  sea
   [0 0x0]
   :: |=  sea=bit-stream
   :: ^-  (list byts)
@@ -25,7 +27,7 @@
   :: Parse Zlib header
   ::
   :: =^  hed  sea  (header sea)
-  :: ?-  -.hed  
+  :: ?-  -.hed
   :: %deflate  (expand-deflate hed sea)
   :: ==
 ::
@@ -48,8 +50,8 @@
   ::
   ::  DEFLATE expansion core
   ::
-  |%  
-  ++  expand-block 
+  |%
+  ++  expand-block
     |.
     =.  sea  (~(need-bits of sea) 3)
     ::
@@ -109,7 +111,7 @@
   =/  fcheck  (dis 0x1f dat.flg)              :: bits 0-4
   =/  fdict   (rsh [2 1] (dis 0x20 dat.flg))  :: bit 5
   =/  flevel  (rsh [2 1] (dis 0xc0 dat.flg))  :: bits 6-7 XX - correct?
-  ::  
+  ::
   ::  Verify
   ::
   =/  check  (add (lsh [3 1] dat.cmf) dat.flg)
@@ -142,7 +144,7 @@
 ::
 ::  Binary stream core
 ::
-++  of 
+++  of
   |_  bit-stream
   +*  this  .
       sea  +6
@@ -155,13 +157,13 @@
   ::
   ::  Read one byte without accumulation
   ::
-  ++  byte 
+  ++  byte
     |.
     ^-  [byts bit-stream]
     =^  bat  sea  (pull-byte)
     [bat (drop-bits 8)]
-  ::  
-  ::  Accumulate one byte 
+  ::
+  ::  Accumulate one byte
   ::
   ++  pull-byte
     |.
@@ -178,8 +180,8 @@
         acu  [hold=(add hold.acu (lsh [0 bits.acu] dat.bat)) bits=(add bits.acu 8)]
         pos  +(pos)
       ==
-  :: 
-  ::  Assure that there are at least n bits 
+  ::
+  ::  Assure that there are at least n bits
   ::  in the bit accumulator
   ::
   ++  need-bits
@@ -232,14 +234,14 @@
 ::
 ::  Parser types
 ::
-::   +$  byts  [wid=@ud dat=@ux]                  :: MSB order 
+::   +$  byts  [wid=@ud dat=@ux]                  :: MSB order
 ::   :: +$  bits  [p=@ud q=@ux]                   :: bit accumulator
 ::   +$  here  @ud                                :: position in the stream
 ::   +$  swim  [p=here q=byts]                    :: binary stream
 ::   +$  buoy  [p=here q=(unit [p=* q=swim])]     :: parsing result
-::   :: 
+::   ::
 ::   +$  boat  _|:($:swim $:buoy)                      :: binary parser rule
-::   :: 
+::   ::
 ::   ::  Parser tracing
 ::   ::
 ::   ++  last
@@ -255,7 +257,7 @@
 ::     |=  sea=swim
 ::     =+  row=(kan sea)
 ::     ?~  q.row
-::       row 
+::       row
 ::     [p=p.row q=[~ u=[p=(oar p.u.q.row) q=q.u.q.row]]]
 ::   ::
 ::   ++  pose  *boat                             :: alternative

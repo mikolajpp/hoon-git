@@ -47,8 +47,9 @@
   %+  expect-eq
   =/  pak  (need (de:base64:mimes:html 'eF4LyUhVKCzNTM5WSCrKL89TSMuvUMgqzS0oVsgvSy1SKAFK5yRWVYLEAVvzD+0='))
   =/  dat  'The quick brown fox jumps over the lazy fox'
-  =/  mak  (expand pak)
-  ~&  `@t`+:mak
+  ~&  pak+pak
+  =/  mak  (expand [0 pak])
+  ~&  mak+mak
   !>  0xff
   !>  0xff
   ==
