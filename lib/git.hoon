@@ -1,34 +1,14 @@
-/-  *git
-/+  zlib
+/-  *git, *stream
+/+  zlib, bys=stream
 |%
 ::
-+$  person  [name=tape email=tape]
-::
-:: libgit2/odb.h
-::
-+$  raw-object  [type=object-type =byts]
-+$  commit-header  $:  tree=tape
-                       parent=tape
-                       author=[person date=[@ud ? tape]]
-                       commiter=[person date=[@ud ? tape]]
-                   ==
-+$  commit      $:  header=commit-header
-                    message=tape
-                ==
-+$  tree-entry  [[mode=@ta node=@ta] hash=@ta]
-+$  object
-  $%
-      [%blob =byts]
-      [%commit commit]
-      [%tree (list tree-entry)]
-  ==
-::
-:: Object
+::  Object
 ::
 ++  obj
   |%
+  ::
   ++  is-loose
-    |=  typ=object-type
+    |=  typ=raw-object-type
     ^-   ?
     ?+  typ    |
       %commit  &
@@ -39,12 +19,13 @@
   ::
   ++  type
     |=  a=@ud
-    ^-  object-type
+    ^-  raw-object-type
     ?+  a  %invalid
       %1  %commit
       %2  %tree
       %3  %blob
       %4  %tag
+      :: 5 is reserved
       %6  %ofs-delta
       %7  %ref-delta
     ==
@@ -70,7 +51,7 @@
       ~|  "Object is corrupted: invalid header"  !!
     ?.  =(+.u.hed (sub len +(pin)))
       ~|  "Object is corrupted: incorrect object length"  !!
-    =/  type=object-type
+    =/  type=raw-object-type
     :: XX Can we somehow cast?
     ?+  -.u.hed  %invalid
         %blob    %blob
@@ -104,6 +85,7 @@
     ::  XX in places like this we need
     ::  to eventually parametrize the hash function somehow
     ::  (if we plan to support sha-256)
+    ::
     =/  six  ;~(pose (shim '0' '9') (shim 'a' 'f'))
     =/  hax  (stun [40 40] six)
     =/  tree    ;~(pfix (jest 'tree ') hax)
@@ -135,13 +117,24 @@
     =/  message  (star ;~(pose prn eol))
     =/  commit-rule
     ::  [tree-hash parent-hash [author-name author-email author-time]
-    ::  ...
-    :: ;~(plug tree parent author commiter message)
       ;~  plug
         ;~(sfix ;~((glue eol) tree parent author committer) eol)
         ;~(pfix eol message)
       ==
-    commit+(scan (trip dat.byts.rob) commit-rule)
+    ::  XX is there a better way to handle this?
+    =/  root-commit-rule
+      ;~  plug
+        ;~(sfix ;~((glue eol) tree author committer) eol)
+        ;~(pfix eol message)
+      ==
+    =+  txt=(trip dat.byts.rob)
+    =+  com=(rust txt commit-rule)
+    ?~  com
+      =+  com=(rust txt root-commit-rule)
+      ?~  com
+        ~|  "Failed to parse commit object"  !!
+      commit+[[-<.u.com "" ->.u.com] +.u.com]
+    commit+u.com
   ::
   ++  parse-tree
     |=  rob=raw-object
@@ -179,7 +172,7 @@
     =/  ent=tree-entry  [ren hax]
     $(tes [ent tes])
   ::
-  :: Render a git object as a raw objects
+  :: Render a git object raw
   ::
   ++  make-raw
     |=  obe=object
@@ -199,13 +192,21 @@
     |=  rob=raw-object
     ^-  hash
     =/  len  (crip ((d-co:co 0) wid.byts.rob))
-    :: There must be a pattern for this
+    ::  There must be a pattern for this
     =/  hed  (cat 3 (cat 3 type.rob ' ') len)
     =/  pak  (cat 3 hed (can 3 ~[[1 0x0] byts.rob]))
     ::  (can ~[type.object ' ' len 0x0 data.object])
     =/  saz  (met 3 pak)
+    ::  XX is there any way to avoid rev?
+    ::
     =/  hax  (sha-1l:sha [saz (rev 3 saz pak)])
-    sha-1+(crip ((x-co:co 0) hax))
+    =/  haz  (crip ((x-co:co 0) hax))
+    =/  dif  (sub 40 (met 3 haz))
+    ::  Account for leading zeros
+    ::
+    ?:  (gth dif 0)
+      sha-1+(add (lsh [3 dif] haz) (fil 3 dif '0'))
+    sha-1+haz
   ::
   :: Hash a raw git object
   ::
@@ -224,31 +225,15 @@
     ^-  hash
     (make-hash-raw hat (make-raw obe))
   --
-::
-::  Byte stream
-::
-+$  stream  [pos=@ =byts]
-::
-::  Pack file
-::
-+$  pack-header  [version=@ud count=@ud]
-+$  pack  [header=pack-header objects=(list raw-object)]
-::
-::  XX in the byte stream library
-::  we should only have a list of byts objects
-::  References should be handled transparently
-::  by indexing into the master store
-::
-+$  raw-pack-object  [=object-type =byts]
 ++  pak
   |%
   ++  read
     |=  sea=stream
     ^-  [pack stream]
     =^  hed  sea  (read-header sea)
-    ~&  hed
     ::  Read objects
     ::
+    :: ~&  pack+"Pack file contains {<count.hed>} objects"
     =/  lob=(list raw-object)  ~
     =^  lob  sea
     |-
@@ -263,7 +248,6 @@
     =^  hax  sea  (read-bytes:bys 20 sea)
     ?~  hax
       ~|  "Pack file is corrupted: no checksum found"  !!
-    ~&  pack-hax+((x-co:co 0) u.hax)
     :_  sea
     [hed lob]
   ::
@@ -287,7 +271,7 @@
   ++  read-object
     |=  sea=stream
     ^-  [raw-object stream]
-    =^  [typ=object-type size=@ud]  sea  (read-object-type-size sea)
+    =^  [typ=raw-object-type size=@ud]  sea  (read-object-type-size sea)
     ::  XX With the future stream library
     ::  use the references to the sea
     ::  and benchmark vs direct copy
@@ -300,7 +284,7 @@
   ::
   ++  read-object-type-size
     |=  sea=stream
-    ^-  [[object-type @ud] stream]
+    ^-  [[raw-object-type @ud] stream]
     =^  bat  sea  (read-bytes:bys 1 sea)
     ?~  bat  !!
     =/  type  (type:obj (dis (rsh [2 1] u.bat) 0x7))
@@ -343,11 +327,6 @@
     $(sel [val sel])
   --
 ::
-::  Git bundle
-::
-+$  reference      [(list tape) hash=@ta]
-+$  bundle-header  [version=%2 reqs=(list @ta) refs=(list reference)]
-+$  bundle  [header=bundle-header =pack]
 ++  bud
   |%
   ++  read
@@ -368,7 +347,7 @@
       ;~(sfix (jest '# v2 git bundle') (just '\0a'))
     ::
     =/  oid-rule
-      %+  cook  |=(a=tape (crip a))
+      %+  cook  crip
       %+  stun  [40 40]
       ;~(pose (shim '0' '9') (shim 'a' 'f'))
     ::
@@ -379,11 +358,10 @@
       ;~(sfix oid-rule (punt comment-rule))
     ::
     =/  refname-elem
-      ;~(plug low (star ;~(pose low nud hep)))
+      (cook crip ;~(plug low (star ;~(pose low nud hep))))
     ::
     =/  refname-rule
       ;~  pose
-        (cook |=(a=@ ~[(trip a)]) (jest 'HEAD'))
         ;~(plug refname-elem (star ;~(pfix fas refname-elem)))
       ==
     ::
@@ -399,7 +377,6 @@
       ~|  "Git bundle is corrupted: signature absent"  !!
     ?~  (rust u.sig sig-rule)
       ~|  "Git bundle is corrupted: invalid signature"  !!
-    ~&  signature+sig
     ::
     ::  Parse prerequisites
     ::
@@ -423,7 +400,7 @@
     =/  nex  (get-line:bys sea)
     ?~  -.nex
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  ref=(unit [@ta (list tape)])  (rust u.-.nex ref-rule)
+    =/  ref=(unit [@ta path])  (rust u.-.nex ref-rule)
     ?~  ref
       :: ~&  "Failed to parse '{u.-.nex}'"
       [refs sea]
@@ -439,82 +416,9 @@
     [%2 reqs refs]
   --
 ::
-::  Byte stream
-::  XX handle leading zeros
+::  Repository
 ::
-++  bys
-  |%
-  :: Should return a unit?
-  ::
-  ++  get-bytes
-    |=  [n=@ud sea=stream]
-    ^-  [(unit @ux) @ud stream]
-    ?:  (gte pos.sea wid.byts.sea)
-      [~ pos.sea sea]
-    :_  [(add n pos.sea) sea]
-    `(cut 3 [pos.sea n] dat.byts.sea)
-  ::
-  ++  read-bytes
-    |=  [n=@ud sea=stream]
-    ^-  [(unit @ux) stream]
-    =/  nex  (get-bytes n sea)
-    :_  [+<.nex byts.+>.nex]
-      -.nex
-  ::  XX handle leading zeros
-  ++  get-line
-    |=  sea=stream
-    ^-  [(unit tape) @ud stream]
-    =/  i  pos.sea
-    |-
-    ?:  (gte i wid.byts.sea)
-      [~ [pos.sea sea]]
-    ?:  =('\0a' (get-char i sea))
-      :_  [pos=+(i) sea=sea]
-        lan=`(get-string [pos.sea i] sea)
-    $(i +(i))
-  ::
-  ++  read-line
-    |=  sea=stream
-    ^-  [(unit tape) stream]
-    =/  nex  (get-line sea)
-    :_  [+<.nex byts.+>.nex]
-      -.nex
-  ::
-  ++  get-char
-    |=  [i=@ sea=stream]
-    ^-  @t
-    (cut 3 [i 1] dat.byts.sea)
-  ::
-  ::  Get a [-.ran +.ran] substring
-  ::
-  ++  get-string
-    |=  [ran=[@ud @ud] sea=stream]
-    ^-  tape
-    (trip (cut 3 [-.ran +((sub +.ran -.ran))] dat.byts.sea))
-  ::
-  ++  find-byte
-    |=  [bat=@ sea=stream]
-    =/  pin  pos.sea
-    |-
-    :: XX return a unit
-    ?.  (lth pin wid.byts.sea)  !!
-    =/  bet  (cut 3 [pin 1] dat.byts.sea)
-    ?:  =(0x0 bet)
-      pin
-    $(pin +(pin))
-  --
-::
-::  Git repository
-::
-+$  repository
-  $:  objects=(map @ta object)
-      refs=~
-      config=~
-  ==
-::
-::  Repository engine
-::
-++  go
+++  git
   |_  repo=repository
   +*  this  .
   ::
@@ -527,6 +431,29 @@
     |=  hax=hash
     ^-  object
     (~(got by objects.repo) +.hax)
+  ::
+  ++  has
+    |=  hax=hash
+    ^-  ?
+    (~(has by objects.repo) +.hax)
+  ::
+  ++  put
+    |=  obe=object
+    ^-  repository
+    =/  hax=hash  (make-hash:obj default-hash obe)
+    ?<  (has hax)
+    :: XX Check repo compatibility with hax
+    repo(objects (~(put by objects.repo) [+.hax obe]))
+  ++  wyt
+    |-
+    ~(wyt by objects.repo)
+  ::
+  ++  put-raw
+    |=  rob=raw-object
+    ^-  repository
+    =/  hax=hash  (make-hash-raw:obj %sha-1 rob)
+    ?<  (has hax)
+    repo(objects (~(put by objects.repo) [+.hax (parse:obj rob)]))
   ::
   :: XX Should a function like this
   :: be in the standard library?
@@ -562,11 +489,66 @@
       $(keys t.keys, heys [i.keys heys])
     $(keys t.keys)
   ::
-  ++  put
-    |=  obe=object
+  ++  unbundle
+    |=  bud=bundle
     ^-  repository
-    =/  hax  (make-hash:obj default-hash obe)
-      :: XX Check repo compatibility with hax
-      repo(objects (~(put by objects.repo) [+.hax obe]))
+    ?>  =(2 version.header.bud)
+    ::  Verify we have all required objects
+    ::
+    =+  mis=(turn reqs.header.bud |=(hax=@ta (has sha-1+hax)))
+    ?:  (gth (lent mis) 0)
+      ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
+    ::  Read objects
+    ::
+    =+  bos=objects.pack.bud
+    =.  repo
+    |-
+    ?~  bos
+      repo
+    $(repo (put-raw i.bos), bos t.bos)
+    ::  Read and verify references
+    ::
+    =+  ref=refs.header.bud
+    =.  repo
+    |-
+    ?~  ref
+      repo
+    ?.  (has [%sha-1 +.i.ref])
+      ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
+    $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
+    ::
+    repo
+  ::
+  ::  This is a configuration store mirroring the one from Git.
+  ::  Configuration variables are grouped into sections with an optional
+  ::  subsection. Thus core/~ corresponds to [core], while remote/origin
+  ::  to [remote "origin"].
+  ::  Configuration variables can be loobean ?, integer @ud, or string @t.
+  ::
+  ::  XX Think whether it would be better to have a typed configuration
+  ::  store. The advantage of the current approach is that a new tool
+  ::  can introduce a configuration variable without the need to
+  ::  alter and recompile libgit itself.
+  ::
+  ++  config
+    |%
+    ::
+    ++  get
+      |=  [key=config-key var=@tas]
+      ^-  (unit config-value)
+      (~(get bi:libmip config.repo) key var)
+    ::
+    ++  put
+      |=  [key=config-key var=@tas val=config-value]
+      ^-  repository
+      repo(config (~(put bi:libmip config.repo) key var val))
+    ::
+    ++  default
+    |.
+    ^-  repository
+    =.  repo  (put core/~ repositoryformatversion+u+0)
+    =.  repo  (put core/~ bare+l+&)
+    repo
+    --
   --
 --
