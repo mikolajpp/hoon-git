@@ -43,8 +43,8 @@
     :-
     :*  tree="d928f280a489455d76396f38444512beedb05b50"
         parent="41416ff404dcf7bb0310bfd740a3c8c4490e7807"
-        author=[["Bilbo Baggins " "bilbo@shire.green"] [1.695.627.855 & "0800"]]
-        commiter=[["Bilbo Baggins " "bilbo@shire.green"] [1.695.627.855 & "0800"]]
+        author=[["Bilbo Baggins" "bilbo@shire.green"] [1.695.627.855 & "0800"]]
+        commiter=[["Bilbo Baggins" "bilbo@shire.green"] [1.695.627.855 & "0800"]]
     ==
     "Discover new trees\0a"
   !>  (parse:obj rob)

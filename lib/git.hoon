@@ -18,9 +18,9 @@
     ==
   ::
   ++  type
-    |=  a=@ud
+    |=  ryt=@ud
     ^-  raw-object-type
-    ?+  a  %invalid
+    ?+  ryt  %invalid
       %1  %commit
       %2  %tree
       %3  %blob
@@ -62,133 +62,137 @@
     [type [+.u.hed data]]
   ::  XX custom crip to handle null bytes properly
   ::  this is probably a bug
+  ::
   ++  crip
     |=  a=tape
     ^-  @t
     (rep 3 a)
   ::
   ++  parse
-    |=  rob=raw-object
+    |=  [=hash-type rob=raw-object]
     ^-  object
+    =<
     ?+  type.rob
       ~|  "Invalid object type {<type.rob>}"  !!
       %blob    rob
       %commit  (parse-commit rob)
       %tree    (parse-tree rob)
     ==
-  ::
-  ++  parse-commit
-    |=  rob=raw-object
-    ^-  object
-    ::  XX handle mailmap globally
+    |%
     ::
-    ::  XX in places like this we need
-    ::  to eventually parametrize the hash function somehow
-    ::  (if we plan to support sha-256)
+    ::  Parsers
     ::
-    =/  six  ;~(pose (shim '0' '9') (shim 'a' 'f'))
-    =/  hax  (stun [40 40] six)
-    =/  tree    ;~(pfix (jest 'tree ') hax)
-    =/  parent  ;~(pfix (jest 'parent ') hax)
-    =/  person
+    ++  eol  (just '\0a')
+    ++  six  ;~(pose (shim '0' '9') (shim 'a' 'f'))
+    ++  hax-sha-1  (stun [40 40] six)
+    ::  Commit rules
+    ::
+    ++  tree  ;~(pfix (jest 'tree ') hax-sha-1)
+    ++  parent  ;~(pfix (jest 'parent ') hax-sha-1)
+    ++  person
       ;~  plug
       ::  Name
       ::
-      (star ;~(less gal prn))
+      ;~(sfix (star ;~(less ;~(plug ace gal) prn)) ;~(plug ace gal))
       ::  Email
       ::
-      (ifix [gal gar] (star ;~(less gar prn)))
+      ;~(sfix (star ;~(less gar prn)) gar)
       ==
-    =/  zone
+    ++  zone
       ;~  plug
       ;~(pose (cold & lus) (cold | hep))
       (plus nud)
       ==
-    =/  time  ;~(plug ;~(sfix dip:ag ace) zone)
-    =/  author
+    ++  time  ;~(plug ;~(sfix dip:ag ace) zone)
+    ++  author
       ;~  pfix  (jest 'author ')
       ;~(plug person ;~(pfix ace time))
       ==
-    =/  committer
+    ++  committer
       ;~  pfix  (jest 'committer ')
       ;~(plug person ;~(pfix ace time))
       ==
-    =/  eol  (just '\0a')
-    =/  message  (star ;~(pose prn eol))
-    =/  commit-rule
-    ::  [tree-hash parent-hash [author-name author-email author-time]
+    ++  message  (star ;~(pose prn eol))
+    ++  commit
       ;~  plug
         ;~(sfix ;~((glue eol) tree parent author committer) eol)
         ;~(pfix eol message)
       ==
-    ::  XX is there a better way to handle this?
-    =/  root-commit-rule
+    ::  XX is there a better way to handle a commit without a parent?
+    ::
+    ++  root-commit
       ;~  plug
         ;~(sfix ;~((glue eol) tree author committer) eol)
         ;~(pfix eol message)
       ==
-    =+  txt=(trip dat.byts.rob)
-    =+  com=(rust txt commit-rule)
-    ?~  com
-      =+  com=(rust txt root-commit-rule)
+    ::  Tree rules
+    ::
+    ++  mode  (cook crip ;~(sfix (plus (shim '0' '9')) ace))
+    ++  node  (cook crip (star ;~(less ace prn)))
+    ::
+    ++  parse-commit
+      |=  rob=raw-object
+      ^-  object
+      ::  XX in places like this we need
+      ::  to eventually parametrize the hash function somehow
+      ::  (if we plan to support sha-256)
+      ::
+      =+  txt=(trip dat.byts.rob)
+      =+  com=(rust txt commit)
       ?~  com
-        ~|  "Failed to parse commit object"  !!
-      commit+[[-<.u.com "" ->.u.com] +.u.com]
-    commit+u.com
-  ::
-  ++  parse-tree
-    |=  rob=raw-object
-    ^-  object
-    ::  XX better parsing of mode.
-    ::  Is leading zero allowed in principle?
+        =+  com=(rust txt root-commit)
+        ?~  com
+          ~|  "Failed to parse commit object"  !!
+        commit+[[haha/-<.u.com "" ->.u.com] +.u.com]
+      commit+u.com
     ::
-    =/  mode  (cook crip ;~(sfix (plus (shim '0' '9')) ace))
-    =/  node  (cook crip (star ;~(less ace prn)))
-    ::
-    ::  Parsing tree objects is a little tricky.
-    ::  Each entry has 20 bytes encoding of SHA-1.
-    ::  This is not suitable for using parsers,
-    ::  (it would @t constraints for valid UTF-8 bytes)
-    ::
-    =/  sea=stream  [0 byts.rob]
-    ::  XX Is there a better pattern for
-    ::  building a list of results?
-    =/  tes=(list tree-entry)  ~
-    |-
-    ?.  (lth pos.sea wid.byts.sea)
-      tree+tes
-    =/  pin  (find-byte:bys 0x0 sea)
-    =^  tex  sea  (read-bytes:bys (sub pin pos.sea) sea)
-    ?~  tex
-      ~|  "Corrupted tree object: malformed tree entry"  !!
-    =/  txt  (trip u.tex)
-    =^  hek  sea  (read-bytes:bys 20 [+(pos.sea) byts.sea])
-    ?~  hek
-      ~|  "Corrupted tree object: malformed hash"  !!
-    ::  XX handle leading zeros in a hash
-    ::
-    =/  hax=@ta  (crip ((x-co:co 0) (rev 3 20 u.hek)))
-    =/  ren  (scan txt ;~(plug mode node))
-    =/  ent=tree-entry  [ren hax]
-    $(tes [ent tes])
+    ++  parse-tree
+      |=  rob=raw-object
+      ^-  object
+      ::  XX better parsing of mode.
+      ::  Is leading zero allowed in principle?
+      ::
+      =/  sea=stream  [0 byts.rob]
+      ::  XX Is there a better pattern for
+      ::  building a list of results?
+      =/  tes=(list tree-entry)  ~
+      |-
+      ?.  (lth pos.sea wid.byts.sea)
+        tree+tes
+      =/  pin  (find-byte:bys 0x0 sea)
+      =^  tex  sea  (read-bytes:bys (sub pin pos.sea) sea)
+      ?~  tex
+        ~|  "Corrupted tree object: malformed tree entry"  !!
+      =/  txt  (trip u.tex)
+      =^  hek  sea  (read-bytes:bys 20 [+(pos.sea) byts.sea])
+      ?~  hek
+        ~|  "Corrupted tree object: malformed hash"  !!
+      ::  XX handle leading zeros in a hash
+      ::  Where else are we printing hashes? Check it.
+      ::
+      =/  hax=@ta  (crip ((x-co:co 0) (rev 3 20 u.hek)))
+      =/  ren  (scan txt ;~(plug mode node))
+      =/  ent=tree-entry  [ren hax]
+      $(tes [ent tes])
+    --
   ::
   :: Render a git object raw
   ::
-  ++  make-raw
+  ++  rare
     |=  obe=object
     ^-  raw-object
     ?-  -.obe
       %blob  obe
-      %tree  !!
+      %tree    !!
       %commit  !!
     ==
   ::
-  ::  SHA1-hash a raw git object
+  ::  sha-1 hash a raw git object
   ::
   ::  XX Improve performance by
-  ::  using Sha1_Update
+  ::  exposing Sha1_Update in zuse
   ::
-  ++  make-raw-hash-sha-1
+  ++  hash-raw-sha-1
     |=  rob=raw-object
     ^-  hash
     =/  len  (crip ((d-co:co 0) wid.byts.rob))
@@ -200,6 +204,8 @@
     ::  XX is there any way to avoid rev?
     ::
     =/  hax  (sha-1l:sha [saz (rev 3 saz pak)])
+    ::  XX does not handle leading zeros correctly!
+    ::
     =/  haz  (crip ((x-co:co 0) hax))
     =/  dif  (sub 40 (met 3 haz))
     ::  Account for leading zeros
@@ -210,20 +216,20 @@
   ::
   :: Hash a raw git object
   ::
-  ++  make-hash-raw
+  ++  hash-raw
     |=  [hat=hash-type rob=raw-object]
     ^-  hash
     ?-  hat
-      %sha-1  (make-raw-hash-sha-1 rob)
+      %sha-1  (hash-raw-sha-1 rob)
       %sha-256  !!
     ==
   ::
   ::  Hash a git object
   ::
-  ++  make-hash
+  ++  hash
     |=  [hat=hash-type obe=object]
-    ^-  hash
-    (make-hash-raw hat (make-raw obe))
+    ^-  ^hash
+    (hash-raw hat (rare obe))
   --
 ++  pak
   |%
@@ -440,9 +446,8 @@
   ++  put
     |=  obe=object
     ^-  repository
-    =/  hax=hash  (make-hash:obj default-hash obe)
+    =/  hax=hash  (hash:obj hash.repo obe)
     ?<  (has hax)
-    :: XX Check repo compatibility with hax
     repo(objects (~(put by objects.repo) [+.hax obe]))
   ++  wyt
     |-
@@ -451,9 +456,9 @@
   ++  put-raw
     |=  rob=raw-object
     ^-  repository
-    =/  hax=hash  (make-hash-raw:obj %sha-1 rob)
+    =/  hax=hash  (hash-raw:obj hash.repo rob)
     ?<  (has hax)
-    repo(objects (~(put by objects.repo) [+.hax (parse:obj rob)]))
+    repo(objects (~(put by objects.repo) [+.hax (parse:obj hash.repo rob)]))
   ::
   :: XX Should a function like this
   :: be in the standard library?
@@ -495,7 +500,9 @@
     ?>  =(2 version.header.bud)
     ::  Verify we have all required objects
     ::
-    =+  mis=(turn reqs.header.bud |=(hax=@ta (has sha-1+hax)))
+    ::  XX Can we get hash.repo+hax syntax to work?
+    ::
+    =+  mis=(turn reqs.header.bud |=(hax=@ta (has [hash.repo hax])))
     ?:  (gth (lent mis) 0)
       ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
     ::  Read objects

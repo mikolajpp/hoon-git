@@ -24,7 +24,6 @@
   !>  ~[~.6e65a945ecbe4eb5afbd92289811e4858cd7286c]
   !>  (~(find-key git repo) ~.6e65)
   ::
-  ~&  ~(tap by refs.repo)
   %+  expect-eq
   !>  :~
       [/refs/heads/master ~.207554077c58bf3536b163d520f1d915e887c2dc]

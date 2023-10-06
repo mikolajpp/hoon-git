@@ -1,12 +1,8 @@
 /+  libmip=mip
 |%
 +$  hash-type
-  $?  %sha-1
-      %sha-256
-  ==
-++  default-hash  %sha-1
-+$  oid
-  $:  [%sha-1 hash=@ta]
+  $?  %sha-256
+      %sha-1
   ==
 +$  hash  [hash-type @ta]
 ::
@@ -60,7 +56,8 @@
 +$  config-key  [@tas (unit @t)]
 +$  reference   [path hash=@ta]
 +$  repository
-  $:  objects=(map @ta object)
+  $:  hash=hash-type
+      objects=(map @ta object)
       refs=(map path @ta)
       config=(mip:libmip config-key @tas config-value)
   ==
