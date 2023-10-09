@@ -2,6 +2,9 @@
 /+  zlib, bys=stream
 |%
 ::
+++  hax-sha-1  (bass 16 (stun [40 40] six:ab))
+++  hax-sha-256  !!
+::
 ::  Object
 ::
 ++  obj
@@ -69,7 +72,7 @@
     (rep 3 a)
   ::
   ++  parse
-    |=  [=hash-type rob=raw-object]
+    |=  [hat=hash-type rob=raw-object]
     ^-  object
     =<
     ?+  type.rob
@@ -83,12 +86,14 @@
     ::  Parsers
     ::
     ++  eol  (just '\0a')
-    ++  six  ;~(pose (shim '0' '9') (shim 'a' 'f'))
-    ++  hax-sha-1  (stun [40 40] six)
+    ++  hax  ?-  hat
+             %sha-1  hax-sha-1
+             %sha-256  hax-sha-256
+             ==
     ::  Commit rules
     ::
-    ++  tree  ;~(pfix (jest 'tree ') hax-sha-1)
-    ++  parent  ;~(pfix (jest 'parent ') hax-sha-1)
+    ++  tree  ;~(pfix (jest 'tree ') hax)
+    ++  parent  ;~(pfix (jest 'parent ') hax)
     ++  person
       ;~  plug
       ::  Name
@@ -143,7 +148,7 @@
         =+  com=(rust txt root-commit)
         ?~  com
           ~|  "Failed to parse commit object"  !!
-        commit+[[haha/-<.u.com "" ->.u.com] +.u.com]
+        commit+[[-<.u.com 0x0 ->.u.com] +.u.com]
       commit+u.com
     ::
     ++  parse-tree
@@ -167,12 +172,10 @@
       =^  hek  sea  (read-bytes:bys 20 [+(pos.sea) byts.sea])
       ?~  hek
         ~|  "Corrupted tree object: malformed hash"  !!
-      ::  XX handle leading zeros in a hash
-      ::  Where else are we printing hashes? Check it.
       ::
-      =/  hax=@ta  (crip ((x-co:co 0) (rev 3 20 u.hek)))
+      =/  haz=@ux  (rev 3 20 u.hek)
       =/  ren  (scan txt ;~(plug mode node))
-      =/  ent=tree-entry  [ren hax]
+      =/  ent=tree-entry  [ren haz]
       $(tes [ent tes])
     --
   ::
@@ -194,7 +197,7 @@
   ::
   ++  hash-raw-sha-1
     |=  rob=raw-object
-    ^-  hash
+    ^-  @ux
     =/  len  (crip ((d-co:co 0) wid.byts.rob))
     ::  There must be a pattern for this
     =/  hed  (cat 3 (cat 3 type.rob ' ') len)
@@ -203,22 +206,14 @@
     =/  saz  (met 3 pak)
     ::  XX is there any way to avoid rev?
     ::
-    =/  hax  (sha-1l:sha [saz (rev 3 saz pak)])
-    ::  XX does not handle leading zeros correctly!
-    ::
-    =/  haz  (crip ((x-co:co 0) hax))
-    =/  dif  (sub 40 (met 3 haz))
-    ::  Account for leading zeros
-    ::
-    ?:  (gth dif 0)
-      sha-1+(add (lsh [3 dif] haz) (fil 3 dif '0'))
-    sha-1+haz
+    =/  haz  (sha-1l:sha [saz (rev 3 saz pak)])
+    haz
   ::
   :: Hash a raw git object
   ::
   ++  hash-raw
     |=  [hat=hash-type rob=raw-object]
-    ^-  hash
+    ^-  @ux
     ?-  hat
       %sha-1  (hash-raw-sha-1 rob)
       %sha-256  !!
@@ -228,7 +223,7 @@
   ::
   ++  hash
     |=  [hat=hash-type obe=object]
-    ^-  ^hash
+    ^-  @ux
     (hash-raw hat (rare obe))
   --
 ++  pak
@@ -346,80 +341,81 @@
   ++  read-header
     |=  sea=stream
     ^-  [bundle-header stream]
-    ::
-    ::  Rules
-    ::
-    =/  sig-rule
-      ;~(sfix (jest '# v2 git bundle') (just '\0a'))
-    ::
-    =/  oid-rule
-      %+  cook  crip
-      %+  stun  [40 40]
-      ;~(pose (shim '0' '9') (shim 'a' 'f'))
-    ::
-    =/  comment-rule  ;~(pfix ace (star prn))
-    ::
-    =/  req-rule
-      %+  ifix  [hep (just '\0a')]
-      ;~(sfix oid-rule (punt comment-rule))
-    ::
-    =/  refname-elem
-      (cook crip ;~(plug low (star ;~(pose low nud hep))))
-    ::
-    =/  refname-rule
-      ;~  pose
-        ;~(plug refname-elem (star ;~(pfix fas refname-elem)))
-      ==
-    ::
-    =/  ref-rule
-      ;~  sfix
-        ;~(plug oid-rule ;~(pfix ace refname-rule))
-        (just '\0a')
-      ==
-    ::
     ::  Parse signature
-    =^  sig  sea  (read-line:bys sea)
-    ?~  sig
-      ~|  "Git bundle is corrupted: signature absent"  !!
-    ?~  (rust u.sig sig-rule)
-      ~|  "Git bundle is corrupted: invalid signature"  !!
     ::
+    =^  nex  sea  (read-line:bys sea)
+    ?~  nex
+      ~|  "Git bundle is corrupted: signature absent"  !!
+    =/  signature
+      ;~(sfix (cold %2 (jest '# v2 git bundle')) (just '\0a'))
+    =+  sig=(rust u.nex signature)
+    ?~  sig
+      ~|  "Git bundle is corrupted: invalid signature"  !!
+    ::  Choose hash type and parser
+    ::
+    =/  [hat=hash-type hax=_hax-sha-1]
+      ?:  ?=(%2 u.sig)
+        [%sha-1 hax-sha-1]
+      !!
+    ::  Compose with parsers
+    ::
+    =<
     ::  Parse prerequisites
     ::
-    =^  reqs=(list @ta)  sea
+    =^  reqs=(list @ux)  sea
     %.  ~
-    |=  reqs=(list @ta)
-    =/  nex  (get-line:bys sea)
-    ?~  -.nex
+    |=  reqs=(list @ux)
+    =+  [nex red]=(read-line:bys sea)
+    ?~  nex
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  oid=(unit @ta)  (rust u.-.nex req-rule)
-    ?~  oid
+    =/  hax=(unit @ux)  (rust u.nex required)
+    ?~  hax
       :: ~&  "Failed to parse '{u.-.nex}'"
       [reqs sea]
-    $(reqs [u.oid reqs], sea [+<.nex byts.+>.nex])
+    $(reqs [u.hax reqs], sea red)
     ::
     ::  Parse references
     ::
-    =^  refs=(list reference)  sea
+    =^  refs=(list ^reference)  sea
     %.  ~
-    |=  refs=(list reference)
-    =/  nex  (get-line:bys sea)
-    ?~  -.nex
+    |=  refs=(list ^reference)
+    =+  [nex red]=(read-line:bys sea)
+    ?~  nex
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  ref=(unit [@ta path])  (rust u.-.nex ref-rule)
+    =/  ref=(unit [@ux path])  (rust u.nex reference)
     ?~  ref
       :: ~&  "Failed to parse '{u.-.nex}'"
       [refs sea]
-    $(refs [[+.u.ref -.u.ref] refs], sea [+<.nex byts.+>.nex])
-    ::
+    $(refs [[+.u.ref -.u.ref] refs], sea red)
     :: Parse newline indicating end of bundle header
-    =^  lan  sea  (read-line:bys sea)
-    ?~  lan
+    ::
+    =^  nex  sea  (read-line:bys sea)
+    ?~  nex
       ~|  "Git bundle is corrupted: header not terminated"  !!
-    ?:  (gth (lent u.lan) 1)
+    ?:  (gth (lent u.nex) 1)
       ~|  "Git bundle is corrupted: invalid header terminator"  !!
     :_  sea
-    [%2 reqs refs]
+    [u.sig hat reqs refs]
+    ::
+    ::  Parsers
+    ::
+    |%
+    ++  comment  ;~(pfix ace (star prn))
+    ++  required
+      %+  ifix  [hep (just '\0a')]
+      ;~(sfix hax (punt comment))
+    ++  segment
+      (cook crip ;~(plug low (star ;~(pose low nud hep))))
+    ++  paf
+      ;~  pose
+        ;~(plug segment (star ;~(pfix fas segment)))
+      ==
+    ++  reference
+      ;~  sfix
+        ;~(plug hax ;~(pfix ace paf))
+        (just '\0a')
+      ==
+    --
   --
 ::
 ::  Repository
@@ -428,27 +424,29 @@
   |_  repo=repository
   +*  this  .
   ::
+  ::  XX validate hash type?
+  ::
   ++  get
-    |=  hax=hash
+    |=  haz=@ux
     ^-  (unit object)
-    (~(get by objects.repo) +.hax)
+    (~(get by objects.repo) haz)
   ::
   ++  got
-    |=  hax=hash
+    |=  haz=@ux
     ^-  object
-    (~(got by objects.repo) +.hax)
+    (~(got by objects.repo) haz)
   ::
   ++  has
-    |=  hax=hash
+    |=  haz=@ux
     ^-  ?
-    (~(has by objects.repo) +.hax)
+    (~(has by objects.repo) haz)
   ::
   ++  put
     |=  obe=object
     ^-  repository
-    =/  hax=hash  (hash:obj hash.repo obe)
-    ?<  (has hax)
-    repo(objects (~(put by objects.repo) [+.hax obe]))
+    =/  haz=@ux  (hash:obj hash.repo obe)
+    ?<  (has haz)
+    repo(objects (~(put by objects.repo) [haz obe]))
   ++  wyt
     |-
     ~(wyt by objects.repo)
@@ -456,43 +454,67 @@
   ++  put-raw
     |=  rob=raw-object
     ^-  repository
-    =/  hax=hash  (hash-raw:obj hash.repo rob)
-    ?<  (has hax)
-    repo(objects (~(put by objects.repo) [+.hax (parse:obj hash.repo rob)]))
+    =/  haz=@ux  (hash-raw:obj hash.repo rob)
+    ?<  (has haz)
+    repo(objects (~(put by objects.repo) [haz (parse:obj hash.repo rob)]))
   ::
-  :: XX Should a function like this
-  :: be in the standard library?
+  ::  Key size in half-bytes
+  ::
+  ::  Why does ?= not work here?
+  ::
+  ++  key-size  ?:  =(hash.repo %sha-1)  40
+                  !!
+  ::
+  ::  Check whether key a
+  ::  is a shorthand of b
+  ::
+  ::  XX This could be done with
+  ::  direct atom comparison
   ::
   ++  match-key
-    |=  [a=@ta b=@ta]
+    |=  [a=byts b=@ux]
     ^-  ?
     ?:  =(a b)
       &
+    ::  Size in half-bytes
+    ::
+    .=  dat.a
+    %+  cut  2
+      :_  b
+      [(sub key-size wid.a) wid.a]
+  ::
+  ++  to-hex
+    |=  a=@ta
+    =+  hex=0x0
     |-
-    ?:  |(=(0 a) =(0 b))
-      &
-    ?.  =((end 3 a) (end 3 b))
-      |
-    $(a (rsh 3 a), b (rsh 3 b))
+    ?:  =(a 0)
+      hex
+    =+  dit=(end [3 1] a)
+    =/  val=@ux
+    ?:  (gth dit '9')
+      (add (sub dit 'a') 10)
+    (sub dit '0')
+    $(a (rsh [3 1] a), hex (add (lsh [2 1] hex) val))
   ::
   :: Find all keys matching the abbreviation
   ::
   ++  find-key
-    |=  ken=@ta
-    ^-  (list @ta)
+    |=  a=@ta
+    ^-  (list @ux)
     ::
     :: XX why does dispatching on non-empty set does not work?
     :: ?~  keys  followed by =/  heys  ~(tap in keys)
     :: results in mull-grow
     ::
-    =/  keys=(list @ta)  ~(tap in ~(key by objects.repo))
-    =|  heys=(list @ta)
+    =+  key=[(met 3 a) (to-hex a)]
+    =/  kel=(list @ux)  ~(tap in ~(key by objects.repo))
+    =|  hey=(list @ux)
     |-
-    ?~  keys
-      heys
-    ?:  (match-key ken i.keys)
-      $(keys t.keys, heys [i.keys heys])
-    $(keys t.keys)
+    ?~  kel
+      hey
+    ?:  (match-key key i.kel)
+      $(kel t.kel, hey [i.kel hey])
+    $(kel t.kel)
   ::
   ++  unbundle
     |=  bud=bundle
@@ -502,7 +524,7 @@
     ::
     ::  XX Can we get hash.repo+hax syntax to work?
     ::
-    =+  mis=(turn reqs.header.bud |=(hax=@ta (has [hash.repo hax])))
+    =+  mis=(turn reqs.header.bud |=(haz=@ux (has haz)))
     ?:  (gth (lent mis) 0)
       ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
     ::  Read objects
@@ -520,7 +542,7 @@
     |-
     ?~  ref
       repo
-    ?.  (has [%sha-1 +.i.ref])
+    ?.  (has +.i.ref)
       ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
     $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
     ::

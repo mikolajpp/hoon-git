@@ -4,7 +4,7 @@
   $?  %sha-256
       %sha-1
   ==
-+$  hash  [hash-type @ta]
++$  hash  [hash-type @ux]
 ::
 +$  raw-object-type
   $?  %invalid
@@ -25,15 +25,15 @@
       [%tree (list tree-entry)]
   ==
 +$  person  [name=tape email=tape]
-+$  commit-header  $:  tree=tape
-                       parent=tape
++$  commit-header  $:  tree=@ux
+                       parent=@ux
                        author=[person date=[@ud ? tape]]
                        commiter=[person date=[@ud ? tape]]
                    ==
 +$  commit      $:  header=commit-header
                     message=tape
                 ==
-+$  tree-entry  [[mode=@ta node=@ta] hash=@ta]
++$  tree-entry  [[mode=@ta node=@ta] hash=@ux]
 +$  config-value  $%
                   [%l ?]
                   [%u @ud]
@@ -54,17 +54,17 @@
 ::  [section (unit subsection)]
 ::
 +$  config-key  [@tas (unit @t)]
-+$  reference   [path hash=@ta]
++$  reference   [path @ux]
 +$  repository
   $:  hash=hash-type
-      objects=(map @ta object)
-      refs=(map path @ta)
+      objects=(map @ux object)
+      refs=(map path @ux)
       config=(mip:libmip config-key @tas config-value)
   ==
 ::
 ::  Git bundle
 ::
-+$  bundle-header  [version=%2 reqs=(list @ta) refs=(list reference)]
++$  bundle-header  [version=%2 hash=hash-type reqs=(list @ux) refs=(list reference)]
 +$  bundle  [header=bundle-header =pack]
 ::
 +$  command

@@ -13,21 +13,21 @@
   !>  ~(wyt git repo)
   ::
   %+  expect-eq
-  !>  ~[~.0a61005c850b28febebfbf9a4d63677d7ba536de]
+  !>  ~[0xa61.005c.850b.28fe.bebf.bf9a.4d63.677d.7ba5.36de]
   !>  (~(find-key git repo) ~.0a610)
   ::
   %+  expect-eq
-  !>  ~[~.41416ff404dcf7bb0310bfd740a3c8c4490e7807]
+  !>  ~[0x4141.6ff4.04dc.f7bb.0310.bfd7.40a3.c8c4.490e.7807]
   !>  (~(find-key git repo) ~.4141)
   ::
   %+  expect-eq
-  !>  ~[~.6e65a945ecbe4eb5afbd92289811e4858cd7286c]
+  !>  ~[0x6e65.a945.ecbe.4eb5.afbd.9228.9811.e485.8cd7.286c]
   !>  (~(find-key git repo) ~.6e65)
   ::
   %+  expect-eq
   !>  :~
-      [/refs/heads/master ~.207554077c58bf3536b163d520f1d915e887c2dc]
-      [/refs/tags/first-trees ~.0a61005c850b28febebfbf9a4d63677d7ba536de]
+      [/refs/heads/master 0x2075.5407.7c58.bf35.36b1.63d5.20f1.d915.e887.c2dc]
+      [/refs/tags/first-trees 0xa61.005c.850b.28fe.bebf.bf9a.4d63.677d.7ba5.36de]
       ==
   !>  ~(tap by refs.repo)
   ==
