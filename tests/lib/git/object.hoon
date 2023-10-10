@@ -1,8 +1,5 @@
 /+  *test, *git, zlib
 |%
-::  XX In the future cords with \00 bytes
-::  will likely be invalid, were atom sanity
-::  be enforced
 ++  hat  %sha-1
 ++  test-parse-raw
   ;:  weld

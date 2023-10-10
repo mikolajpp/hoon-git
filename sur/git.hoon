@@ -6,24 +6,14 @@
   ==
 +$  hash  [hash-type @ux]
 ::
-+$  raw-object-type
-  $?  %invalid
-      %commit    ::  1
-      %tree      ::  2
-      %blob      ::  3
-      %tag       ::  4
-                 ::  5 is reserved
-      %ofs-delta ::  6
-      %ref-delta ::  7
++$  object-type
+  $?  %commit
+      %tree
+      %blob
+      %tag
   ==
-+$  raw-object  [type=raw-object-type =byts]
-+$  object-type  ?(%blob %commit %tree)
-+$  object
-  $%
-      [%blob =byts]
-      [%commit commit]
-      [%tree (list tree-entry)]
-  ==
++$  raw-object  [type=object-type =byts]
+::
 +$  person  [name=tape email=tape]
 +$  commit-header  $:  tree=@ux
                        parent=@ux
@@ -34,23 +24,36 @@
                     message=tape
                 ==
 +$  tree-entry  [[mode=@ta node=@ta] hash=@ux]
-+$  config-value  $%
-                  [%l ?]
-                  [%u @ud]
-                  [%s @t]
+::
++$  object
+  $%  [%blob =byts]
+      [%commit commit]
+      [%tree (list tree-entry)]
+  ==
++$  config-value  $%  [%l ?]
+                      [%u @ud]
+                      [%s @t]
                   ==
 ::
 ::  Pack file
 ::
-+$  pack-header  [version=@ud count=@ud]
-+$  pack  [header=pack-header objects=(list raw-object)]
++$  pack-object-type  $?  object-type
+                          %ofs-delta
+                          %ref-delta
+                      ==
++$  pack-object  $%  raw-object
+                     [%ofs-delta offset=@ud =byts]
+                     [%ref-delta =byts]
+                 ==
+
++$  pack-header  [version=%2 count=@ud]
++$  pack  [header=pack-header objects=(list pack-object)]
 ::
 ::  XX in the byte stream library
 ::  we should only have a list of byts objects
 ::  References should be handled transparently
 ::  by indexing into the master store
 ::
-+$  raw-pack-object  [=object-type =byts]
 ::  [section (unit subsection)]
 ::
 +$  config-key  [@tas (unit @t)]

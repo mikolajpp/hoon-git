@@ -10,27 +10,14 @@
 ++  obj
   |%
   ::
-  ++  is-loose
-    |=  typ=raw-object-type
-    ^-   ?
-    ?+  typ    |
-      %commit  &
-      %tree    &
-      %blob    &
-      %tag     &
-    ==
-  ::
   ++  type
     |=  ryt=@ud
-    ^-  raw-object-type
-    ?+  ryt  %invalid
-      %1  %commit
-      %2  %tree
-      %3  %blob
-      %4  %tag
-      :: 5 is reserved
-      %6  %ofs-delta
-      %7  %ref-delta
+    ^-  (unit object-type)
+    ?+  ryt  ~
+      %1  `%commit
+      %2  `%tree
+      %3  `%blob
+      %4  `%tag
     ==
   ::
   :: Parse raw git object
@@ -54,15 +41,15 @@
       ~|  "Object is corrupted: invalid header"  !!
     ?.  =(+.u.hed (sub len +(pin)))
       ~|  "Object is corrupted: incorrect object length"  !!
-    =/  type=raw-object-type
+    =/  typ=object-type
     :: XX Can we somehow cast?
-    ?+  -.u.hed  %invalid
-        %blob    %blob
-        %commit  %commit
-        %tree    %tree
+      ?+  -.u.hed  ~|  "Unknown object type {<-.u.hed>}"  !!
+          %blob    %blob
+          %commit  %commit
+          %tree    %tree
       ==
     =/  data=@  (cut 3 [+(pin) +.u.hed] dat)
-    [type [+.u.hed data]]
+    [typ [+.u.hed data]]
   ::  XX custom crip to handle null bytes properly
   ::  this is probably a bug
   ::
@@ -75,13 +62,17 @@
     |=  [hat=hash-type rob=raw-object]
     ^-  object
     =<
-    ?+  type.rob
-      ~|  "Invalid object type {<type.rob>}"  !!
+    ?-  type.rob
       %blob    rob
       %commit  (parse-commit rob)
       %tree    (parse-tree rob)
+      %tag     !!
     ==
     |%
+    ++  hash-bytes  ?-  hat
+                    %sha-1  20
+                    %sha-256  !!
+                    ==
     ::
     ::  Parsers
     ::
@@ -136,7 +127,7 @@
     ++  node  (cook crip (star ;~(less ace prn)))
     ::
     ++  parse-commit
-      |=  rob=raw-object
+      |=  rob=[%commit =byts]
       ^-  object
       ::  XX in places like this we need
       ::  to eventually parametrize the hash function somehow
@@ -152,7 +143,7 @@
       commit+u.com
     ::
     ++  parse-tree
-      |=  rob=raw-object
+      |=  rob=[%tree =byts]
       ^-  object
       ::  XX better parsing of mode.
       ::  Is leading zero allowed in principle?
@@ -169,11 +160,14 @@
       ?~  tex
         ~|  "Corrupted tree object: malformed tree entry"  !!
       =/  txt  (trip u.tex)
-      =^  hek  sea  (read-bytes:bys 20 [+(pos.sea) byts.sea])
+      ::  XX parametrize by hash type
+      ::
+      =^  hek  sea  (read-bytes:bys hash-bytes [+(pos.sea) byts.sea])
       ?~  hek
         ~|  "Corrupted tree object: malformed hash"  !!
+      ::  XX parametrize by hash type
       ::
-      =/  haz=@ux  (rev 3 20 u.hek)
+      =/  haz=@ux  (rev 3 hash-bytes u.hek)
       =/  ren  (scan txt ;~(plug mode node))
       =/  ent=tree-entry  [ren haz]
       $(tes [ent tes])
@@ -234,8 +228,8 @@
     =^  hed  sea  (read-header sea)
     ::  Read objects
     ::
-    :: ~&  pack+"Pack file contains {<count.hed>} objects"
-    =/  lob=(list raw-object)  ~
+    ~&  pack+"Pack file contains {<count.hed>} objects"
+    =|  lob=(list pack-object)
     =^  lob  sea
     |-
     ?:  =(0 count.hed)
@@ -245,7 +239,8 @@
     :: ~&  sea-read+[pos.sea wid.byts.sea]
     $(lob [rob lob], count.hed (dec count.hed))
     :: XX verify pack integrity
-    :: XX handle leading zeros
+    :: XX parametrize by hash type
+    ::
     =^  hax  sea  (read-bytes:bys 20 sea)
     ?~  hax
       ~|  "Pack file is corrupted: no checksum found"  !!
@@ -266,40 +261,102 @@
     =^  count  sea  (read-bytes:bys 4 sea)
     ?~  count
       ~|  "Pack file is corrupted: no object count found"  !!
+    =+  ver=(rev 3 4 u.version)
+    =+  cot=(rev 3 4 u.count)
+    ?>  ?=(%2 ver)
     :_  sea
-    [(rev 3 4 u.version) (rev 3 4 u.count)]
+    [ver cot]
   ::
   ++  read-object
     |=  sea=stream
-    ^-  [raw-object stream]
-    =^  [typ=raw-object-type size=@ud]  sea  (read-object-type-size sea)
-    ::  XX With the future stream library
-    ::  use the references to the sea
-    ::  and benchmark vs direct copy
+    ^-  [pack-object stream]
+    ::  XX something is wrong
+    ::  with the faced tuple spec mode.
+    ::  :- does not work here.
+    =/  [[typ=pack-object-type size=@ud] red=stream]
+      (read-object-type-size sea)
+    ?+  typ
+      ::  XX With the future stream library
+      ::  use the references to the sea
+      ::  and benchmark vs direct copy
+      ::
+      =^  dat  sea  (expand:zlib red)
+      ?.  =(wid.dat size)
+        ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<wid.dat>}b)"  !!
+      :_  sea
+      [typ dat]
     ::
+    %ofs-delta  (read-object-ofs pos.sea red)
+    ::
+    %ref-delta  !!
+    ::
+    ==
+  ::
+  ++  read-object-ofs
+    |=  [base=@ud sea=stream]
+    ^-  [pack-object stream]
+    =^  offset=@ud  sea  (read-offset sea)
+    ::  XX this check is wrong:
+    ::  the stream position might
+    ::  not be relative to the beginning of the packfile.
+    ::
+    ?<  |(=(0 offset) (gte offset base))
     =^  dat  sea  (expand:zlib sea)
-    ?.  =(wid.dat size)
-      ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<wid.dat>}b)"  !!
     :_  sea
-    [typ dat]
+    [%ofs-delta offset dat]
+  ::
+  ++  read-offset
+    |=  sea=stream
+    ^-  [@ud stream]
+    =+  fet=0
+    ::  XX put a safety stop
+    ::  to prevent infinite loop here
+    ::  and at read-object-type-size
+    ::
+    |-
+    =^  bay  sea  (read-bytes:bys 1 sea)
+    =+  bat=(need bay)
+    =+  fet=(add (lsh [0 7] fet) (dis 0x7f bat))
+    ?:  =(0 (dis 0x80 bat))
+      :_  sea
+      fet
+    $(fet fet)
+  ::  XX This can be just computed
+  ::  in a single loop
   ::
   ++  read-object-type-size
     |=  sea=stream
-    ^-  [[raw-object-type @ud] stream]
+    ^-  [[pack-object-type @ud] stream]
     =^  bat  sea  (read-bytes:bys 1 sea)
     ?~  bat  !!
-    =/  type  (type:obj (dis (rsh [2 1] u.bat) 0x7))
-    ?:  =(type %invalid)  !!
+    =+  tap=(dis (rsh [2 1] u.bat) 0x7)
+    =/  typ  (object-type tap)
+    ?~  typ
+      ~|  "Invalid pack object type {<tap>}"  !!
     ::  Decode object size
+    ::  XX Should really be one loop
     ::
     =/  qad  (dis u.bat 0xf)
     ?:  =(0 (dis u.bat 0x80))
       :_  sea
-      [type qad]
-    =^  sel=(list @ux)  sea  (read-object-length sea)
+      [u.typ qad]
+    =^  sel=(list @ux)  sea  (read-length-bytes sea)
     =/  size  (object-size qad sel)
     :_  sea
-    [type size]
+    [u.typ size]
+  ::
+  ++  object-type
+    |=  ryt=@ud
+    ^-  (unit pack-object-type)
+    ?+  ryt  ~
+      %1  `%commit
+      %2  `%tree
+      %3  `%blob
+      %4  `%tag
+      ::
+      %6  `%ofs-delta
+      %7  `%ref-delta
+    ==
   ::
   ++  object-size
     |=  [qad=@ux sel=(list @ux)]
@@ -314,7 +371,7 @@
     :: ~&  [qad `@ux`size]
     (add (lsh [2 1] size) qad)
   ::
-  ++  read-object-length
+  ++  read-length-bytes
     |=  sea=stream
     ^-  [(list @ux) stream]
     =/  sel=(list @ux)  ~
@@ -527,26 +584,27 @@
     =+  mis=(turn reqs.header.bud |=(haz=@ux (has haz)))
     ?:  (gth (lent mis) 0)
       ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
+    *repository
     ::  Read objects
     ::
-    =+  bos=objects.pack.bud
-    =.  repo
-    |-
-    ?~  bos
-      repo
-    $(repo (put-raw i.bos), bos t.bos)
-    ::  Read and verify references
-    ::
-    =+  ref=refs.header.bud
-    =.  repo
-    |-
-    ?~  ref
-      repo
-    ?.  (has +.i.ref)
-      ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
-    $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
-    ::
-    repo
+    :: =+  bos=objects.pack.bud
+    :: =.  repo
+    :: |-
+    :: ?~  bos
+    ::   repo
+    :: $(repo (put-raw i.bos), bos t.bos)
+    :: ::  Read and verify references
+    :: ::
+    :: =+  ref=refs.header.bud
+    :: =.  repo
+    :: |-
+    :: ?~  ref
+    ::   repo
+    :: ?.  (has +.i.ref)
+    ::   ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
+    :: $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
+    :: ::
+    :: repo
   ::
   ::  This is a configuration store mirroring the one from Git.
   ::  Configuration variables are grouped into sections with an optional
