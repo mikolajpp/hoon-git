@@ -111,9 +111,28 @@
     ++  message  (star ;~(pose prn eol))
     ++  commit
       ;~  plug
-        ;~(sfix ;~((glue eol) tree parent author committer) eol)
+        ;~  sfix
+          ;~  plug
+            ;~(sfix tree eol)
+            (star ;~(sfix parent eol))
+            ;~(sfix author eol)
+            committer
+          ==
+          eol
+        ==
         ;~(pfix eol message)
       ==
+      :: ;~  sfix
+      ::   ;~  (glue eol)
+      ::     tree
+      ::     (star ;~(sfix parent eol))
+      ::     author
+      ::     committer
+      ::   ==
+      ::   eol
+      :: ==
+      :: ;~(pfix eol message)
+      :: ==
     ::  XX is there a better way to handle a commit without a parent?
     ::
     ++  root-commit
@@ -129,18 +148,11 @@
     ++  parse-commit
       |=  rob=[%commit =byts]
       ^-  object
-      ::  XX in places like this we need
-      ::  to eventually parametrize the hash function somehow
-      ::  (if we plan to support sha-256)
-      ::
       =+  txt=(trip dat.byts.rob)
-      =+  com=(rust txt commit)
-      ?~  com
-        =+  com=(rust txt root-commit)
-        ?~  com
-          ~|  "Failed to parse commit object"  !!
-        commit+[[-<.u.com 0x0 ->.u.com] +.u.com]
-      commit+u.com
+      =+  com=(commit [[1 1] txt])
+      ?~  q.com
+        ~|  "Failed to parse commit object: syntax error {<p.com>} in {txt}"  !!
+      commit+p.u.q.com
     ::
     ++  parse-tree
       |=  rob=[%tree =byts]
@@ -195,15 +207,21 @@
     =/  len  (crip ((d-co:co 0) wid.byts.rob))
     ::  There must be a pattern for this
     =/  hed  (cat 3 (cat 3 type.rob ' ') len)
-    =/  pak  (cat 3 hed (can 3 ~[[1 0x0] byts.rob]))
+    =/  dat  (cat 3 hed (can 3 ~[[1 0x0] byts.rob]))
     ::  (can ~[type.object ' ' len 0x0 data.object])
-    =/  saz  (met 3 pak)
-    ::  XX is there any way to avoid rev?
+    =/  wid  (met 3 dat)
+    ::  XX is there a way to avoid rev?
     ::
-    =/  haz  (sha-1l:sha [saz (rev 3 saz pak)])
-    haz
+    (hash-byts-sha-1 [wid dat])
   ::
-  :: Hash a raw git object
+  ::  Hash raw bytes
+  ::
+  ++  hash-byts-sha-1
+    |=  =byts
+    (sha-1l:sha wid.byts (rev 3 wid.byts dat.byts))
+  ::
+  ::
+  ::  Hash a raw git object
   ::
   ++  hash-raw
     |=  [hat=hash-type rob=raw-object]
@@ -219,33 +237,56 @@
     |=  [hat=hash-type obe=object]
     ^-  @ux
     (hash-raw hat (rare obe))
+  ::
+  ++  print-hash
+    |=  [hat=hash-type haz=hash]
+    ^-  tape
+    ::  XX use hash type
+    ::
+    ((x-co:co 40) (rev 3 20 haz))
+  ::
   --
 ++  pak
   |%
   ++  read
     |=  sea=stream
     ^-  [pack stream]
+    ::  Record the base offset
+    ::
     =^  hed  sea  (read-header sea)
+    =/  hash-bytes=@ud
+      ?-  version.hed
+        %2  20  ::  sha-1
+      ==
     ::  Read objects
     ::
     ~&  pack+"Pack file contains {<count.hed>} objects"
-    =|  lob=(list pack-object)
+    =|  lob=(list (pair @ud pack-object))
     =^  lob  sea
+    ::
     |-
     ?:  =(0 count.hed)
       :_  sea
       lob
-    =^  rob  sea  (read-object sea)
-    :: ~&  sea-read+[pos.sea wid.byts.sea]
-    $(lob [rob lob], count.hed (dec count.hed))
+    ::  Record object offset
+    ::
+    =/  fet=@ud  pos.sea
+    =^  kob=pack-object  sea  (read-object sea)
+    %=  $
+      count.hed  (dec count.hed)
+      lob  [[fet kob] lob]
+    ==
     :: XX verify pack integrity
     :: XX parametrize by hash type
     ::
-    =^  hax  sea  (read-bytes:bys 20 sea)
+    =^  hax  sea  (read-bytes:bys hash-bytes sea)
     ?~  hax
       ~|  "Pack file is corrupted: no checksum found"  !!
     :_  sea
-    [hed lob]
+    ::  XX How to efficiently avoid the flop?
+    ::  Objects need to processed head first
+    ::
+    [hed (flop lob)]
   ::
   ++  read-header
     |=  sea=stream
@@ -286,7 +327,8 @@
       :_  sea
       [typ dat]
     ::
-    %ofs-delta  (read-object-ofs pos.sea red)
+    %ofs-delta
+    (read-object-ofs pos.sea red)
     ::
     %ref-delta  !!
     ::
@@ -303,7 +345,7 @@
     ?<  |(=(0 offset) (gte offset base))
     =^  dat  sea  (expand:zlib sea)
     :_  sea
-    [%ofs-delta offset dat]
+    [%ofs-delta base offset dat]
   ::
   ++  read-offset
     |=  sea=stream
@@ -316,11 +358,15 @@
     |-
     =^  bay  sea  (read-bytes:bys 1 sea)
     =+  bat=(need bay)
-    =+  fet=(add (lsh [0 7] fet) (dis 0x7f bat))
+    =+  tef=(add (lsh [0 7] fet) (dis 0x7f bat))
     ?:  =(0 (dis 0x80 bat))
       :_  sea
-      fet
-    $(fet fet)
+      tef
+    ::  XX find out why we need to increase
+    ::  offset by one as we go. Is the offset from
+    ::  the beginning of the %ofs-delta object *data*?
+    ::
+    $(fet +(tef))
   ::  XX This can be just computed
   ::  in a single loop
   ::
@@ -383,6 +429,11 @@
       :_  sea
       [val sel]
     $(sel [val sel])
+  ::
+  ++  is-delta
+    |=  kob=pack-object
+    ^-  ?
+    ?=(?(%ofs-delta %ref-delta) -.kob)
   --
 ::
 ++  bud
@@ -391,6 +442,7 @@
     |=  sea=stream
     ^-  [bundle stream]
     =^  hed  sea  (read-header:bud sea)
+    ~&  pack-base+pos.sea
     =^  pak  sea  (read:pak sea)
     :_  sea
     [header=hed pak]
@@ -419,13 +471,13 @@
     =<
     ::  Parse prerequisites
     ::
-    =^  reqs=(list @ux)  sea
+    =^  reqs=(list hash)  sea
     %.  ~
-    |=  reqs=(list @ux)
+    |=  reqs=(list hash)
     =+  [nex red]=(read-line:bys sea)
     ?~  nex
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  hax=(unit @ux)  (rust u.nex required)
+    =/  hax=(unit hash)  (rust u.nex required)
     ?~  hax
       :: ~&  "Failed to parse '{u.-.nex}'"
       [reqs sea]
@@ -439,7 +491,7 @@
     =+  [nex red]=(read-line:bys sea)
     ?~  nex
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  ref=(unit [@ux path])  (rust u.nex reference)
+    =/  ref=(unit [hash path])  (rust u.nex reference)
     ?~  ref
       :: ~&  "Failed to parse '{u.-.nex}'"
       [refs sea]
@@ -512,15 +564,19 @@
     |=  rob=raw-object
     ^-  repository
     =/  haz=@ux  (hash-raw:obj hash.repo rob)
+    ::  XX parametrize by hash type
+    ::
+    ~&  put-raw+haz
     ?<  (has haz)
     repo(objects (~(put by objects.repo) [haz (parse:obj hash.repo rob)]))
   ::
+  ::
   ::  Key size in half-bytes
   ::
-  ::  Why does ?= not work here?
-  ::
-  ++  key-size  ?:  =(hash.repo %sha-1)  40
-                  !!
+  ++  key-size  ?-  hash.repo
+                  %sha-1    40
+                  %sha-256  !!
+                ==
   ::
   ::  Check whether key a
   ::  is a shorthand of b
@@ -584,27 +640,70 @@
     =+  mis=(turn reqs.header.bud |=(haz=@ux (has haz)))
     ?:  (gth (lent mis) 0)
       ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
-    *repository
-    ::  Read objects
+    ::  Unpack and merge
     ::
-    :: =+  bos=objects.pack.bud
-    :: =.  repo
-    :: |-
-    :: ?~  bos
-    ::   repo
-    :: $(repo (put-raw i.bos), bos t.bos)
-    :: ::  Read and verify references
-    :: ::
-    :: =+  ref=refs.header.bud
-    :: =.  repo
-    :: |-
-    :: ?~  ref
-    ::   repo
-    :: ?.  (has +.i.ref)
-    ::   ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
-    :: $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
-    :: ::
-    :: repo
+    =+  bos=(unpack pack.bud)
+    ::  XX prevent overwriting of objects
+    ::
+    :: =.  objects.repo  (~(uni by objects.repo) bos)
+    ::  Read and verify references
+    ::
+    =+  ref=refs.header.bud
+    =.  repo
+    |-
+    ?~  ref
+      repo
+    ?.  (has +.i.ref)
+      ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
+    $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
+    ::
+    repo
+  ::
+  ::  Unpack a pack
+  ::
+  ++  unpack
+    |=  =pack
+    ^-  object-store
+    =|  bos=raw-object-store
+    =|  dex=pack-index
+    =+  lob=objects.pack
+    ::
+    =<
+    ::
+    !.
+    |-
+    ?~  lob
+      *object-store
+    =/  rob=raw-object
+    ::  XX lob is not readable
+    ::
+    ?:  ?=(pack-delta-object +.i.lob)
+      (resolve-delta-object i.lob)
+    +.i.lob
+    =+  haz=(hash-raw:obj hash.repo rob)
+    ?:  (~(has by bos) haz)
+      ~|  "Pack is invalid: object {<haz>} duplicated"  !!
+    ::
+    ~&  unpacked+[haz -.i.lob]
+    %=  $
+      bos  (~(put by bos) haz rob)
+      dex  (~(put by dex) -.i.lob haz)
+      lob  t.lob
+    ==
+    ::
+    |%
+    ::
+    ++  resolve-delta-object
+      |=  [base=@ud kob=pack-delta-object]
+      ^-  raw-object
+      ?>  ?=(%ofs-delta -.kob)
+      =+  pos=(sub base offset.kob)
+      =+  haz=(~(get by dex) pos)
+      ?~  haz
+        ~|  "Unable to resolve delta: requested base object at {<pos>}: base={<base>}, offset={<offset.kob>}"  !!
+      ~&  resolve-from+haz
+      *raw-object
+    --
   ::
   ::  This is a configuration store mirroring the one from Git.
   ::  Configuration variables are grouped into sections with an optional

@@ -13,6 +13,8 @@
 =/  bundle=bundle:libgit  -:(read:bud:libgit [0 bundle-base64])
 ~&  header.bundle
 ~&  header.pack.bundle
+=.  repo  (unbundle:git:libgit bundle)
+:: ~&  object-count+(lent ~(tap in ~(key by objects.repo)))
 0xff
 :: -:(read-object-type-size:pak:libgit [pos2 bundle-base64])
 :: =^  rob  sea  (read-object:pak:libgit [pos1 bundle-base64])
