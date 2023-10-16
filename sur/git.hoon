@@ -19,7 +19,7 @@
 +$  commit-header  $:  tree=hash
                        parent=(list hash)
                        author=[person date=[@ud ? tape]]
-                       commiter=[person date=[@ud ? tape]]
+                       committer=[person date=[@ud ? tape]]
                    ==
 +$  commit      $:  header=commit-header
                     message=tape
@@ -35,13 +35,6 @@
                       [%u @ud]
                       [%s @t]
                   ==
-::
-::  XX in the byte stream library
-::  we should only have a list of byts objects
-::  References should be handled transparently
-::  by indexing into the master store
-::
-::  [section (unit subsection)]
 ::
 +$  raw-object-store  (map hash raw-object)
 +$  object-store  (map hash object)
@@ -69,13 +62,14 @@
 +$  pack-delta-object  $>(?(%ofs-delta %ref-delta) pack-object)
 
 +$  pack-header  [version=%2 count=@ud]
+::
 ::  Pack index - a map from offset
-::  in the sea to the object id
+::  in the packfile to the object id
 ::
 +$  pack-index   (map @ud hash)
 +$  pack  [header=pack-header objects=(list (pair @ud pack-object))]
 ::
-::  Git bundle
+::  Bundle
 ::
 +$  bundle-header  [version=%2 hash=hash-type reqs=(list hash) refs=(list reference)]
 +$  bundle  [header=bundle-header =pack]

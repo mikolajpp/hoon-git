@@ -1,6 +1,7 @@
 /-  *stream
 |%
-:: Should return a unit?
+::  Should return a unit?
+::  XX should return byts, not @ux
 ::
 ++  get-bytes
   |=  [n=@ud sea=stream]
@@ -9,6 +10,7 @@
     [~ pos.sea sea]
   :_  [(add n pos.sea) sea]
   `(cut 3 [pos.sea n] dat.byts.sea)
+::  XX should return byts not @ux
 ::
 ++  read-bytes
   |=  [n=@ud sea=stream]
@@ -58,4 +60,49 @@
   ?:  =(0x0 bet)
     pin
   $(pin +(pin))
+::  Append n bytes to red from sea.
+::  Advances sea.
+::
+::  XX should return byts not @ux
+::  XX what is a jet based solution?
+::  Use blocks of bytes, or lists?
+::
+++  append-read-bytes
+  |=  [n=@ud red=stream sea=stream]
+  ^-  [stream stream]
+  ?:  =(n 0)
+    [red sea]
+  =^  byt  sea  (read-bytes n sea)
+  =+  bat=(need byt)
+  =*  byts  byts.red
+  :_  sea
+  ::
+  :-  pos.red
+  :-  (add wid.byts n)
+  (add dat.byts (lsh [3 wid.byts] bat))
+::
+::  Append n bytes to red from sea
+::  Does not advance sea.
+:::
+++  append-get-bytes
+  |=  [n=@ud red=stream sea=stream]
+  ^-  [stream stream]
+  ?:  =(n 0)
+    [red sea]
+  =+  nex=(get-bytes n sea)
+  =+  bat=(need -.nex)
+  =*  byts  byts.red
+  :_  +>.nex
+  ::
+  :-  pos.red
+  :-  (add wid.byts n)
+  (add dat.byts (lsh [3 wid.byts] bat))
+::
+++  is-dry
+  |=  sea=stream
+  (gte pos.sea wid.byts.sea)
+::
+++  is-wet
+  |=  sea=stream
+  (lth pos.sea wid.byts.sea)
 --

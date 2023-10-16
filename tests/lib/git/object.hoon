@@ -40,7 +40,7 @@
   !>  :-  %commit
     :-
     :*  tree=0xd928.f280.a489.455d.7639.6f38.4445.12be.edb0.5b50
-        parent=0x4141.6ff4.04dc.f7bb.0310.bfd7.40a3.c8c4.490e.7807
+        parent=~[0x4141.6ff4.04dc.f7bb.0310.bfd7.40a3.c8c4.490e.7807]
         author=[["Bilbo Baggins" "bilbo@shire.green"] [1.695.627.855 & "0800"]]
         commiter=[["Bilbo Baggins" "bilbo@shire.green"] [1.695.627.855 & "0800"]]
     ==

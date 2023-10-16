@@ -14,8 +14,7 @@
 ~&  header.bundle
 ~&  header.pack.bundle
 =.  repo  (unbundle:git:libgit bundle)
-:: ~&  object-count+(lent ~(tap in ~(key by objects.repo)))
-0xff
+repo
 :: -:(read-object-type-size:pak:libgit [pos2 bundle-base64])
 :: =^  rob  sea  (read-object:pak:libgit [pos1 bundle-base64])
 :: `@ux`(need -:(read-bytes:stream 10 sea))

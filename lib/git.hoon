@@ -204,12 +204,12 @@
   ++  hash-raw-sha-1
     |=  rob=raw-object
     ^-  @ux
-    =/  len  (crip ((d-co:co 0) wid.byts.rob))
+    =/  len  (crip ((d-co:co 1) wid.byts.rob))
     ::  There must be a pattern for this
     =/  hed  (cat 3 (cat 3 type.rob ' ') len)
     =/  dat  (cat 3 hed (can 3 ~[[1 0x0] byts.rob]))
     ::  (can ~[type.object ' ' len 0x0 data.object])
-    =/  wid  (met 3 dat)
+    =/  wid  (add +((met 3 hed)) wid.byts.rob)
     ::  XX is there a way to avoid rev?
     ::
     (hash-byts-sha-1 [wid dat])
@@ -380,16 +380,31 @@
     ?~  typ
       ~|  "Invalid pack object type {<tap>}"  !!
     ::  Decode object size
-    ::  XX Should really be one loop
     ::
-    =/  qad  (dis u.bat 0xf)
+    =/  siz=@ud  (dis u.bat 0xf)
     ?:  =(0 (dis u.bat 0x80))
       :_  sea
-      [u.typ qad]
-    =^  sel=(list @ux)  sea  (read-length-bytes sea)
-    =/  size  (object-size qad sel)
+      [u.typ siz]
+    =^  tiz=@ud  sea  (read-object-size sea)
+    =.  siz  (add (lsh [0 4] tiz) siz)
     :_  sea
-    [u.typ size]
+    [u.typ siz]
+  ::
+  ++  read-object-size
+    |=  sea=stream
+    ^-  [@ud stream]
+    =|  bits=@ud
+    =|  size=@ud
+    |-
+    =^  bat  sea  (read-bytes:bys 1 sea)
+    ?~  bat  !!
+    ?:  =(0 (dis u.bat 0x80))
+      :_  sea
+      (add size (lsh [0 bits] u.bat))
+    %=  $
+      size  (add size (lsh [0 bits] (dis u.bat 0x7f)))
+      bits  (add bits 7)
+    ==
   ::
   ++  object-type
     |=  ryt=@ud
@@ -642,10 +657,13 @@
       ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
     ::  Unpack and merge
     ::
-    =+  bos=(unpack pack.bud)
-    ::  XX prevent overwriting of objects
+    =+  ros=(unpack pack.bud)
+    ::  XX  Load objects
     ::
-    :: =.  objects.repo  (~(uni by objects.repo) bos)
+    =.  objects.repo
+      %-  ~(uni by objects.repo)
+      %-  ~(run by ros)
+      |=(rob=raw-object (parse:obj hash.repo rob))
     ::  Read and verify references
     ::
     =+  ref=refs.header.bud
@@ -663,46 +681,170 @@
   ::
   ++  unpack
     |=  =pack
-    ^-  object-store
-    =|  bos=raw-object-store
+    ^-  raw-object-store
+    =|  ros=raw-object-store
     =|  dex=pack-index
     =+  lob=objects.pack
     ::
     =<
     ::
-    !.
+    !:
     |-
+    ::  XX verify object count
     ?~  lob
-      *object-store
+      ros
     =/  rob=raw-object
-    ::  XX lob is not readable
+    ::  XX the lob usage is not readable
     ::
     ?:  ?=(pack-delta-object +.i.lob)
-      (resolve-delta-object i.lob)
+      ::  Resolve delta object
+      ::
+      (resolve-delta i.lob)
+      ::
     +.i.lob
     =+  haz=(hash-raw:obj hash.repo rob)
-    ?:  (~(has by bos) haz)
+    ?:  (~(has by ros) haz)
       ~|  "Pack is invalid: object {<haz>} duplicated"  !!
     ::
-    ~&  unpacked+[haz -.i.lob]
     %=  $
-      bos  (~(put by bos) haz rob)
+      ros  (~(put by ros) haz rob)
       dex  (~(put by dex) -.i.lob haz)
       lob  t.lob
     ==
     ::
     |%
     ::
-    ++  resolve-delta-object
-      |=  [base=@ud kob=pack-delta-object]
-      ^-  raw-object
+    ++  resolve-base
+      |=  [pos=@ud kob=pack-delta-object]
+      ^-  hash
       ?>  ?=(%ofs-delta -.kob)
-      =+  pos=(sub base offset.kob)
-      =+  haz=(~(get by dex) pos)
+      =+  haz=(~(get by dex) (sub pos offset.kob))
       ?~  haz
         ~|  "Unable to resolve delta: requested base object at {<pos>}: base={<base>}, offset={<offset.kob>}"  !!
-      ~&  resolve-from+haz
-      *raw-object
+      u.haz
+    ::
+    ++  resolve-delta
+      |=  [pos=@ud kob=pack-delta-object]
+      ^-  raw-object
+      ?>  ?=(%ofs-delta -.kob)
+      =+  haz=(resolve-base pos kob)
+      ::  XX only works for self-contained packs
+      ::  In general we also need to lookup the repository
+      ::
+      =+  rob=(~(got by ros) haz)
+      =/  sea=stream:libstream  [0 byts.kob]
+      ::  Read base and target sizes
+      ::
+      =^  biz  sea  (read-object-size:pak sea)
+      =^  siz  sea  (read-object-size:pak sea)
+      :: ~&  base-sz+biz
+      :: ~&  target-sz+siz
+      :: ~&  sea-stream+[pos.sea wid.byts.sea]
+      ?>  =(wid.byts.rob biz)
+      ::  New object data
+      ::
+      =|  red=stream
+      ::  Process delta instructions
+      ::  to resolve the object
+      ::
+      =<
+      |-
+      ?:  (is-dry:bys sea)
+        [type.rob byts.red]
+      =^  byt  sea  (read-bytes:bys 1 sea)
+      =+  bat=(need byt)
+      ?>  (lth pos.sea wid.byts.sea)
+      :: ~&  delta-op+[pos.sea wid.byts.sea `@ux`bat]
+      ?:  =(0x0 bat)
+        ~|  "Resolve delta: hit reserved instruction 0x00"  !!
+      =^  red  sea
+        ?:  =(0 (dis bat 0x80))
+          ::  Add data
+          ::
+          (add-data bat)
+        ::  Copy data
+        ::
+        (copy-data bat)
+      $(red red)
+      ::
+      |%
+      ::
+      ::  Add data instruction
+      ::  0xxxxxxx
+      ::
+      ++  add-data
+        |=  bat=@uxD
+        ^-  [stream stream]
+        :: ~&  resolve-add-data+`@ub`bat
+        =+  siz=(dis bat 0x7f)
+        ::  XX ideally red should be mutated in one
+        ::  place for performance
+        ::
+        :: ~&  resolve-add-sz-bytes+siz
+        (append-read-bytes:bys siz red sea)
+      ::
+      ::  Copy data instruction
+      ::  1xxxxxxx
+      ::
+      ++  copy-data
+        |=  bat=@uxD
+        ^-  [stream stream]
+        =+  ind=0
+        =+  mak=0x1
+        :: ~&  copy-data+bat
+        ::  Retrieve offset
+        ::
+        =|  offset=@ud
+        =^  offset  sea
+        |-
+        ?:  (gth mak 0x8)
+          :_  sea
+          offset
+        =^  fet=@uxD  sea
+          ?:  =(0 (dis bat mak))
+            ::  XX remove sea here and
+            ::  we get failure, but not nest
+            ::  fail
+            :_  sea
+            0x0
+          =^  tef  sea  (read-bytes:bys 1 sea)
+          ?~  tef
+            ~|  "Stream exhausted"  !!
+          :_  sea
+          u.tef
+        %=  $
+          ind  +(ind)
+          mak  (lsh [0 1] mak)
+          offset  (add offset (lsh [3 ind] fet))
+        ==
+        ::  Retrieve size
+        ::
+        =+  ind=0
+        =+  mak=0x10
+        =|  size=@ud
+        =^  size  sea
+        |-
+        ?:  (gth mak 0x40)
+          :_  sea
+          ?:  =(0 size)
+            `@ud`0x1.0000
+          size
+        =^  sal=@uxD  sea
+          ?:  =(0 (dis bat mak))
+            :_  sea
+            0x0
+          =^  las  sea  (read-bytes:bys 1 sea)
+          :_  sea
+          (need las)
+        :: ~&  [ind mak sal size]
+        %=  $
+          ind  +(ind)
+          mak  (lsh [0 1] mak)
+          size  (add size (lsh [3 ind] sal))
+        ==
+        :_  sea
+        -:(append-get-bytes:bys size red [offset byts.rob])
+      --
     --
   ::
   ::  This is a configuration store mirroring the one from Git.
