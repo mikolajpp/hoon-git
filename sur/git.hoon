@@ -39,6 +39,9 @@
 +$  raw-object-store  (map hash raw-object)
 +$  object-store  (map hash object)
 +$  config-key  [@tas (unit @t)]
+::  XX make it [hash path]
+::  as it is in Git formats
+::
 +$  reference   [path hash]
 ::  XX  Consider renaming objects -> object-store
 ::
