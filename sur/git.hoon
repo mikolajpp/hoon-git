@@ -13,7 +13,7 @@
       %blob
       %tag
   ==
-+$  raw-object  [type=object-type =byts]
++$  raw-object  [type=object-type data=stream:libstream]
 ::
 +$  person  [name=tape email=tape]
 +$  commit-header  $:  tree=hash
@@ -27,7 +27,7 @@
 +$  tree-entry  [[mode=@ta node=@ta] =hash]
 ::
 +$  object
-  $%  [%blob =byts]
+  $%  [%blob =octs]
       [%commit commit]
       [%tree (list tree-entry)]
   ==
@@ -46,7 +46,7 @@
 ::  XX  Consider renaming objects -> object-store
 ::
 +$  repository
-  $:  hash=hash-type
+  $:  =hash-type
       objects=object-store
       refs=(map path hash)
       config=(mip:libmip config-key @tas config-value)
@@ -59,23 +59,23 @@
                           %ref-delta
                       ==
 +$  pack-object  $%  raw-object
-                     [%ofs-delta base=@ud offset=@ud =byts]
-                     [%ref-delta =byts]
+                     [%ofs-delta pos=@ud base-offset=@ud =octs]
+                     [%ref-delta =octs]
                  ==
 +$  pack-delta-object  $>(?(%ofs-delta %ref-delta) pack-object)
 
 +$  pack-header  [version=%2 count=@ud]
++$  pack-file    [header=pack-header data=stream:libstream]
 ::
-::  Pack index - a map from offset
-::  in the packfile to the object id
-::
-+$  pack-index   (map @ud hash)
-+$  pack  [header=pack-header objects=(list (pair @ud pack-object))]
++$  pack-index   (map hash @ud)
++$  pack  [index=pack-index data=stream:libstream]
 ::
 ::  Bundle
 ::
 +$  bundle-header  [version=%2 hash=hash-type reqs=(list hash) refs=(list reference)]
 +$  bundle  [header=bundle-header =pack]
+::
+::  Network protocol
 ::
 +$  command
   $%  :: init

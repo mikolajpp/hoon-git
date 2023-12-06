@@ -1,45 +1,52 @@
-/-  *git, *stream
-/+  zlib, bys=stream
-|%
+/-  *git
+/+  zlib, stream
+~%  %git  ..part  ~
+::  
+::  Git core
 ::
-++  hax-sha-1  (bass 16 (stun [40 40] six:ab))
-++  hax-sha-256  !!
+::  +obj -- object
+::  +pak -- packfile
+::  +bud -- bundle
+::
+::  XX  move bundle to a separate library, 
+::  as it is not an integral part of git. 
+::
+|%
 ::
 ::  Object
 ::
 ++  obj
   |%
+  ++  hax-sha-1  (bass 16 (stun [40 40] six:ab))
+  ++  hax-sha-256  !!
   ::
   ++  type
-    |=  ryt=@ud
+    |=  tip=@ud
     ^-  (unit object-type)
-    ?+  ryt  ~
+    ?+  tip  ~
       %1  `%commit
       %2  `%tree
       %3  `%blob
       %4  `%tag
     ==
   ::
-  :: Parse raw git object
-  ::
-  :: XX should accept byts
+  :: Parse a raw git object
   ::
   ++  parse-raw
-    |=  dat=@
+    |=  =octs
     ^-  raw-object
-    =/  len  (met 3 dat)
     ::  Parse header
     ::
-    =/  pin  (find-byte:bys 0x0 [0 len dat])
-    ?.  (lth pin len)
+    =+  pin=(find-byte:stream 0x0 0+octs)
+    ?~  pin 
       ~|  "Object is corrupted: no header terminator found"  !!
-    =/  txt  (trip (cut 3 [0 pin] dat))
+    =/  txt  (trip (cut 3 [0 u.pin] q.octs))
     :: [type len]
     ::
     =/  hed  (rust txt ;~(plug sym ;~(pfix ace dip:ag)))
     ?~  hed
       ~|  "Object is corrupted: invalid header"  !!
-    ?.  =(+.u.hed (sub len +(pin)))
+    ?.  =(+.u.hed (sub p.octs +(u.pin)))
       ~|  "Object is corrupted: incorrect object length"  !!
     =/  typ=object-type
     :: XX Can we somehow cast?
@@ -48,8 +55,21 @@
           %commit  %commit
           %tree    %tree
       ==
-    =/  data=@  (cut 3 [+(pin) +.u.hed] dat)
-    [typ [+.u.hed data]]
+    [typ [+(u.pin) octs]]
+  ::  Size of the data payload
+  ::
+  ++  raw-size
+    |=  rob=raw-object
+    ^-  @ud
+    (sub p.octs.data.rob pos.data.rob)
+  ::
+  ++  raw-data
+    |=  rob=raw-object
+    ^-  octs
+    :-  (raw-size rob)
+    %^  cut  3
+      [pos.data.rob (raw-size rob)]
+    q.octs.data.rob
   ::  XX custom crip to handle null bytes properly
   ::  this is probably a bug
   ::
@@ -63,12 +83,22 @@
     ^-  object
     =<
     ?-  type.rob
-      %blob    rob
+      %blob    (parse-blob rob)
       %commit  (parse-commit rob)
       %tree    (parse-tree rob)
       %tag     !!
     ==
+    ::  XX reorganize
     |%
+    ++  parse-blob
+      |=  rob=raw-object
+      ^-  object
+      ?>  ?=(%blob -.rob)
+      =+  len=(sub p.octs.data.rob pos.data.rob)
+      :+  %blob
+      len
+      (cut 3 [pos.data.rob len] q.octs.data.rob)
+    ::
     ++  hash-bytes  ?-  hat
                     %sha-1  20
                     %sha-256  !!
@@ -78,7 +108,7 @@
     ::
     ++  eol  (just '\0a')
     ++  hax  ?-  hat
-             %sha-1  hax-sha-1
+             %sha-1    hax-sha-1
              %sha-256  hax-sha-256
              ==
     ::  Commit rules
@@ -122,64 +152,54 @@
         ==
         ;~(pfix eol message)
       ==
-      :: ;~  sfix
-      ::   ;~  (glue eol)
-      ::     tree
-      ::     (star ;~(sfix parent eol))
-      ::     author
-      ::     committer
-      ::   ==
-      ::   eol
-      :: ==
-      :: ;~(pfix eol message)
-      :: ==
-    ::  XX is there a better way to handle a commit without a parent?
-    ::
-    ++  root-commit
-      ;~  plug
-        ;~(sfix ;~((glue eol) tree author committer) eol)
-        ;~(pfix eol message)
-      ==
     ::  Tree rules
     ::
     ++  mode  (cook crip ;~(sfix (plus (shim '0' '9')) ace))
     ++  node  (cook crip (star ;~(less ace prn)))
     ::
     ++  parse-commit
-      |=  rob=[%commit =byts]
+      ::  XX looks like another compiler bug.
+      ::  Below crashes with no error 
+      :: |=  rob=$>(%commit raw-object)
+      |=  rob=raw-object
       ^-  object
-      =+  txt=(trip dat.byts.rob)
+      ?>  ?=(%commit -.rob)
+      =+  txt=(trip q:(raw-data:obj rob))
       =+  com=(commit [[1 1] txt])
       ?~  q.com
         ~|  "Failed to parse commit object: syntax error {<p.com>} in {txt}"  !!
       commit+p.u.q.com
     ::
     ++  parse-tree
-      |=  rob=[%tree =byts]
+      :: |=  rob=$>(%tree raw-object)
+      |=  rob=raw-object
       ^-  object
+      ?>  ?=(%tree -.rob)
       ::  XX better parsing of mode.
       ::  Is leading zero allowed in principle?
       ::
-      =/  sea=stream  [0 byts.rob]
+      =/  sea=stream:stream  data.rob
       ::  XX Is there a better pattern for
       ::  building a list of results?
+      ::
       =/  tes=(list tree-entry)  ~
       |-
-      ?.  (lth pos.sea wid.byts.sea)
+      ?.  (lth pos.sea p.octs.sea)
         tree+tes
-      =/  pin  (find-byte:bys 0x0 sea)
-      =^  tex  sea  (read-bytes:bys (sub pin pos.sea) sea)
+      =+  pin=(find-byte:stream 0x0 sea)
+      ?~  pin  !!
+      =^  tex  sea  (read-bytes:stream (sub u.pin pos.sea) sea)
       ?~  tex
         ~|  "Corrupted tree object: malformed tree entry"  !!
-      =/  txt  (trip u.tex)
+      =/  txt  (trip q.u.tex)
       ::  XX parametrize by hash type
       ::
-      =^  hek  sea  (read-bytes:bys hash-bytes [+(pos.sea) byts.sea])
+      =^  hek  sea  (read-bytes:stream hash-bytes [+(pos.sea) octs.sea])
       ?~  hek
         ~|  "Corrupted tree object: malformed hash"  !!
       ::  XX parametrize by hash type
       ::
-      =/  haz=@ux  (rev 3 hash-bytes u.hek)
+      =/  haz=@ux  (rev 3 hash-bytes q.u.hek)
       =/  ren  (scan txt ;~(plug mode node))
       =/  ent=tree-entry  [ren haz]
       $(tes [ent tes])
@@ -191,7 +211,7 @@
     |=  obe=object
     ^-  raw-object
     ?-  -.obe
-      %blob  obe
+      %blob    !!
       %tree    !!
       %commit  !!
     ==
@@ -204,22 +224,21 @@
   ++  hash-raw-sha-1
     |=  rob=raw-object
     ^-  @ux
-    =/  len  (crip ((d-co:co 1) wid.byts.rob))
+    =/  len  (crip ((d-co:co 1) p.octs.data.rob))
     ::  There must be a pattern for this
     =/  hed  (cat 3 (cat 3 type.rob ' ') len)
-    =/  dat  (cat 3 hed (can 3 ~[[1 0x0] byts.rob]))
+    =/  dat  (add hed (lsh [3 +((met 3 hed))] q.octs.data.rob))
+    =/  dat  (cat 3 hed (can 3 ~[[1 0x0] octs.data.rob]))
     ::  (can ~[type.object ' ' len 0x0 data.object])
-    =/  wid  (add +((met 3 hed)) wid.byts.rob)
-    ::  XX is there a way to avoid rev?
-    ::
-    (hash-byts-sha-1 [wid dat])
+    =/  wid  (add +((met 3 hed)) p.octs.data.rob)
+    :: XX is there a way to avoid rev?
+    (hash-octs-sha-1 [wid dat])
   ::
   ::  Hash raw bytes
   ::
-  ++  hash-byts-sha-1
-    |=  =byts
-    (sha-1l:sha wid.byts (rev 3 wid.byts dat.byts))
-  ::
+  ++  hash-octs-sha-1
+    |=  =octs
+    (sha-1l:sha p.octs (rev 3 p.octs q.octs))
   ::
   ::  Hash a raw git object
   ::
@@ -241,16 +260,22 @@
   ++  print-hash
     |=  [hat=hash-type haz=hash]
     ^-  tape
-    ::  XX use hash type
-    ::
-    ((x-co:co 40) (rev 3 20 haz))
-  ::
+    ?-  hat
+      %sha-1
+      ((x-co:co 40) (rev 3 20 haz))
+      ::
+      %sha-256  !!
+    ==
   --
+::
+::  Packfile
+::
 ++  pak
+  ~%  %pak  ..pak  ~
   |%
   ++  read
-    |=  sea=stream
-    ^-  [pack stream]
+    |=  sea=stream:stream
+    ^-  [pack-file stream:stream]
     ::  Record the base offset
     ::
     =^  hed  sea  (read-header sea)
@@ -258,108 +283,353 @@
       ?-  version.hed
         %2  20  ::  sha-1
       ==
+    ::  XX We simply pass the sea to avoid copying
+    ::  huge atoms. 
+    ::
+    :_  sea
+    [hed sea]
     ::  Read objects
     ::
-    ~&  pack+"Pack file contains {<count.hed>} objects"
-    =|  lob=(list (pair @ud pack-object))
-    =^  lob  sea
-    ::
-    |-
-    ?:  =(0 count.hed)
-      :_  sea
-      lob
+    :: ~&  pack+"Pack file contains {<count.hed>} objects"
+    :: =|  lob=(list (pair @ud pack-object))
+    :: =^  lob  sea
+    :: ::
+    :: !.
+    :: |-
+    :: ?:  =(0 count.hed)
+    ::   :_  sea
+    ::   lob
     ::  Record object offset
     ::
-    =/  fet=@ud  pos.sea
-    =^  kob=pack-object  sea  (read-object sea)
-    %=  $
-      count.hed  (dec count.hed)
-      lob  [[fet kob] lob]
-    ==
-    :: XX verify pack integrity
-    :: XX parametrize by hash type
-    ::
-    =^  hax  sea  (read-bytes:bys hash-bytes sea)
-    ?~  hax
-      ~|  "Pack file is corrupted: no checksum found"  !!
-    :_  sea
-    ::  XX How to efficiently avoid the flop?
-    ::  Objects need to processed head first
-    ::
-    [hed (flop lob)]
+    :: =/  fet=@ud  pos.sea
+    :: =^  kob=pack-object  sea  (read-object sea)
+    :: %=  $
+    ::   count.hed  (dec count.hed)
+    ::   lob  [[fet kob] lob]
+    :: ==
+    :: :: XX verify pack integrity
+    :: :: XX parametrize by hash type
+    :: ::
+    :: =^  hax  sea  (read-bytes:stream hash-bytes sea)
+    :: ?~  hax
+    ::   ~|  "Pack file is corrupted: no checksum found"  !!
+    :: :_  sea
+    :: [hed (flop lob)]
   ::
   ++  read-header
-    |=  sea=stream
-    ^-  [pack-header stream]
-    =^  sig  sea  (read-bytes:bys 4 sea)
+    |=  sea=stream:stream
+    ^-  [pack-header stream:stream]
+    =^  sig  sea  (read-bytes:stream 4 sea)
     ?~  sig
       ~|  "Pack file is corrupted: no signature found"  !!
-    ?.  =(u.sig 'PACK')
-      ~|  "Pack file is corrupted: invalid signature {<u.sig>}"  !!
-    =^  version  sea  (read-bytes:bys 4 sea)
+    ?.  =(q.u.sig 'PACK')
+      ~|  "Pack file is corrupted: invalid signature {<`@t`q.u.sig>} ({<p.u.sig>} bytes)"  !!
+    =^  version  sea  (read-bytes:stream 4 sea)
     ?~  version
       ~|  "Pack file is corrupted: no version found"  !!
-    =^  count  sea  (read-bytes:bys 4 sea)
+    =^  count  sea  (read-bytes:stream 4 sea)
     ?~  count
       ~|  "Pack file is corrupted: no object count found"  !!
-    =+  ver=(rev 3 4 u.version)
-    =+  cot=(rev 3 4 u.count)
+    =+  ver=(rev 3 4 q.u.version)
+    =+  cot=(rev 3 4 q.u.count)
     ?>  ?=(%2 ver)
     :_  sea
     [ver cot]
   ::
-  ++  read-object
-    |=  sea=stream
-    ^-  [pack-object stream]
-    ::  XX something is wrong
-    ::  with the faced tuple spec mode.
-    ::  :- does not work here.
-    =/  [[typ=pack-object-type size=@ud] red=stream]
-      (read-object-type-size sea)
-    ?+  typ
-      ::  XX With the future stream library
-      ::  use the references to the sea
-      ::  and benchmark vs direct copy
-      ::
-      =^  dat  sea  (expand:zlib red)
-      ?.  =(wid.dat size)
-        ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<wid.dat>}b)"  !!
-      :_  sea
-      [typ dat]
+  ++  pack-hash-bytes
+    |=  hed=pack-header
+    ^-  @ud
+    ?-  version.hed
+      %2  20
+    ==
+  ++  pack-hash-type
+    |=  hed=pack-header
+    ^-  hash-type
+    ?-  version.hed
+      %2  %sha-1
+    ==
+  ::
+  ++  index
+    |=  =pack-file
+    ^-  pack
+    =*  sea  data.pack-file
+    =+  pos=pos.sea
+    =|  count=@ud
+    =|  index=pack-index
+    =.  index
+    !.
+    |-
+    ?.  (lth count count.header.pack-file)
+      index
+    ?:  (is-dry:stream sea)
+      ~|  "Expected {<count.header.pack-file>} objects ({<count>} processed)"
+        !!
+    ~&  pack-index+"{<+(count)>}/{<count.header.pack-file>}"
+    =+  start=pos.sea
+    :: ~&  pack-offset+start
+    =^  kob=pack-object  sea  (read-pack-object sea)
+    =/  rob=raw-object
+      ?:  ?=(raw-object kob)
+        kob
+      (resolve-delta-object kob sea)
+    =+  hax=(hash-raw:obj (pack-hash-type header.pack-file) rob)
+    :: ~&  hax
+    ?:  (~(has by index) hax)
+      ~&  rob
+      ~|  "Object {<hax>} duplicated: indexed at {<(~(get by index) hax)>}"  !!
+    %=  $
+      index  (~(put by index) [hax pos])
+      count  +(count)
+    ==
+    :: XX verify pack integrity
+    :: XX parametrize by hash type
     ::
-    %ofs-delta
-    (read-object-ofs pos.sea red)
+    =^  hax  sea  
+      (read-bytes:stream (pack-hash-bytes header.pack-file) sea)
+    ?~  hax
+      ~|  "Pack file is corrupted: no checksum found"  !!
+    ~&  pack-checksum+`@ux`q:(need hax)
+    [index [pos octs.sea]]
+  ::
+  ++  resolve-delta-object
+    |=  [delta=pack-delta-object sea=stream:stream]
+    ^-  raw-object
+    ::  XX  handle ref-delta
+    ?>  ?=(%ofs-delta -.delta)
+    ::  Generate chain of delta objects terminating 
+    ::  at the first encountered non-delta object
+    ::
+    ::  XX introduce cache (map pos raw-object)
+    ::  storing certain number of recently resolved objects
+    ::
+    =/  chain=(lest pack-delta-object)
+      ~[delta]
+    =^  base=raw-object  chain
+    |-
+    :: ~&  i.chain
+    ::  XX is there a better way?
+    ::  use a lest?
+    ::
+    ?~  chain  !!
+    ?>  ?=(%ofs-delta -.i.chain)
+    =/  kob=pack-object  
+      =<  -
+      %+  read-pack-object
+        (sub pos.i.chain base-offset.i.chain)
+        octs.sea
+    ?:  ?=(pack-delta-object kob)
+      $(chain [kob chain])
+    [kob chain]
+    ::
+    :: ~&  delta-chain+(lent chain)
+    ::
+    (resolve-delta-chain base chain sea)
+  ::  Resolve a raw object from 
+  ::  a base and a chain of delta objects
+  ::
+  ++  resolve-delta-chain
+    |=  $:  base=raw-object 
+            chain=(list pack-delta-object) 
+            sea=stream:stream
+        ==
+    ^-  raw-object
+    ::  resolved object data
+    ::
+    |-
+    ?~  chain
+      base
+    =+  delta=i.chain
+    %=  $
+      chain  t.chain
+      base  (expand-delta-object base delta)
+    ==
+  ::  Resolve a delta object against
+  ::  a base
+  ::
+  ++  expand-delta-object
+    ~/  %expand-delta-object
+    |=  [base=raw-object delta=pack-delta-object]
+    ^-  raw-object
+    ?>  ?=(%ofs-delta -.delta)
+    =/  sea=stream:stream  0+octs.delta
+    ::  Read base and target sizes
+    ::
+    =^  biz=@ud  sea  (read-object-size sea)
+    =^  siz=@ud  sea  (read-object-size sea)
+    ::  Verify base size
+    ::
+    ?>  =((raw-size:obj base) biz)
+    ::  Expanded object data
+    ::
+    =|  red=stream:stream
+    ::  Process delta instructions
+    ::  to resolve the object
+    ::
+    =<
+    |-
+    ?:  (is-dry:stream sea)
+      ::  Verify target size
+      =+  rob=[type.base 0+octs.red]
+      ?>  =((raw-size:obj rob) siz)
+      rob
+      :: (parse-raw:obj octs.red)
+    =^  byt  sea  (read-byte:stream sea)
+    =+  bat=(need byt)
+    ::  XX why is this needed?
+    ?>  (lth pos.sea p.octs.sea)
+    :: ~&  delta-op+[pos.sea p.octs.sea `@ux`bat]
+    ?:  =(0x0 bat)
+      ~|  "Resolve delta: hit reserved instruction 0x00"  !!
+    =^  red  sea
+      ?:  =(0 (dis bat 0x80))
+        ::  Add data
+        ::
+        (add-data bat)
+      ::  Copy data
+      ::
+      (copy-data bat)
+    $(red red)
+    ::
+    |%
+    ::
+    ::  Add data instruction
+    ::  0xxxxxxx
+    ::
+    ++  add-data
+      |=  bat=@uxD
+      ^-  [stream:stream stream:stream]
+      =+  siz=(dis bat 0x7f)
+      (append-read-bytes:stream siz red sea)
+    ::
+    ::  Copy data instruction
+    ::  1xxxxxxx
+    ::
+    ++  copy-data
+      |=  bat=@uxD
+      ^-  [stream:stream stream:stream]
+      =+  ind=0
+      =+  mak=0x1
+      ::  Retrieve offset
+      ::
+      ::  XX this looks quite convoluted
+      ::  -- try to rewrite.
+      =|  offset=@ud
+      =^  offset  sea
+      |-
+      ?:  (gth mak 0x8)
+        :_  sea
+        offset
+      =^  fet=@uxD  sea
+        ?:  =(0 (dis bat mak))
+          ::  XX remove sea here and
+          ::  we get failure, but not nest
+          ::  fail
+          :_  sea
+          0x0
+        =^  tef  sea  (read-byte:stream sea)
+        ?~  tef
+          ~|  "Stream exhausted"  !!
+        :_  sea
+        u.tef
+      %=  $
+        ind  +(ind)
+        mak  (lsh [0 1] mak)
+        offset  (add offset (lsh [3 ind] fet))
+      ==
+      ::  Retrieve size
+      ::
+      =+  ind=0
+      =+  mak=0x10
+      =|  size=@ud
+      =^  size  sea
+      |-
+      ?:  (gth mak 0x40)
+        :_  sea
+        ?:  =(0 size)
+          `@ud`0x1.0000
+        size
+      =^  sal=@uxD  sea
+        ?:  =(0 (dis bat mak))
+          :_  sea
+          0x0
+        =^  las  sea  (read-byte:stream sea)
+        :_  sea
+        (need las)
+      :: ~&  [ind mak sal size]
+      %=  $
+        ind  +(ind)
+        mak  (lsh [0 1] mak)
+        size  (add size (lsh [3 ind] sal))
+      ==
+      :: ~&  copy-data+[size=size offset=offset]
+      :_  sea
+      =<  -
+      %^  append-get-bytes:stream  
+        size
+        red
+        [offset octs.data.base]
+    --
+  ::
+  ++  read-pack-object
+    |=  sea=stream:stream
+    ^-  [pack-object stream:stream]
+    =/  [[typ=pack-object-type size=@ud] red=stream:stream]
+      (read-object-type-size sea)
+    :: ~&  read-pack-object+pos.sea
+    :: ~&  read-pack-object+[typ size]
+    ?+  typ
+      ::
+      ::  XX
+      ::  sea could be very large (hundreds of MB)
+      ::  is modifying whole sea efficient?
+      ::
+      ::  It  seems it should be, since the big atom 
+      ::  is not modified, only the position pointer 
+      ::  is changed.
+      ::
+      ::  XX  byts v octs
+      =^  data=octs  sea  (expand:zlib red)
+      ?.  =(p.data size)
+        ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<p.data>}b)"  !!
+      :_  sea
+      ::  XX parametrize by hash type
+      ::
+      [typ 0+data]
+    ::
+    %ofs-delta  (read-object-ofs pos.sea red)
     ::
     %ref-delta  !!
     ::
     ==
   ::
   ++  read-object-ofs
-    |=  [base=@ud sea=stream]
-    ^-  [pack-object stream]
-    =^  offset=@ud  sea  (read-offset sea)
-    ::  XX this check is wrong:
+    |=  [pos=@ud sea=stream:stream]
+    ^-  [pack-object stream:stream]
+    =^  base-offset=@ud  sea  (read-offset sea)
+    ::  XX this check could be wrong
     ::  the stream position might
-    ::  not be relative to the beginning of the packfile.
+    ::  not be relative to the beginning of the packfile, 
+    ::  but, for instance, to a bundle file. 
     ::
-    ?<  |(=(0 offset) (gte offset base))
+    ?<  |(=(0 base-offset) (gte base-offset pos))
     =^  dat  sea  (expand:zlib sea)
     :_  sea
-    [%ofs-delta base offset dat]
+    [%ofs-delta pos base-offset dat]
   ::
   ++  read-offset
-    |=  sea=stream
-    ^-  [@ud stream]
+    |=  sea=stream:stream
+    ^-  [@ud stream:stream]
     =+  fet=0
     ::  XX put a safety stop
     ::  to prevent infinite loop here
     ::  and at read-object-type-size
     ::
     |-
-    =^  bay  sea  (read-bytes:bys 1 sea)
-    =+  bat=(need bay)
-    =+  tef=(add (lsh [0 7] fet) (dis 0x7f bat))
-    ?:  =(0 (dis 0x80 bat))
+    ::  XX introduce unsafe read-byte?
+    =^  bat  sea  (read-byte:stream sea)
+    ?~  bat  !!
+    =+  tef=(add (lsh [0 7] fet) (dis 0x7f u.bat))
+    ?:  =(0 (dis 0x80 u.bat))
       :_  sea
       tef
     ::  XX find out why we need to increase
@@ -371,9 +641,9 @@
   ::  in a single loop
   ::
   ++  read-object-type-size
-    |=  sea=stream
-    ^-  [[pack-object-type @ud] stream]
-    =^  bat  sea  (read-bytes:bys 1 sea)
+    |=  sea=stream:stream
+    ^-  [[pack-object-type @ud] stream:stream]
+    =^  bat  sea  (read-byte:stream sea)
     ?~  bat  !!
     =+  tap=(dis (rsh [2 1] u.bat) 0x7)
     =/  typ  (object-type tap)
@@ -391,12 +661,12 @@
     [u.typ siz]
   ::
   ++  read-object-size
-    |=  sea=stream
-    ^-  [@ud stream]
+    |=  sea=stream:stream
+    ^-  [@ud stream:stream]
     =|  bits=@ud
     =|  size=@ud
     |-
-    =^  bat  sea  (read-bytes:bys 1 sea)
+    =^  bat  sea  (read-byte:stream sea)
     ?~  bat  !!
     ?:  =(0 (dis u.bat 0x80))
       :_  sea
@@ -414,72 +684,65 @@
       %2  `%tree
       %3  `%blob
       %4  `%tag
-      ::
+      ::  5 is reserved
       %6  `%ofs-delta
       %7  `%ref-delta
     ==
-  ::
-  ++  object-size
-    |=  [qad=@ux sel=(list @ux)]
-    ^-  @ud
-    =/  sez  0
-    =/  size=@ud
-    |-
-    ?~  sel
-      sez
-    $(sel +:sel, sez (add (lsh [0 7] sez) -:sel))
-    ::
-    :: ~&  [qad `@ux`size]
-    (add (lsh [2 1] size) qad)
-  ::
-  ++  read-length-bytes
-    |=  sea=stream
-    ^-  [(list @ux) stream]
-    =/  sel=(list @ux)  ~
-    |-
-    =^  nes  sea  (read-bytes:bys 1 sea)
-    ?~  nes  !!
-    =/  val  (dis u.nes 0x7f)
-    ?:  =(0 (dis u.nes 0x80))
-      :_  sea
-      [val sel]
-    $(sel [val sel])
   ::
   ++  is-delta
     |=  kob=pack-object
     ^-  ?
     ?=(?(%ofs-delta %ref-delta) -.kob)
+  ::
+  ++  is-raw
+    |=  kob=pack-object
+    ^-  ?
+    !(is-delta kob)
+  :: ++  object-size
+  ::   |=  [qad=@ux sel=(list @ux)]
+  ::   ^-  @ud
+  ::   =/  sez  0
+  ::   =/  size=@ud
+  ::   |-
+  ::   ?~  sel
+  ::     sez
+  ::   $(sel +:sel, sez (add (lsh [0 7] sez) -:sel))
+  ::   ::
+  ::   :: ~&  [qad `@ux`size]
+  ::   (add (lsh [2 1] size) qad)
   --
+::
+::  Bundle
 ::
 ++  bud
   |%
   ++  read
-    |=  sea=stream
-    ^-  [bundle stream]
+    |=  sea=stream:stream
+    ^-  [bundle stream:stream]
     =^  hed  sea  (read-header:bud sea)
-    ~&  pack-base+pos.sea
-    =^  pak  sea  (read:pak sea)
+    =^  pack-file  sea  (read:pak sea)
+    =+  pak=(index:pak pack-file)
     :_  sea
     [header=hed pak]
   ::
   ++  read-header
-    |=  sea=stream
-    ^-  [bundle-header stream]
+    |=  sea=stream:stream
+    ^-  [bundle-header stream:stream]
     ::  Parse signature
     ::
-    =^  nex  sea  (read-line:bys sea)
-    ?~  nex
+    =^  line  sea  (read-line:stream sea)
+    ?~  line
       ~|  "Git bundle is corrupted: signature absent"  !!
     =/  signature
       ;~(sfix (cold %2 (jest '# v2 git bundle')) (just '\0a'))
-    =+  sig=(rust u.nex signature)
+    =+  sig=(rust (trip q.u.line) signature)
     ?~  sig
       ~|  "Git bundle is corrupted: invalid signature"  !!
     ::  Choose hash type and parser
     ::
-    =/  [hat=hash-type hax=_hax-sha-1]
+    =/  [hat=hash-type hax=_hax-sha-1:obj]
       ?:  ?=(%2 u.sig)
-        [%sha-1 hax-sha-1]
+        [%sha-1 hax-sha-1:obj]
       !!
     ::  Compose with parsers
     ::
@@ -489,10 +752,10 @@
     =^  reqs=(list hash)  sea
     %.  ~
     |=  reqs=(list hash)
-    =+  [nex red]=(read-line:bys sea)
-    ?~  nex
+    =+  [line red]=(read-line:stream sea)
+    ?~  line 
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  hax=(unit hash)  (rust u.nex required)
+    =/  hax=(unit hash)  (rust (trip q.u.line) required)
     ?~  hax
       :: ~&  "Failed to parse '{u.-.nex}'"
       [reqs sea]
@@ -503,20 +766,20 @@
     =^  refs=(list ^reference)  sea
     %.  ~
     |=  refs=(list ^reference)
-    =+  [nex red]=(read-line:bys sea)
-    ?~  nex
+    =+  [line red]=(read-line:stream sea)
+    ?~  line 
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  ref=(unit [hash path])  (rust u.nex reference)
+    =/  ref=(unit [hash path])  (rust (trip q.u.line) reference)
     ?~  ref
       :: ~&  "Failed to parse '{u.-.nex}'"
       [refs sea]
     $(refs [[+.u.ref -.u.ref] refs], sea red)
     :: Parse newline indicating end of bundle header
     ::
-    =^  nex  sea  (read-line:bys sea)
-    ?~  nex
+    =^  line  sea  (read-line:stream sea)
+    ?~  line
       ~|  "Git bundle is corrupted: header not terminated"  !!
-    ?:  (gth (lent u.nex) 1)
+    ?:  (gth p.u.line 1)
       ~|  "Git bundle is corrupted: invalid header terminator"  !!
     :_  sea
     [u.sig hat reqs refs]
@@ -542,7 +805,7 @@
     --
   --
 ::
-::  Repository
+::  Repository engine
 ::
 ++  git
   |_  repo=repository
@@ -568,7 +831,7 @@
   ++  put
     |=  obe=object
     ^-  repository
-    =/  haz=@ux  (hash:obj hash.repo obe)
+    =/  haz=@ux  (hash:obj hash-type.repo obe)
     ?<  (has haz)
     repo(objects (~(put by objects.repo) [haz obe]))
   ++  wyt
@@ -578,17 +841,14 @@
   ++  put-raw
     |=  rob=raw-object
     ^-  repository
-    =/  haz=@ux  (hash-raw:obj hash.repo rob)
-    ::  XX parametrize by hash type
-    ::
-    ~&  put-raw+haz
+    =/  haz=@ux  (hash-raw:obj hash-type.repo rob)
     ?<  (has haz)
-    repo(objects (~(put by objects.repo) [haz (parse:obj hash.repo rob)]))
+    repo(objects (~(put by objects.repo) [haz (parse:obj hash-type.repo rob)]))
   ::
   ::
   ::  Key size in half-bytes
   ::
-  ++  key-size  ?-  hash.repo
+  ++  key-size  ?-  hash-type.repo
                   %sha-1    40
                   %sha-256  !!
                 ==
@@ -600,16 +860,16 @@
   ::  direct atom comparison
   ::
   ++  match-key
-    |=  [a=byts b=@ux]
+    |=  [a=octs b=@ux]
     ^-  ?
     ?:  =(a b)
       &
     ::  Size in half-bytes
     ::
-    .=  dat.a
+    .=  q.a
     %+  cut  2
       :_  b
-      [(sub key-size wid.a) wid.a]
+      [(sub key-size p.a) p.a]
   ::
   ++  to-hex
     |=  a=@ta
@@ -647,205 +907,36 @@
   ++  unbundle
     |=  bud=bundle
     ^-  repository
-    ?>  =(2 version.header.bud)
-    ::  Verify we have all required objects
-    ::
-    ::  XX Can we get hash.repo+hax syntax to work?
-    ::
-    =+  mis=(turn reqs.header.bud |=(haz=@ux (has haz)))
-    ?:  (gth (lent mis) 0)
-      ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
-    ::  Unpack and merge
-    ::
-    =+  ros=(unpack pack.bud)
-    ::  XX  Load objects
-    ::
-    =.  objects.repo
-      %-  ~(uni by objects.repo)
-      %-  ~(run by ros)
-      |=(rob=raw-object (parse:obj hash.repo rob))
-    ::  Read and verify references
-    ::
-    =+  ref=refs.header.bud
-    =.  repo
-    |-
-    ?~  ref
-      repo
-    ?.  (has +.i.ref)
-      ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
-    $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
-    ::
-    repo
-  ::
-  ::  Unpack a pack
-  ::
-  ++  unpack
-    |=  =pack
-    ^-  raw-object-store
-    =|  ros=raw-object-store
-    =|  dex=pack-index
-    =+  lob=objects.pack
-    ::
-    =<
-    ::
-    !:
-    |-
-    ::  XX verify object count
-    ?~  lob
-      ros
-    =/  rob=raw-object
-    ::  XX the lob usage is not readable
-    ::
-    ?:  ?=(pack-delta-object +.i.lob)
-      ::  Resolve delta object
-      ::
-      (resolve-delta i.lob)
-      ::
-    +.i.lob
-    =+  haz=(hash-raw:obj hash.repo rob)
-    ?:  (~(has by ros) haz)
-      ~|  "Pack is invalid: object {<haz>} duplicated"  !!
-    ::
-    %=  $
-      ros  (~(put by ros) haz rob)
-      dex  (~(put by dex) -.i.lob haz)
-      lob  t.lob
-    ==
-    ::
-    |%
-    ::
-    ++  resolve-base
-      |=  [pos=@ud kob=pack-delta-object]
-      ^-  hash
-      ?>  ?=(%ofs-delta -.kob)
-      =+  haz=(~(get by dex) (sub pos offset.kob))
-      ?~  haz
-        ~|  "Unable to resolve delta: requested base object at {<pos>}: base={<base>}, offset={<offset.kob>}"  !!
-      u.haz
-    ::
-    ++  resolve-delta
-      |=  [pos=@ud kob=pack-delta-object]
-      ^-  raw-object
-      ?>  ?=(%ofs-delta -.kob)
-      =+  haz=(resolve-base pos kob)
-      ::  XX only works for self-contained packs
-      ::  In general we also need to lookup the repository
-      ::
-      =+  rob=(~(got by ros) haz)
-      =/  sea=stream:libstream  [0 byts.kob]
-      ::  Read base and target sizes
-      ::
-      =^  biz  sea  (read-object-size:pak sea)
-      =^  siz  sea  (read-object-size:pak sea)
-      :: ~&  base-sz+biz
-      :: ~&  target-sz+siz
-      :: ~&  sea-stream+[pos.sea wid.byts.sea]
-      ?>  =(wid.byts.rob biz)
-      ::  New object data
-      ::
-      =|  red=stream
-      ::  Process delta instructions
-      ::  to resolve the object
-      ::
-      =<
-      |-
-      ?:  (is-dry:bys sea)
-        [type.rob byts.red]
-      =^  byt  sea  (read-bytes:bys 1 sea)
-      =+  bat=(need byt)
-      ?>  (lth pos.sea wid.byts.sea)
-      :: ~&  delta-op+[pos.sea wid.byts.sea `@ux`bat]
-      ?:  =(0x0 bat)
-        ~|  "Resolve delta: hit reserved instruction 0x00"  !!
-      =^  red  sea
-        ?:  =(0 (dis bat 0x80))
-          ::  Add data
-          ::
-          (add-data bat)
-        ::  Copy data
-        ::
-        (copy-data bat)
-      $(red red)
-      ::
-      |%
-      ::
-      ::  Add data instruction
-      ::  0xxxxxxx
-      ::
-      ++  add-data
-        |=  bat=@uxD
-        ^-  [stream stream]
-        :: ~&  resolve-add-data+`@ub`bat
-        =+  siz=(dis bat 0x7f)
-        ::  XX ideally red should be mutated in one
-        ::  place for performance
-        ::
-        :: ~&  resolve-add-sz-bytes+siz
-        (append-read-bytes:bys siz red sea)
-      ::
-      ::  Copy data instruction
-      ::  1xxxxxxx
-      ::
-      ++  copy-data
-        |=  bat=@uxD
-        ^-  [stream stream]
-        =+  ind=0
-        =+  mak=0x1
-        :: ~&  copy-data+bat
-        ::  Retrieve offset
-        ::
-        =|  offset=@ud
-        =^  offset  sea
-        |-
-        ?:  (gth mak 0x8)
-          :_  sea
-          offset
-        =^  fet=@uxD  sea
-          ?:  =(0 (dis bat mak))
-            ::  XX remove sea here and
-            ::  we get failure, but not nest
-            ::  fail
-            :_  sea
-            0x0
-          =^  tef  sea  (read-bytes:bys 1 sea)
-          ?~  tef
-            ~|  "Stream exhausted"  !!
-          :_  sea
-          u.tef
-        %=  $
-          ind  +(ind)
-          mak  (lsh [0 1] mak)
-          offset  (add offset (lsh [3 ind] fet))
-        ==
-        ::  Retrieve size
-        ::
-        =+  ind=0
-        =+  mak=0x10
-        =|  size=@ud
-        =^  size  sea
-        |-
-        ?:  (gth mak 0x40)
-          :_  sea
-          ?:  =(0 size)
-            `@ud`0x1.0000
-          size
-        =^  sal=@uxD  sea
-          ?:  =(0 (dis bat mak))
-            :_  sea
-            0x0
-          =^  las  sea  (read-bytes:bys 1 sea)
-          :_  sea
-          (need las)
-        :: ~&  [ind mak sal size]
-        %=  $
-          ind  +(ind)
-          mak  (lsh [0 1] mak)
-          size  (add size (lsh [3 ind] sal))
-        ==
-        :_  sea
-        -:(append-get-bytes:bys size red [offset byts.rob])
-      --
-    --
+    *repository
+    :: ?>  =(2 version.header.bud)
+    :: ::  Verify we have all required objects
+    :: ::
+    :: ::  XX Can we get hash.repo+hax syntax to work?
+    :: ::
+    :: =+  mis=(turn reqs.header.bud |=(haz=@ux (has haz)))
+    :: ?:  (gth (lent mis) 0)
+    ::   ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
+    :: ::  Unpack and merge
+    :: ::
+    :: =+  ros=(index pack.bud)
+    :: ::  XX  Load objects
+    :: ::
+    :: =.  objects.repo
+    ::   %-  ~(uni by objects.repo)
+    ::   %-  ~(run by ros)
+    ::   |=(rob=raw-object (parse:obj hash-type.repo rob))
+    :: ::  Read and verify references
+    :: ::
+    :: =+  ref=refs.header.bud
+    :: =.  repo
+    :: |-
+    :: ?~  ref
+    ::   repo
+    :: ?.  (has +.i.ref)
+    ::   ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
+    :: $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
+    :: ::
+    :: repo
   ::
   ::  This is a configuration store mirroring the one from Git.
   ::  Configuration variables are grouped into sections with an optional

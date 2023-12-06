@@ -1,23 +1,23 @@
 /+  *test, *git, zlib
 |%
 ++  hat  %sha-1
-++  test-parse-raw
+++  test-parse-blob
   ;:  weld
   ::
   =/  dat  'blob 3\00oak'
-  =/  rob  (parse-raw:obj dat)
+  =/  rob  (parse-raw:obj [(met 3 dat) dat])
   %+  expect-eq
   !>  [%blob [3 'oak']]
   !>  (parse:obj hat rob)
   ::
   =/  dat  'blob 3\00fir'
-  =/  rob  (parse-raw:obj dat)
+  =/  rob  (parse-raw:obj [(met 3 dat) dat])
   %+  expect-eq
   !>  [%blob [3 'fir']]
   !>  (parse:obj hat rob)
   ::
   =/  dat  'blob 5\00maple'
-  =/  rob  (parse-raw:obj dat)
+  =/  rob  (parse-raw:obj [(met 3 dat) dat])
   %+  expect-eq
   !>  [%blob [5 'maple']]
   !>  (parse:obj hat rob)
@@ -35,7 +35,8 @@
 
   Discover new trees\0a
   """
-  =/  rob  (parse-raw:obj dat)
+  =/  octs  [(met 3 dat) dat]
+  =/  rob  (parse-raw:obj octs)
   %+  expect-eq
   !>  :-  %commit
     :-
@@ -49,7 +50,7 @@
   ::
   =/  dat  %-  need  %-  de:base64:mimes:html
   'dHJlZSA2OQAxMDA2NDQgUkVBRE1FLm1kAG5lqUXsvk61r72SKJgR5IWM1yhsNDAwMDAgdHJlZXMAGwbNWLyXaB6s5lJb9DTUapEoXck='
-  =/  rob  (parse-raw:obj q.dat)
+  =/  rob  (parse-raw:obj dat)
   %+  expect-eq
   !>  :-  %tree
       :~

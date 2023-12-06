@@ -18,7 +18,7 @@
 ++  expand
   ~/  %expand
   |=  sea=stream
-  ^-  [byts stream]
+  ^-  [octs stream]
   :_  sea
   [0 0x0]
   :: |=  sea=bit-stream

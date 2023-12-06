@@ -8,7 +8,7 @@
 =/  bundle-base64=byts  (need (de:base64:mimes:html (snag 0 .^(wain %cx file))))
 =+  sea=[0 bundle-base64]
 =^  hed  sea  (read-header:bud:libgit sea)
-=+  pos1=70.246
+:: =+  pos1=70.246
 :: =+  pos2=67.219
 =/  bundle=bundle:libgit  -:(read:bud:libgit [0 bundle-base64])
 ~&  header.bundle
