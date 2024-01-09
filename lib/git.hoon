@@ -238,6 +238,7 @@
   ::
   ++  hash-octs-sha-1
     |=  =octs
+    ^-  @ux
     (sha-1l:sha p.octs (rev 3 p.octs q.octs))
   ::
   ::  Hash a raw git object
@@ -275,6 +276,7 @@
   |%
   ++  read
     |=  sea=stream:stream
+    ?>  (gte p.octs.sea (met 3 q.octs.sea))
     ^-  [pack-file stream:stream]
     ::  Record the base offset
     ::
@@ -364,21 +366,19 @@
     ?:  (is-dry:stream sea)
       ~|  "Expected {<count.header.pack-file>} objects ({<count>} processed)"
         !!
-    ~&  pack-index+"{<+(count)>}/{<count.header.pack-file>}"
-    =+  start=pos.sea
-    :: ~&  pack-offset+start
+    ~?  =(0 (mod count 10.000))  
+      pack-index+"{<+(count)>}/{<count.header.pack-file>}"
     =^  kob=pack-object  sea  (read-pack-object sea)
     =/  rob=raw-object
       ?:  ?=(raw-object kob)
         kob
-      (resolve-delta-object kob sea)
+        (resolve-delta-object kob sea)
     =+  hax=(hash-raw:obj (pack-hash-type header.pack-file) rob)
-    :: ~&  hax
+    ?>  (gte p.octs.data.rob (met 3 q.octs.data.rob))
     ?:  (~(has by index) hax)
-      ~&  rob
       ~|  "Object {<hax>} duplicated: indexed at {<(~(get by index) hax)>}"  !!
     %=  $
-      index  (~(put by index) [hax pos])
+      index  (~(put by index) [hax pos.sea])
       count  +(count)
     ==
     :: XX verify pack integrity
@@ -410,7 +410,6 @@
     ::  XX is there a better way?
     ::  use a lest?
     ::
-    ?~  chain  !!
     ?>  ?=(%ofs-delta -.i.chain)
     =/  kob=pack-object  
       =<  -
@@ -420,8 +419,6 @@
     ?:  ?=(pack-delta-object kob)
       $(chain [kob chain])
     [kob chain]
-    ::
-    :: ~&  delta-chain+(lent chain)
     ::
     (resolve-delta-chain base chain sea)
   ::  Resolve a raw object from 
@@ -441,13 +438,14 @@
     =+  delta=i.chain
     %=  $
       chain  t.chain
-      base  (expand-delta-object base delta)
+      base   (expand-delta-object base delta)
     ==
   ::  Resolve a delta object against
   ::  a base
   ::
   ++  expand-delta-object
     ~/  %expand-delta-object
+    !:
     |=  [base=raw-object delta=pack-delta-object]
     ^-  raw-object
     ?>  ?=(%ofs-delta -.delta)
@@ -456,6 +454,7 @@
     ::
     =^  biz=@ud  sea  (read-object-size sea)
     =^  siz=@ud  sea  (read-object-size sea)
+    ~&  expand-to+[type=type.base biz siz]
     ::  Verify base size
     ::
     ?>  =((raw-size:obj base) biz)
@@ -499,6 +498,7 @@
       |=  bat=@uxD
       ^-  [stream:stream stream:stream]
       =+  siz=(dis bat 0x7f)
+      :: ~&  add-data+siz=siz
       (append-read-bytes:stream siz red sea)
     ::
     ::  Copy data instruction
@@ -573,22 +573,11 @@
   ++  read-pack-object
     |=  sea=stream:stream
     ^-  [pack-object stream:stream]
-    =/  [[typ=pack-object-type size=@ud] red=stream:stream]
+    =+  pos=pos.sea
+    =^  [typ=pack-object-type size=@ud]  sea
       (read-object-type-size sea)
-    :: ~&  read-pack-object+pos.sea
-    :: ~&  read-pack-object+[typ size]
     ?+  typ
-      ::
-      ::  XX
-      ::  sea could be very large (hundreds of MB)
-      ::  is modifying whole sea efficient?
-      ::
-      ::  It  seems it should be, since the big atom 
-      ::  is not modified, only the position pointer 
-      ::  is changed.
-      ::
-      ::  XX  byts v octs
-      =^  data=octs  sea  (expand:zlib red)
+      =^  data=octs  sea  (expand:zlib sea)
       ?.  =(p.data size)
         ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<p.data>}b)"  !!
       :_  sea
@@ -596,7 +585,7 @@
       ::
       [typ 0+data]
     ::
-    %ofs-delta  (read-object-ofs pos.sea red)
+    %ofs-delta  (read-object-ofs pos sea)
     ::
     %ref-delta  !!
     ::
@@ -816,34 +805,34 @@
   ++  get
     |=  haz=@ux
     ^-  (unit object)
-    (~(get by objects.repo) haz)
+    (~(get by object-store.repo) haz)
   ::
   ++  got
     |=  haz=@ux
     ^-  object
-    (~(got by objects.repo) haz)
+    (~(got by object-store.repo) haz)
   ::
   ++  has
     |=  haz=@ux
     ^-  ?
-    (~(has by objects.repo) haz)
+    (~(has by object-store.repo) haz)
   ::
   ++  put
     |=  obe=object
     ^-  repository
     =/  haz=@ux  (hash:obj hash-type.repo obe)
     ?<  (has haz)
-    repo(objects (~(put by objects.repo) [haz obe]))
+    repo(object-store (~(put by object-store.repo) [haz obe]))
   ++  wyt
     |-
-    ~(wyt by objects.repo)
+    ~(wyt by object-store.repo)
   ::
   ++  put-raw
     |=  rob=raw-object
     ^-  repository
     =/  haz=@ux  (hash-raw:obj hash-type.repo rob)
     ?<  (has haz)
-    repo(objects (~(put by objects.repo) [haz (parse:obj hash-type.repo rob)]))
+    repo(object-store (~(put by object-store.repo) [haz (parse:obj hash-type.repo rob)]))
   ::
   ::
   ::  Key size in half-bytes
@@ -895,7 +884,7 @@
     :: results in mull-grow
     ::
     =+  key=[(met 3 a) (to-hex a)]
-    =/  kel=(list @ux)  ~(tap in ~(key by objects.repo))
+    =/  kel=(list @ux)  ~(tap in ~(key by object-store.repo))
     =|  hey=(list @ux)
     |-
     ?~  kel
@@ -921,8 +910,8 @@
     :: =+  ros=(index pack.bud)
     :: ::  XX  Load objects
     :: ::
-    :: =.  objects.repo
-    ::   %-  ~(uni by objects.repo)
+    :: =.  object-store.repo
+    ::   %-  ~(uni by object-store.repo)
     ::   %-  ~(run by ros)
     ::   |=(rob=raw-object (parse:obj hash-type.repo rob))
     :: ::  Read and verify references

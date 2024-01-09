@@ -43,14 +43,6 @@
 ::  as it is in Git formats
 ::
 +$  reference   [path hash]
-::  XX  Consider renaming objects -> object-store
-::
-+$  repository
-  $:  =hash-type
-      objects=object-store
-      refs=(map path hash)
-      config=(mip:libmip config-key @tas config-value)
-  ==
 ::
 ::  Pack file
 ::
@@ -70,21 +62,29 @@
 +$  pack-index   (map hash @ud)
 +$  pack  [index=pack-index data=stream:libstream]
 ::
++$  repository
+  $:  =hash-type
+      =object-store
+      archive=(list pack)
+      refs=(map path hash)
+      config=(mip:libmip config-key @tas config-value)
+  ==
+::
 ::  Bundle
 ::
 +$  bundle-header  [version=%2 hash=hash-type reqs=(list hash) refs=(list reference)]
 +$  bundle  [header=bundle-header =pack]
 ::
-::  Network protocol
+::  Agent commands
 ::
 +$  command
-  $%  :: init
-      [%init name=@tas]
-      :: List repositories
-      [%ls ~]
+  $%  [%init name=@tas]
+      [%clone name=@tas url=@t]
+      [%list ~]
+      [%delete name=@tas]
       :: hash-object
-      [%hash-object repository=(unit @tas) type=object-type data=@]
+      :: [%hash-object repository=(unit @tas) type=object-type data=@]
       :: cat-file
-      [%cat-file repository=@tas hash=@ta]
+      :: [%cat-file repository=@tas hash=@ta]
   ==
 --
