@@ -44,10 +44,12 @@
     |=  com=command:git
     ^-  (quip card _state)
     ?-  -.com
-      %init    (init:cmd +.com)
-      %clone   (clone:cmd +.com)
-      %list    list:cmd
-      %delete  (delete:cmd +.com)
+      %init      (init:cmd +.com)
+      %cat-file  (cat-file:cmd +.com)
+      %clone     (clone:cmd +.com)
+      %delete    (delete:cmd +.com)
+      %pull      (pull:cmd +.com)
+      %list      list:cmd
     ==
   --
 ::
@@ -58,19 +60,61 @@
 ++  on-arvo
   |=  [=wire sign=sign-arvo]
   ^-  (quip card _this)
-  ?>  ?=([%clone %pack @tas ~] wire)
-  =+  name=i.t.t.wire
-  ?:  (~(has by repos.state.this) name)
-    ~|  "Repository {<name>} already exists"  !!
-  ?>  ?=([%khan %arow *] sign)
-  ?:  ?=(%| -.p.sign)
-    ((slog leaf+<p.p.sign> ~) `this)
-  =+  pack=!<(pack:git q.p.p.sign)
-  ~&  "Successfully cloned new repository {<name>}"
-  =|  repo=repository:git
-  =.  repo  repo(archive [pack ~])
-  =+  repos=(~(put by repos.state) [name repo])
-  `this(repos.state repos)
+  ?+  wire  !!
+    ::  /clone/repo
+    [%clone @tas ~]
+      =+  name=i.t.wire
+      ?>  ?=([%khan %arow *] sign)
+      ?:  ?=(%| -.p.sign)
+         %-  (slog +.p.p.sign)
+         ~&  clone-failed+name
+         `this(repos.state (~(del by repos.state) name))
+      =/  [refs=(^list reference:git) pack=pack:git]
+        !<  [(^list reference:git) pack:git]
+        q.p.p.sign
+      ~&  "Successfully cloned new repository {<name>}"
+      =+  repo=(~(got by repos.state) name)
+      =/  origin=remote:git
+        %-  got:~(phone git remote.repo) %origin
+      =.  refs.origin  (malt refs)
+      ::
+      =|  repo=repository:git
+      ::  Find main branch
+      ::
+      =+  main=(find-main-branch:git refs)
+      ?~  main
+        ~|  "No main branch detected"  !!
+      =.  repo  =~  repo
+        (put:~(refer git .) u.main)
+        (put:~(track git .) -.u.main
+        (put:~(phone git .) %origin origin)
+      ==
+      `this(repos.state  (~(put by repos.state) name repo))
+    ::  /fetch/repo/remote
+    ::
+    ::  /pull/repo/remote
+    [%pull @tas @tas ~]
+      =+  repo-name=i.t.wire
+      =+  remote-name=i.t.t.wire
+      ?>  ?=([%khan %arow *] sign)
+      ?:  ?=(%| -.p.sign)
+        ~&  fetch-failed+name
+        %-  (slog +.p.p.sign)
+        `this
+      =+  fetch-pack=!<(fetch-pack:git q.p.p.sign)
+      ~&  "Successfully fetched refs for {<remote-name>}"
+      =+  repo=(~(got by repos.state) repo-name
+      =.  repo 
+        =~  repo
+          (receive-pack:~(store git .) pack.fetch-pack)
+          (update-refs:~(phone git .) remote-name refs.fetch-pack)
+          (update:~(track git .) remote-name refs.fetch-pack)
+        ==
+      ::  Update the master branch
+      ::
+      `this(repos.state (~(put by repos.state) repo-name repo))
+  ==
+::
 ++  on-fail    on-fail:def
 --
 |_  =bowl:gall
@@ -84,15 +128,43 @@
     `state
   ~&  "Initialized empty Git repository {<name>}"
   `state(repos (~(put by repos) name *repository:git))
+::
 ++  clone
   |=  [name=@tas url=@t]
   ^-  (quip card _state)
-  =+  ted=[%fard q.byk.bowl %git-clone %noun !>(`url)]
+  ?:  (~(has by repos.state) name)
+    ~|  "Repository {<name>} already exists"  !!
+  =+  ted=[%fard q.byk.bowl %git-clone %noun !>(url)]
+  ::  Start the clone thread
+  ::
+  :-
+  [%pass ~[%clone name] %arvo %k ted]~
+  ::  Create an empty repository
+  ::
+  =/  origin=remote:git
+    [url ~]
+  =|  repo=repository:git
+  =.  remotes.repo
+    (malt ~[[%origin origin]])
+  state(repos (~(put by repos) [name repo]))
+::
+++  pull
+  |=  [name=@tas remote=@tas]
+  ^-  (quip card _state)
+  =+  repo=(~(get by repos.state) name)
+  ?~  repo
+    ~|  "Repository {<name>} not found"  !!
+  ?.  (~(has by remotes.u.repo) remote)
+    ~|  "Remote {<remote>} not found"  !!
+  =+  ted=[%fard q.byk.bowl %git-fetch %noun !>([u.repo remote])]
   :_  state
-  [%pass [%clone %pack name ~] %arvo %k ted]~
+  :~
+    [%pass ~[%pull name remote] %arvo %k ted]
+  ==
 ::
 ++  delete
   |=  name=@tas
+  ~&  delete-repo+name
   ^-  (quip card _state)
   ?:  (~(has by repos) name)
     ~&  "Deleted Git repository {<name>}"
@@ -118,19 +190,22 @@
 ::   =.  repo  (~(put go:git repo) [%blob [(met 3 data) data]])
 ::   `state(repos (~(put by repos) u.repository repo))
 ::
-:: ++  cmd-cat-file
-::   |=  [repository=@tas hash=@ta]
-::   ^-  (quip card _state)
-::   ?:  (lth (met 3 hash) 4)
-::     ~|  "Not a valid object name {<hash>}"  !!
-::   =/  repo  (~(got by repos) repository)
-::   =/  keys  (~(find-key go:git repo) hash)
-::   ?~  keys
-::     ~|  "Not a valid object name {<hash>}"  !!
-::   ?:  (gth (lent keys) 1)
-::     ~|  "Short object ID {<hash>} is ambigous"
-::     ~|  "{<keys>}"
-::     !!
-::   ~&  (~(got go:git repo) [%sha-1 i.keys])
-::   `state
+++  cat-file
+  |=  [repository=@tas hash=@ta]
+  ^-  (quip card _state)
+  ?:  (lth (met 3 hash) 4)
+    ~|  "Not a valid object name {<hash>}"  !!
+  =/  repo  (~(got by repos) repository)
+  ?~  archive.object-store.repo  !!
+  =/  keys
+    (~(find-keys pak:git i.archive.object-store.repo) hash)
+  ?~  keys
+    ~|  "No object found for {<hash>}"  !!
+  ?:  (gth (lent keys) 1)
+    ~|  "Short object ID {<hash>} is ambiguous"
+    ~|  "{<keys>}"
+    !!
+  ~&  cat-file+i.keys
+  ~&  (~(got pak:git i.archive.object-store.repo) i.keys)
+  `state
 --

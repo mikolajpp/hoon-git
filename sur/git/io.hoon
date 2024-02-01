@@ -8,4 +8,7 @@
                  caps=(list @t)
                  args=(list @t)
              ==
++$  fetch-pack  $:  [=refs =pack]
+                    main=(unit [reference hash])
+                ==
 --

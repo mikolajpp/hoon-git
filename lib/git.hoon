@@ -2,16 +2,51 @@
 /+  zlib, stream
 ~%  %git  ..part  ~
 ::  
-::  Git core
+::  Git core library
 ::
-::  +obj -- object
+::  +obj -- objects
 ::  +pak -- packfile
-::  +bud -- bundle
-::
-::  XX  move bundle to a separate library, 
-::  as it is not an integral part of git. 
+::  +git -- repository engine
+::    +refer -- references
+::    +store -- object store
+::    +track -- tracking braches
+::    +phone -- remotes
+::    +tweak -- configuration
 ::
 |%
+::  
+::  Utility functions
+::
+++  key-size  
+  |=  hat=hash-type
+  ?-  hat
+    %sha-1    40
+    %sha-256  !!
+  ==
+++  match-key
+  |=  [kes=@ud a=octs b=@ux]
+  ^-  ?
+  ?:  =(a b)
+    &
+  ::  Size in half-bytes
+  ::
+  .=  q.a
+  %+  cut  2
+    :_  b
+    [(sub kes p.a) p.a]
+::
+++  to-hex
+  |=  a=@ta
+  =+  hex=0x0
+  |-
+  ?:  =(a 0)
+    hex
+  =+  dit=(end [3 1] a)
+  =/  val=@ux
+  ?:  (gth dit '9')
+    (add (sub dit 'a') 10)
+  (sub dit '0')
+  $(a (rsh [3 1] a), hex (add (lsh [2 1] hex) val))
 ::
 ::  Object
 ::
@@ -32,7 +67,7 @@
   ::
   :: Parse a raw git object
   ::
-  ++  parse-raw
+  ++  parse-octs
     |=  =octs
     ^-  raw-object
     ::  Parse header
@@ -78,7 +113,7 @@
     ^-  @t
     (rep 3 a)
   ::
-  ++  parse
+  ++  parse-raw
     |=  [hat=hash-type rob=raw-object]
     ^-  object
     =<
@@ -139,6 +174,29 @@
       ;~(plug person ;~(pfix ace time))
       ==
     ++  message  (star ;~(pose prn eol))
+    ++  gpg-header-begin
+      ;~  pose
+        (jest '-----BEGIN PGP SIGNATURE-----')
+        (jest '-----BEGIN PGP MESSAGE-----')
+      ==
+    ++  gpg-header-end
+      ;~  pose
+        (jest '-----END PGP SIGNATURE-----')
+        (jest '-----END PGP MESSAGE-----')
+      ==
+    ++  commit-signature
+      ;~  pfix
+        ;~  plug
+          (jest 'gpgsig')
+          ace
+          gpg-header-begin
+        ==
+      ;~  sfix
+        (stag %gpg (cook crip (plus ;~(less hep ;~(pose prn gah)))))
+        ;~(plug gpg-header-end eol ace)
+      ==
+      
+      ==
     ++  commit
       ;~  plug
         ;~  sfix
@@ -147,6 +205,7 @@
             (star ;~(sfix parent eol))
             ;~(sfix author eol)
             committer
+            (punt ;~(pfix eol commit-signature))
           ==
           eol
         ==
@@ -269,11 +328,11 @@
     ==
   --
 ::
-::  Packfile
+::  Pack
 ::
 ++  pak
   ~%  %pak  ..pak  ~
-  |%
+  |_  =pack:git
   ++  read
     |=  sea=stream:stream
     ?>  (gte p.octs.sea (met 3 q.octs.sea))
@@ -281,42 +340,8 @@
     ::  Record the base offset
     ::
     =^  hed  sea  (read-header sea)
-    =/  hash-bytes=@ud
-      ?-  version.hed
-        %2  20  ::  sha-1
-      ==
-    ::  XX We simply pass the sea to avoid copying
-    ::  huge atoms. 
-    ::
     :_  sea
     [hed sea]
-    ::  Read objects
-    ::
-    :: ~&  pack+"Pack file contains {<count.hed>} objects"
-    :: =|  lob=(list (pair @ud pack-object))
-    :: =^  lob  sea
-    :: ::
-    :: !.
-    :: |-
-    :: ?:  =(0 count.hed)
-    ::   :_  sea
-    ::   lob
-    ::  Record object offset
-    ::
-    :: =/  fet=@ud  pos.sea
-    :: =^  kob=pack-object  sea  (read-object sea)
-    :: %=  $
-    ::   count.hed  (dec count.hed)
-    ::   lob  [[fet kob] lob]
-    :: ==
-    :: :: XX verify pack integrity
-    :: :: XX parametrize by hash type
-    :: ::
-    :: =^  hax  sea  (read-bytes:stream hash-bytes sea)
-    :: ?~  hax
-    ::   ~|  "Pack file is corrupted: no checksum found"  !!
-    :: :_  sea
-    :: [hed (flop lob)]
   ::
   ++  read-header
     |=  sea=stream:stream
@@ -353,13 +378,13 @@
   ::
   ++  index
     |=  =pack-file
-    ^-  pack
+    ^-  pack:git
     =*  sea  data.pack-file
     =+  pos=pos.sea
     =|  count=@ud
     =|  index=pack-index
     =.  index
-    !.
+    :: !.
     |-
     ?.  (lth count count.header.pack-file)
       index
@@ -368,17 +393,16 @@
         !!
     ~?  =(0 (mod count 10.000))  
       pack-index+"{<+(count)>}/{<count.header.pack-file>}"
-    =^  kob=pack-object  sea  (read-pack-object sea)
+    =+  beg=pos.sea
+    =^  pob=pack-object  sea  (read-pack-object sea)
     =/  rob=raw-object
-      ?:  ?=(raw-object kob)
-        kob
-        (resolve-delta-object kob sea)
+      (resolve-object pob sea)
     =+  hax=(hash-raw:obj (pack-hash-type header.pack-file) rob)
     ?>  (gte p.octs.data.rob (met 3 q.octs.data.rob))
     ?:  (~(has by index) hax)
       ~|  "Object {<hax>} duplicated: indexed at {<(~(get by index) hax)>}"  !!
     %=  $
-      index  (~(put by index) [hax pos.sea])
+      index  (put:pion:git index hax beg)
       count  +(count)
     ==
     :: XX verify pack integrity
@@ -389,8 +413,15 @@
     ?~  hax
       ~|  "Pack file is corrupted: no checksum found"  !!
     ~&  pack-checksum+`@ux`q:(need hax)
+    :-  (pack-hash-type header.pack-file)
     [index [pos octs.sea]]
   ::
+  ++  resolve-object
+    |=  [pob=pack-object sea=stream:stream]
+    ^-  raw-object
+    ?:  ?=(raw-object pob)
+      pob
+    (resolve-delta-object pob sea)
   ++  resolve-delta-object
     |=  [delta=pack-delta-object sea=stream:stream]
     ^-  raw-object
@@ -682,250 +713,190 @@
     |=  kob=pack-object
     ^-  ?
     ?=(?(%ofs-delta %ref-delta) -.kob)
+  :: 
+  ::  Object access
   ::
-  ++  is-raw
-    |=  kob=pack-object
-    ^-  ?
-    !(is-delta kob)
-  :: ++  object-size
-  ::   |=  [qad=@ux sel=(list @ux)]
-  ::   ^-  @ud
-  ::   =/  sez  0
-  ::   =/  size=@ud
-  ::   |-
-  ::   ?~  sel
-  ::     sez
-  ::   $(sel +:sel, sez (add (lsh [0 7] sez) -:sel))
-  ::   ::
-  ::   :: ~&  [qad `@ux`size]
-  ::   (add (lsh [2 1] size) qad)
-  --
-::
-::  Bundle
-::
-++  bud
-  |%
-  ++  read
-    |=  sea=stream:stream
-    ^-  [bundle stream:stream]
-    =^  hed  sea  (read-header:bud sea)
-    =^  pack-file  sea  (read:pak sea)
-    =+  pak=(index:pak pack-file)
-    :_  sea
-    [header=hed pak]
-  ::
-  ++  read-header
-    |=  sea=stream:stream
-    ^-  [bundle-header stream:stream]
-    ::  Parse signature
-    ::
-    =^  line  sea  (read-line:stream sea)
-    ?~  line
-      ~|  "Git bundle is corrupted: signature absent"  !!
-    =/  signature
-      ;~(sfix (cold %2 (jest '# v2 git bundle')) (just '\0a'))
-    =+  sig=(rust (trip q.u.line) signature)
-    ?~  sig
-      ~|  "Git bundle is corrupted: invalid signature"  !!
-    ::  Choose hash type and parser
-    ::
-    =/  [hat=hash-type hax=_hax-sha-1:obj]
-      ?:  ?=(%2 u.sig)
-        [%sha-1 hax-sha-1:obj]
-      !!
-    ::  Compose with parsers
-    ::
-    =<
-    ::  Parse prerequisites
-    ::
-    =^  reqs=(list hash)  sea
-    %.  ~
-    |=  reqs=(list hash)
-    =+  [line red]=(read-line:stream sea)
-    ?~  line 
-      ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  hax=(unit hash)  (rust (trip q.u.line) required)
-    ?~  hax
-      :: ~&  "Failed to parse '{u.-.nex}'"
-      [reqs sea]
-    $(reqs [u.hax reqs], sea red)
-    ::
-    ::  Parse references
-    ::
-    =^  refs=(list ^reference)  sea
-    %.  ~
-    |=  refs=(list ^reference)
-    =+  [line red]=(read-line:stream sea)
-    ?~  line 
-      ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  ref=(unit [hash path])  (rust (trip q.u.line) reference)
-    ?~  ref
-      :: ~&  "Failed to parse '{u.-.nex}'"
-      [refs sea]
-    $(refs [[+.u.ref -.u.ref] refs], sea red)
-    :: Parse newline indicating end of bundle header
-    ::
-    =^  line  sea  (read-line:stream sea)
-    ?~  line
-      ~|  "Git bundle is corrupted: header not terminated"  !!
-    ?:  (gth p.u.line 1)
-      ~|  "Git bundle is corrupted: invalid header terminator"  !!
-    :_  sea
-    [u.sig hat reqs refs]
-    ::
-    ::  Parsers
-    ::
+  ++  obj
     |%
-    ++  comment  ;~(pfix ace (star prn))
-    ++  required
-      %+  ifix  [hep (just '\0a')]
-      ;~(sfix hax (punt comment))
-    ++  segment
-      (cook crip ;~(plug low (star ;~(pose low nud hep))))
-    ++  paf
-      ;~  pose
-        ;~(plug segment (star ;~(pfix fas segment)))
-      ==
-    ++  reference
-      ;~  sfix
-        ;~(plug hax ;~(pfix ace paf))
-        (just '\0a')
-      ==
+    ++  get-raw
+      |=  hax=hash
+      ^-  (unit raw-object)
+      =+  pin=(get:pion index.pack hax)
+      ?~  pin
+        ~
+      =+  sea=[u.pin octs.data.pack]
+      =^  pob  sea  (read-pack-object sea)
+      `(resolve-object pob sea)
+    ++  get
+      |=  hax=hash
+      ^-  (unit object)
+      =+  obe=(get-raw hax)
+      ::  XX Why is this function called a bind?
+      ::
+      (bind obe (cury parse-raw:obj hash-type.pack))
+    ++  got-raw
+      |=  hax=hash
+      ^-  raw-object
+      =+  pin=(get:pion index.pack hax)
+      ?~  pin  !!
+      =+  sea=[u.pin octs.data.pack]
+      =^  pob  sea  (read-pack-object sea)
+      (resolve-object pob sea)
+    ++  got
+      |=  hax=hash
+      ^-  object
+      =+  obe=(got-raw hax)
+      (parse-raw:obj hash-type.pack obe)
+    ++  has
+      |=  hax=hash
+      ^-  ?
+      (~(has by index.pack) hax)
+    ::
+    ::  Find objects whose hashes match the 
+    ::  key @a
+    ::
+    ++  find-by-key
+      |=  a=@ta
+      ^-  (list hash)
+      =+  kex=(to-hex a)
+      =+  key=[(met 3 a) kex]
+      ::  The matching keys are in the range a..a+1
+      ::
+      =+  len=(met 3 (crip ((x-co:co 0) +(kex))))
+      =+  fen=(sub (key-size hash-type.pack) len)
+      =+  end=(lsh [2 fen] +(kex))
+      =|  hey=(list @ux)
+      =<  -  
+      %^  (dip:pion _hey)  
+        index.pack
+      hey
+        |=  [hey=(list @ux) item=[hash @ud]]
+        ?.  (compare:pion -.item end)
+          [`+.item & hey]
+        ?:  (match-key (key-size hash-type.pack) key -.item)
+          [`+.item & [-.item hey]]
+        [`+.item | hey]
     --
   --
 ::
 ::  Repository engine
 ::
+::    +store -- object store
+::    +refer -- references
+::    +track -- tracking braches
+::    +phone -- remotes
+::    +tweak -- configuration
+::
 ++  git
   |_  repo=repository
   +*  this  .
-  ::
-  ::  XX validate hash type?
-  ::
-  ++  get
-    |=  haz=@ux
-    ^-  (unit object)
-    (~(get by object-store.repo) haz)
-  ::
-  ++  got
-    |=  haz=@ux
-    ^-  object
-    (~(got by object-store.repo) haz)
-  ::
-  ++  has
-    |=  haz=@ux
-    ^-  ?
-    (~(has by object-store.repo) haz)
-  ::
-  ++  put
-    |=  obe=object
-    ^-  repository
-    =/  haz=@ux  (hash:obj hash-type.repo obe)
-    ?<  (has haz)
-    repo(object-store (~(put by object-store.repo) [haz obe]))
-  ++  wyt
-    |-
-    ~(wyt by object-store.repo)
-  ::
-  ++  put-raw
-    |=  rob=raw-object
-    ^-  repository
-    =/  haz=@ux  (hash-raw:obj hash-type.repo rob)
-    ?<  (has haz)
-    repo(object-store (~(put by object-store.repo) [haz (parse:obj hash-type.repo rob)]))
-  ::
-  ::
-  ::  Key size in half-bytes
-  ::
-  ++  key-size  ?-  hash-type.repo
-                  %sha-1    40
-                  %sha-256  !!
-                ==
-  ::
-  ::  Check whether key a
-  ::  is a shorthand of b
-  ::
-  ::  XX This could be done with
-  ::  direct atom comparison
-  ::
-  ++  match-key
-    |=  [a=octs b=@ux]
-    ^-  ?
-    ?:  =(a b)
-      &
-    ::  Size in half-bytes
+  ++  store
+    |%
     ::
-    .=  q.a
-    %+  cut  2
-      :_  b
-      [(sub key-size p.a) p.a]
-  ::
-  ++  to-hex
-    |=  a=@ta
-    =+  hex=0x0
-    |-
-    ?:  =(a 0)
-      hex
-    =+  dit=(end [3 1] a)
-    =/  val=@ux
-    ?:  (gth dit '9')
-      (add (sub dit 'a') 10)
-    (sub dit '0')
-    $(a (rsh [3 1] a), hex (add (lsh [2 1] hex) val))
-  ::
-  :: Find all keys matching the abbreviation
-  ::
-  ++  find-key
-    |=  a=@ta
-    ^-  (list @ux)
+    ::  XX validate hash type?
     ::
-    :: XX why does dispatching on non-empty set does not work?
-    :: ?~  keys  followed by =/  heys  ~(tap in keys)
-    :: results in mull-grow
+    :: ++  get
+    ::   |=  haz=@ux
+    ::   ^-  (unit object)
+    ::   (~(get by object-store.repo) haz)
+    :: ::
+    :: ++  got
+    ::   |=  haz=@ux
+    ::   ^-  object
+    ::   (~(got by object-store.repo) haz)
+    :: ::
+    :: ++  has
+    ::   |=  haz=@ux
+    ::   ^-  ?
+    ::   (~(has by object-store.repo) haz)
+    :: ::
+    :: ++  put
+    ::   |=  obe=object
+    ::   ^-  repository
+    ::   =/  haz=@ux  (hash:obj hash-type.repo obe)
+    ::   ?<  (has haz)
+    ::   repo(object-store (~(put by object-store.repo) [haz obe]))
+    :: ++  wyt
+    ::   |-
+    ::   ~(wyt by object-store.repo)
+    :: ::
+    :: ++  put-raw
+    ::   |=  rob=raw-object
+    ::   ^-  repository
+    ::   =/  haz=@ux  (hash-raw:obj hash-type.repo rob)
+    ::   ?<  (has haz)
+    ::   repo(object-store (~(put by object-store.repo) [haz (parse:obj hash-type.repo rob)]))
     ::
-    =+  key=[(met 3 a) (to-hex a)]
-    =/  kel=(list @ux)  ~(tap in ~(key by object-store.repo))
-    =|  hey=(list @ux)
-    |-
-    ?~  kel
-      hey
-    ?:  (match-key key i.kel)
-      $(kel t.kel, hey [i.kel hey])
-    $(kel t.kel)
-  ::
-  ++  unbundle
-    |=  bud=bundle
-    ^-  repository
-    *repository
-    :: ?>  =(2 version.header.bud)
-    :: ::  Verify we have all required objects
-    :: ::
-    :: ::  XX Can we get hash.repo+hax syntax to work?
-    :: ::
-    :: =+  mis=(turn reqs.header.bud |=(haz=@ux (has haz)))
-    :: ?:  (gth (lent mis) 0)
-    ::   ~|  "Bundle can not be unpacked, missing prerequisites {<mis>}"  !!
-    :: ::  Unpack and merge
-    :: ::
-    :: =+  ros=(index pack.bud)
-    :: ::  XX  Load objects
-    :: ::
-    :: =.  object-store.repo
-    ::   %-  ~(uni by object-store.repo)
-    ::   %-  ~(run by ros)
-    ::   |=(rob=raw-object (parse:obj hash-type.repo rob))
-    :: ::  Read and verify references
-    :: ::
-    :: =+  ref=refs.header.bud
-    :: =.  repo
-    :: |-
-    :: ?~  ref
-    ::   repo
-    :: ?.  (has +.i.ref)
-    ::   ~|  "Bundle contains reference to unknown object {<+.i.ref>}"  !!
-    :: $(refs.repo (~(put by refs.repo) i.ref), ref t.ref)
-    :: ::
-    :: repo
+    ::  Check whether key a
+    ::  is a shorthand of b
+    ::
+    ::  XX This could be done with
+    ::  direct atom comparison
+    ::
+    ::  XX a is not really octs
+    ::  'cafe' -> [4 0xcafe], which is wrong
+    ::
+    :: Find all keys matching the abbreviation. 
+    :: Search in the object-store
+    ::
+    :: ++  find-key-in-store
+    ::   |=  a=@ta
+    ::   ^-  (list @ux)
+    ::   ::
+    ::   :: XX why does dispatching on non-empty set does not work?
+    ::   :: ?~  keys  followed by =/  heys  ~(tap in keys)
+    ::   :: results in mull-grow
+    ::   ::
+    ::   =+  key=[(met 3 a) (to-hex a)]
+    ::   =/  kel=(list @ux)  ~(tap in ~(key by object-store.repo))
+    ::   =|  hey=(list @ux)
+    ::   |-
+    ::   ?~  kel
+    ::     hey
+    ::   ?:  (match-key key i.kel)
+    ::     $(kel t.kel, hey [i.kel hey])
+    ::   $(kel t.kel)
+    --
+  ++  phone
+    |%
+    ++  fetch
+      |=  [remote-name=@tas =pack refs=(list reference)]
+      ^-  repository
+      =+  remote=(got:~(phone git repo) remote-name)
+      ::  Update remote-tracking references
+      ::  XX This should only concern branches
+      ::  XX What would happen if we push an update 
+      ::  to a tag?
+      ::
+      =.  refs.remote
+      |-
+      ?~  refs
+        refs.remote
+      =+  ref=i.refs
+      =+  far=(get:~(refer git repo) -.ref)
+      ::  New reference
+      ::
+      ?~  far
+        ~&  fetch-new-ref+ref
+        %=  $
+          refs  t.refs
+          repo  (put:~(refer git repo) ref)
+        ==
+      ::  Existing reference, update
+      ::
+      ?:  =(u.far +.ref)
+        $(refs t.refs)
+      ~&  fetch-update-ref+[-.ref u.far '~>' +.ref]
+      %=  $
+        refs  t.refs
+        refs.remote  (~(put by refs.remote) ref)
+      ==
+      ::
+      %=  repo
+        remotes  (~(put by remotes.repo) remote-name remote)
+        archive.object-store  [pack archive.object-store.repo]
+      ==
+    --
   ::
   ::  This is a configuration store mirroring the one from Git.
   ::  Configuration variables are grouped into sections with an optional
@@ -938,7 +909,12 @@
   ::  can introduce a configuration variable without the need to
   ::  alter and recompile libgit itself.
   ::
-  ++  config
+  ::  XX The configuration does not belong in libgit. 
+  ::  Configuration should affects user tooling by altering.
+  ::  Settings which actually serve as data stores (remote, brench etc.)
+  ::  should be part of the repository structure proper.
+  ::
+  ++  tweak
     |%
     ::
     ++  get

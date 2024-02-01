@@ -93,7 +93,6 @@
   =.  rel
   ::  Parse references
   ::
-  !.
   |-
   ?~  lip
     rel
@@ -108,7 +107,7 @@
   ::  XX conform to git-check-ref-format
   ::
   ++  segment
-    (cook crip (plus prn))
+    (cook crip (plus ;~(less fas prn)))
   ++  paf
     ;~  pose
       ;~(plug (jest 'HEAD') (easy ~))
@@ -119,20 +118,33 @@
       |=([hax=@ux =path] [path hax])
       ;~(plug hax-sha-1:obj:git ;~(pfix ace paf))
   --
+::
+::  Fetch references
+::
 ++  fetch
-  |=  hax=@ux
+  |=  [have=(list hash:git) want=(list hash:git)]
   =/  m  (strand ,pack:git)
   ^-  form:m
   =+  caps=~
   =/  args
-    :~  (crip "want {((x-co:co 40) hax)}")
-        'ofs-delta'
+    ;:  weld
+    ~['ofs-delta']
+    ::
+    %+  turn
+      have
+    |=  hax=hash:git
+    (crip "have {((x-co:co 40) hax)}")
+    ::
+    %+  turn
+      want
+    |=  hax=hash:git
+    (crip "want {((x-co:co 40) hax)}")
     ==
   ;<  ~  bind:m  (send-request %fetch caps args)
   ;<  res=client-response:iris  bind:m  take-client-response:strandio
   ?>  ?=(%finished -.res)
   ?~  full-file.res
-  ~|  "No pack received"  !!
+    ~|  "No pack received"  !!
   ~&  "Received {<p.data.u.full-file.res>} bytes"
   =/  sea=stream:stream  0+data.u.full-file.res
   ::  Handle packfile response
@@ -140,13 +152,7 @@
   =<
   ::  Acknowledgements
   ::
-  =^  ack  sea  (read-acknowledgements sea)
-  ::  Ack-only response
-  ::
-  =+  pkt=-:(read-pkt-line | sea)
-  ?@  pkt
-    (pure:m *pack:git)
-  ::
+  =^  ack  sea  (read-acks sea)
   =^  sal  sea  (read-shallow-info sea)
   =^  wef  sea  (read-wanted-refs sea)
   =^  pur  sea  (read-pack-uris sea)
@@ -155,19 +161,19 @@
   (pure:m pak)
   ::
   |%
-  ++  read-acknowledgements 
+  ++  read-acks
     |=  sea=stream:stream
     ^-  [(list hash:git) stream:stream]
     =|  red=stream:stream
-    =^  pkt  red  (read-pkt-line | sea)
+    =^  pkt  red  (read-pkt-line & sea)
     ?@  pkt
       :_  sea
       ~
-    ?.  =('acknowledgements' q.octs.pkt)
+    ?.  =('acknowledgments' q.octs.pkt)
       :_  sea
       ~
     =.  sea  red
-    =^  pkt  red  (read-pkt-line | sea)
+    =^  pkt  red  (read-pkt-line & sea)
     ?@  pkt
       :_  sea
       ~
@@ -195,8 +201,11 @@
       ack
     =^  pkt  red  (read-pkt-line & sea)
     ?@  pkt
-      :_  sea
-      ~
+      :_  (read-pkt-delim red)
+      ack
+    ?:  =('ready' q.octs.pkt)
+      :_  (read-pkt-delim red)
+      ack
     %=  $
       ack  [(parse-ack pkt) ack]
       sea  red
@@ -204,8 +213,12 @@
     ::
     |%
     ++  parse-ack
-      |=  pkt=$>(%data pkt-line)
+      :: XX seems to be another bug,
+      :: this does not work properly
+      :: |=  pkt=$>(%data pkt-line)
+      |=  pkt=pkt-line
       ^-  hash:git
+      ?<  ?=(@ pkt)
       %+  scan
         (trip q.octs.pkt)
       ;~(pfix (jest 'ACK ') hax-sha-1:obj:git)
@@ -229,12 +242,17 @@
     ::
     =^  pkt  sea  (read-pkt-line & sea)
     ?@  pkt
-      ~|  "Expected packfile stream"  !!
+      ?:  ?=(%flush pkt)
+        ~|  "Expected packfile stream"  !!
+      ~&  %read-pack-empty
+      :_  sea
+      *pack:git
     ?>  =('packfile' q.octs.pkt)
     ::  Read packfile
     ::
     =^  red=stream:stream  sea  (stream-pkt-lines-on-band 1 sea)
     =/  pack-file  -:(read:pak:git red)
+    ~&  read-pack+header.pack-file
     =+  pack=(index:pak:git pack-file)
     :_  sea
     pack
@@ -375,8 +393,14 @@
       data+[(dec len) (cut 3 [0 (dec len)] q.u.byt)]
     data+[p=len octs=q.u.byt]
   ?>  ?=(%data -.pkt)
-  :: ~&  pkt-line+[%data `@t`(cut 3 [0 35] q.octs.pkt)]
   :_  sea
   pkt
+  ::
+  ++  read-pkt-delim
+    |=  sea=stream:stream
+    ^-  stream:stream
+    =^  pkt  sea  (read-pkt-line | sea)
+    ?>  &(?=(@ pkt) ?=(%delim pkt))
+    sea
 ::
 --

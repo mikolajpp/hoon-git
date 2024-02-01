@@ -16,10 +16,12 @@
 +$  raw-object  [type=object-type data=stream:libstream]
 ::
 +$  person  [name=tape email=tape]
++$  signature  [%gpg @t]
 +$  commit-header  $:  tree=hash
                        parent=(list hash)
                        author=[person date=[@ud ? tape]]
                        committer=[person date=[@ud ? tape]]
+                       sign=(unit signature)
                    ==
 +$  commit      $:  header=commit-header
                     message=tape
@@ -31,18 +33,6 @@
       [%commit commit]
       [%tree (list tree-entry)]
   ==
-+$  config-value  $%  [%l ?]
-                      [%u @ud]
-                      [%s @t]
-                  ==
-::
-+$  raw-object-store  (map hash raw-object)
-+$  object-store  (map hash object)
-+$  config-key  [@tas (unit @t)]
-::  XX make it [hash path]
-::  as it is in Git formats
-::
-+$  reference   [path hash]
 ::
 ::  Pack file
 ::
@@ -58,15 +48,39 @@
 
 +$  pack-header  [version=%2 count=@ud]
 +$  pack-file    [header=pack-header data=stream:libstream]
+::  XX different comparison functions 
+::  do not throw error!
++$  pack-index   ((mop hash @ud) lth)
+++  pion  ((on hash @ud) lth)
++$  pack  [=hash-type index=pack-index data=stream:libstream]
 ::
-+$  pack-index   (map hash @ud)
-+$  pack  [index=pack-index data=stream:libstream]
++$  config-value  $%  [%l ?]
+                      [%u @ud]
+                      [%s @t]
+                  ==
+::
++$  object-store  $:  loose=(map hash object)
+                      archive=(list pack)
+                  ==
++$  config-key  [@tas (unit @t)]
+::  XX make it [hash path]
+::  as it is in Git formats
+::
+::  XX reference should just be a path
++$  reference  path
++$  refs  (map reference hash)
++$  remote  [url=@t =refs]
++$  ref-spec  @t
++$  trail-spec [remote=@tas =ref-spec]
+::  XX repository is a type 
+::  parametrized by the hash-type
 ::
 +$  repository
   $:  =hash-type
       =object-store
-      archive=(list pack)
-      refs=(map path hash)
+      =refs
+      trail=(map reference trail-spec)
+      remotes=(map @tas remote)
       config=(mip:libmip config-key @tas config-value)
   ==
 ::
@@ -79,9 +93,11 @@
 ::
 +$  command
   $%  [%init name=@tas]
+      [%cat-file name=@tas hash=@ta]
       [%clone name=@tas url=@t]
-      [%list ~]
       [%delete name=@tas]
+      [%pull name=@tas remote=@tas]
+      [%list ~]
       :: hash-object
       :: [%hash-object repository=(unit @tas) type=object-type data=@]
       :: cat-file
