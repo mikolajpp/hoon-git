@@ -2,12 +2,12 @@
 :: git-http is a library of smart HTTP protocol 
 :: component strands.
 :: 
-:: Only smart git protocol version 2 is supported.
+:: Only git protocol version 2 is supported.
 ::
-/-  git, *git-io, spider
+/-  git, *git-http, spider
 /+  git, stream, strandio
 =,  strand=strand:spider
-~%  %git-io  ..part  ~
+~%  %git-http  ..part  ~
 |_  url=@t
 ::
 ::  Greet the server to obtain a map of capabilities
@@ -76,7 +76,7 @@
 ::
 ++  ls-refs
   |=  args=(list @t)
-  =/  m  (strand ,(list reference:git))
+  =/  m  (strand ,(list [reference:git hash:git]))
   ^-  form:m
   =+  caps=~
   ;<  ~  bind:m  (send-request %ls-refs caps args)
@@ -91,7 +91,7 @@
   ::
   =^  pil  sea  (read-pkt-lines & sea)
   =+  lip=(flop pil)
-  =|  rel=(list reference:git)
+  =|  rel=(list [reference:git hash:git])
   =.  rel
   ::  Parse references
   ::

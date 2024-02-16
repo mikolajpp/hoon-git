@@ -63,15 +63,11 @@
                       archive=(list pack)
                   ==
 +$  config-key  [@tas (unit @t)]
-::  XX make it [hash path]
-::  as it is in Git formats
-::
-::  XX reference should just be a path
 +$  reference  path
 +$  refs  (map reference hash)
 +$  remote  [url=@t =refs]
 +$  ref-spec  @t
-+$  trail-spec [remote=@tas =ref-spec]
++$  trail-spec  [remote=@tas =ref-spec]
 ::  XX repository is a type 
 ::  parametrized by the hash-type
 ::
@@ -82,25 +78,5 @@
       trail=(map reference trail-spec)
       remotes=(map @tas remote)
       config=(mip:libmip config-key @tas config-value)
-  ==
-::
-::  Bundle
-::
-+$  bundle-header  [version=%2 hash=hash-type reqs=(list hash) refs=(list reference)]
-+$  bundle  [header=bundle-header =pack]
-::
-::  Agent commands
-::
-+$  command
-  $%  [%init name=@tas]
-      [%cat-file name=@tas hash=@ta]
-      [%clone name=@tas url=@t]
-      [%delete name=@tas]
-      [%pull name=@tas remote=@tas]
-      [%list ~]
-      :: hash-object
-      :: [%hash-object repository=(unit @tas) type=object-type data=@]
-      :: cat-file
-      :: [%cat-file repository=@tas hash=@ta]
   ==
 --

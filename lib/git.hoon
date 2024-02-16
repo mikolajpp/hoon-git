@@ -4,9 +4,13 @@
 ::  
 ::  Git core library
 ::
+::  Helper cores
+::
 ::  +obj -- objects
 ::  +pak -- packfiles 
 ::  
+::  Repository interface
+::
 ::  +git -- repository engine
 ::    +refer -- references
 ::    +store -- object store
@@ -714,83 +718,157 @@
     |=  kob=pack-object
     ^-  ?
     ?=(?(%ofs-delta %ref-delta) -.kob)
-  :: 
-  ::  Object access
+  ++  get-raw
+    |=  hax=hash
+    ^-  (unit raw-object)
+    =+  pin=(get:pion index.pack hax)
+    ?~  pin
+      ~
+    =+  sea=[u.pin octs.data.pack]
+    =^  pob  sea  (read-pack-object sea)
+    `(resolve-object pob sea)
+  ++  get
+    |=  hax=hash
+    ^-  (unit object)
+    =+  obe=(get-raw hax)
+    ::  XX Why is this function called a bind?
+    ::
+    (bind obe (cury parse-raw:obj hash-type.pack))
+  ++  got-raw
+    |=  hax=hash
+    ^-  raw-object
+    =+  pin=(get:pion index.pack hax)
+    ?~  pin  !!
+    =+  sea=[u.pin octs.data.pack]
+    =^  pob  sea  (read-pack-object sea)
+    (resolve-object pob sea)
+  ++  got
+    |=  hax=hash
+    ^-  object
+    =+  obe=(got-raw hax)
+    (parse-raw:obj hash-type.pack obe)
+  ++  has
+    |=  hax=hash
+    ^-  ?
+    (~(has by index.pack) hax)
   ::
-  ++  obj
-    |%
-    ++  get-raw
-      |=  hax=hash
-      ^-  (unit raw-object)
-      =+  pin=(get:pion index.pack hax)
-      ?~  pin
-        ~
-      =+  sea=[u.pin octs.data.pack]
-      =^  pob  sea  (read-pack-object sea)
-      `(resolve-object pob sea)
-    ++  get
-      |=  hax=hash
-      ^-  (unit object)
-      =+  obe=(get-raw hax)
-      ::  XX Why is this function called a bind?
-      ::
-      (bind obe (cury parse-raw:obj hash-type.pack))
-    ++  got-raw
-      |=  hax=hash
-      ^-  raw-object
-      =+  pin=(get:pion index.pack hax)
-      ?~  pin  !!
-      =+  sea=[u.pin octs.data.pack]
-      =^  pob  sea  (read-pack-object sea)
-      (resolve-object pob sea)
-    ++  got
-      |=  hax=hash
-      ^-  object
-      =+  obe=(got-raw hax)
-      (parse-raw:obj hash-type.pack obe)
-    ++  has
-      |=  hax=hash
-      ^-  ?
-      (~(has by index.pack) hax)
+  ::  Find objects whose hashes match the 
+  ::  key @a
+  ::
+  ++  find-by-key
+    |=  a=@ta
+    ^-  (list hash)
+    =+  kex=(to-hex a)
+    =+  key=[(met 3 a) kex]
+    ::  The matching keys are in the range a..a+1
     ::
-    ::  Find objects whose hashes match the 
-    ::  key @a
-    ::
-    ++  find-by-key
-      |=  a=@ta
-      ^-  (list hash)
-      =+  kex=(to-hex a)
-      =+  key=[(met 3 a) kex]
-      ::  The matching keys are in the range a..a+1
-      ::
-      =+  len=(met 3 (crip ((x-co:co 0) +(kex))))
-      =+  fen=(sub (key-size hash-type.pack) len)
-      =+  end=(lsh [2 fen] +(kex))
-      =|  hey=(list @ux)
-      =<  -  
-      %^  (dip:pion _hey)  
-        index.pack
-      hey
-        |=  [hey=(list @ux) item=[hash @ud]]
-        ?.  (compare:pion -.item end)
-          [`+.item & hey]
-        ?:  (match-key (key-size hash-type.pack) key -.item)
-          [`+.item & [-.item hey]]
-        [`+.item | hey]
-    --
+    =+  len=(met 3 (crip ((x-co:co 0) +(kex))))
+    =+  fen=(sub (key-size hash-type.pack) len)
+    =+  end=(lsh [2 fen] +(kex))
+    =|  hey=(list @ux)
+    =<  -  
+    %^  (dip:pion _hey)  
+      index.pack
+    hey
+      |=  [hey=(list @ux) item=[hash @ud]]
+      ?.  (compare:pion -.item end)
+        [`+.item & hey]
+      ?:  (match-key (key-size hash-type.pack) key -.item)
+        [`+.item & [-.item hey]]
+      [`+.item | hey]
   --
 ::
 ::  Repository engine
 ::
 ::    +store -- object store
-::    +refer -- references
-::    +track -- tracking braches
-::    +phone -- remotes
-::    +tweak -- configuration
+::    +link  -- references
+::    +trail -- tracking braches
+::    +remote -- remotes
+::    +config -- configuration
 ::
 ++  git
   |_  repo=repository
   +*  this  .
+  ::
+  ::  This is a configuration store mirroring the one from Git.
+  ::  Configuration variables are grouped into sections with an optional
+  ::  subsection. Thus core/~ corresponds to [core], while remote/origin
+  ::  to [remote "origin"].
+  ::  Configuration variables can be loobean ?, integer @ud, or string @t.
+  ::
+  ::  XX Think whether it would be better to have a typed configuration
+  ::  store. The advantage of the current approach is that a new tool
+  ::  can introduce a configuration variable without the need to
+  ::  alter and recompile libgit itself.
+  ::
+  ::  XX The configuration does not belong in libgit. 
+  ::  Configuration should affects user tooling by altering.
+  ::  Settings which actually serve as data stores (remote, brench etc.)
+  ::  should be part of the repository structure proper.
+  ::
+  ++  config 
+    |%
+    ::
+    ++  get
+      |=  [key=config-key var=@tas]
+      ^-  (unit config-value)
+      (~(get bi:libmip config.repo) key var)
+    ::
+    ++  put
+      |=  [key=config-key var=@tas val=config-value]
+      ^-  repository
+      repo(config (~(put bi:libmip config.repo) key var val))
+    ::
+    ++  default
+    |.
+    ^-  repository
+    =.  repo  (put core/~ repositoryformatversion+u+0)
+    =.  repo  (put core/~ bare+l+&)
+    repo
+    --
+  --
+  ++  link  ~
+  ++  remote
+    |%
+    ++  fetch
+      |=  [remote-name=@tas =pack refs=(list reference)]
+      ^-  repository
+      *repository
+    ::   =+  remote=(got:~(phone git repo) remote-name)
+    ::   ::  Update remote-tracking references
+    ::   ::  XX This should only concern branches
+    ::   ::  XX What would happen if we push an update 
+    ::   ::  to a tag?
+    ::   ::
+    ::   =.  refs.remote
+    ::   |-
+    ::   ?~  refs
+    ::     refs.remote
+    ::   =+  ref=i.refs
+    ::   =+  far=(get:~(refer git repo) -.ref)
+    ::   ::  New reference
+    ::   ::
+    ::   ?~  far
+    ::     ~&  fetch-new-ref+ref
+    ::     %=  $
+    ::       refs  t.refs
+    ::       repo  (put:~(refer git repo) ref)
+    ::     ==
+    ::   ::  Existing reference, update
+    ::   ::
+    ::   ?:  =(u.far +.ref)
+    ::     $(refs t.refs)
+    ::   ~&  fetch-update-ref+[-.ref u.far '~>' +.ref]
+    ::   %=  $
+    ::     refs  t.refs
+    ::     refs.remote  (~(put by refs.remote) ref)
+    ::   ==
+    ::   ::
+    ::   %=  repo
+    ::     remotes  (~(put by remotes.repo) remote-name remote)
+    ::     archive.object-store  [pack archive.object-store.repo]
+    ::   ==
+    --
   ++  store
     |%
     ::
@@ -858,82 +936,5 @@
     ::     $(kel t.kel, hey [i.kel hey])
     ::   $(kel t.kel)
     --
-  ++  phone
-    |%
-    ++  fetch
-      |=  [remote-name=@tas =pack refs=(list reference)]
-      ^-  repository
-      =+  remote=(got:~(phone git repo) remote-name)
-      ::  Update remote-tracking references
-      ::  XX This should only concern branches
-      ::  XX What would happen if we push an update 
-      ::  to a tag?
-      ::
-      =.  refs.remote
-      |-
-      ?~  refs
-        refs.remote
-      =+  ref=i.refs
-      =+  far=(get:~(refer git repo) -.ref)
-      ::  New reference
-      ::
-      ?~  far
-        ~&  fetch-new-ref+ref
-        %=  $
-          refs  t.refs
-          repo  (put:~(refer git repo) ref)
-        ==
-      ::  Existing reference, update
-      ::
-      ?:  =(u.far +.ref)
-        $(refs t.refs)
-      ~&  fetch-update-ref+[-.ref u.far '~>' +.ref]
-      %=  $
-        refs  t.refs
-        refs.remote  (~(put by refs.remote) ref)
-      ==
-      ::
-      %=  repo
-        remotes  (~(put by remotes.repo) remote-name remote)
-        archive.object-store  [pack archive.object-store.repo]
-      ==
-    --
-  ::
-  ::  This is a configuration store mirroring the one from Git.
-  ::  Configuration variables are grouped into sections with an optional
-  ::  subsection. Thus core/~ corresponds to [core], while remote/origin
-  ::  to [remote "origin"].
-  ::  Configuration variables can be loobean ?, integer @ud, or string @t.
-  ::
-  ::  XX Think whether it would be better to have a typed configuration
-  ::  store. The advantage of the current approach is that a new tool
-  ::  can introduce a configuration variable without the need to
-  ::  alter and recompile libgit itself.
-  ::
-  ::  XX The configuration does not belong in libgit. 
-  ::  Configuration should affects user tooling by altering.
-  ::  Settings which actually serve as data stores (remote, brench etc.)
-  ::  should be part of the repository structure proper.
-  ::
-  ++  tweak
-    |%
-    ::
-    ++  get
-      |=  [key=config-key var=@tas]
-      ^-  (unit config-value)
-      (~(get bi:libmip config.repo) key var)
-    ::
-    ++  put
-      |=  [key=config-key var=@tas val=config-value]
-      ^-  repository
-      repo(config (~(put bi:libmip config.repo) key var val))
-    ::
-    ++  default
-    |.
-    ^-  repository
-    =.  repo  (put core/~ repositoryformatversion+u+0)
-    =.  repo  (put core/~ bare+l+&)
-    repo
-    --
-  --
+  ++  trail  ~
 --
