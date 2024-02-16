@@ -5,13 +5,14 @@
 ::  Git core library
 ::
 ::  +obj -- objects
-::  +pak -- packfile
+::  +pak -- packfiles 
+::  
 ::  +git -- repository engine
 ::    +refer -- references
 ::    +store -- object store
 ::    +track -- tracking braches
-::    +phone -- remotes
 ::    +tweak -- configuration
+::    +phone -- remotes
 ::
 |%
 ::  
