@@ -10,15 +10,15 @@
 ~%  %git-http  ..part  ~
 |_  url=@t
 ::
-::  Greet the server to obtain a map of capabilities
+::  Greet the "upload" server service to obtain a map of capabilities
 ::
-++  greet-server
+++  greet-server-upload
   =/  m  (strand ,caps)
   ^-  form:m
   ;<  ~  bind:m
   %-  send-request:strandio  
     :^  %'GET'
-        (cat 3 url '/info/refs?service=git-upload-pack')
+        (cat 3 url upload-pack-url)
         :~  ['Git-Protocol' 'version=2']
             ['User-Agent' agent]
         ==
@@ -40,6 +40,49 @@
   ?>  ?=(%data -.i.lip)
   =/  lip
     ?:  =(q.octs.i.lip '# service=git-upload-pack')
+      =^  pil  sea  (read-pkt-lines & sea)
+      (flop pil)
+    lip
+  ?~  lip
+    ~|  "Server response empty"  !!
+  ::  Enforce version
+  ::
+  ?>  ?=(%data -.i.lip)
+  ?>  =('version 2' q.octs.i.lip)
+  =+  caps=(parse-caps t.lip)
+  (pure:m caps)
+::
+::  Greet the receive server service to obtain a map of capabilities
+::
+++  greet-server-receive
+  =/  m  (strand ,caps)
+  ^-  form:m
+  ;<  ~  bind:m
+  %-  send-request:strandio  
+    :^  %'GET'
+        (cat 3 url '/info/refs?service=git-receive-pack')
+        :~  ['Git-Protocol' 'version=0']
+            ['User-Agent' agent]
+        ==
+        ~
+  ;<  res=client-response:iris  bind:m  take-client-response:strandio
+  ?>  ?=(%finished -.res)
+  ?.  =(%200 status-code.response-header.res)
+    ~|  "Response failed {<res>}"  !!
+  ?~  full-file.res  !!
+  ::
+  =/  sea=stream:stream  0+data.u.full-file.res
+  =^  pil  sea  (read-pkt-lines & sea)
+  =+  lip=(flop pil)
+  ?~  lip 
+    ~|  "Server response empty"  !!
+  ~&  `@t`q.data.u.full-file.res
+  ::  Handle non-standard behaviour
+  ::  of servers advertising the service name
+  ::
+  ?>  ?=(%data -.i.lip)
+  =/  lip
+    ?:  =(q.octs.i.lip '# service=git-receive-pack')
       =^  pil  sea  (read-pkt-lines & sea)
       (flop pil)
     lip

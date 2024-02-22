@@ -8,12 +8,13 @@
 ^-  form:m
 =/  url  !<((unit @t) arg)
 =*  http  ~(. git-http (need url))
-;<  caps=(map @ta (unit @t))  bind:m  greet-server:http
+;<  caps=(map @ta (unit @t))  bind:m  greet-server-upload:http
+~&  caps
 ;<  refs=(list [reference:git hash:git])  
   bind:m  (ls-refs:http ~)
+::
 ::  Retrieve HEAD hash
 ::
-~&  refs
 =/  head=hash:git
   |-
   ?~  refs
@@ -21,7 +22,6 @@
   ?:  =(~['HEAD'] -.i.refs)
     +.i.refs
   $(refs t.refs)
-:: ~&  refs
 ;<  pack=pack:git  bind:m  (fetch:http ~ ~[head])
   :: %+  fetch:gitio 
   ::   ::  have
