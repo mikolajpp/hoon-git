@@ -23,13 +23,15 @@
     +.i.refs
   $(refs t.refs)
 ;<  pack=pack:git  bind:m  (fetch:http ~ ~[head])
-  :: %+  fetch:gitio 
+  :: %+  fetch:http
   ::   ::  have
+  ::   ::
   ::   ~
   ::   ::  want
+  ::   ::
   ::   %+  turn
   ::     refs
-  ::   |=  ref=reference:git
+  ::   |=  ref=[reference:git hash:git]
   ::   ^-  hash:git
   ::   +.ref
 (pure:m !>([refs pack]))

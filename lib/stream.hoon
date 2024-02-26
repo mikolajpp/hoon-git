@@ -1,6 +1,6 @@
 /-  *stream
 ::
-::  Byte- and bit-stream library. 
+::  Byte-string library
 ::
 ::  Reading data. There are two families of functions: 
 ::  "get" and "read".
@@ -19,9 +19,26 @@
 ::  A conventional variable name for a byte-stream is sea.
 ::  
 ::  A conventional name for a bit-stream is zea.
-::  
+::
 ~%  %stream  ..part  ~
 |%
+::
+::  Concatenate octs
+::
+++  cat-octs
+  |=  [a=octs b=octs]
+  ^-  octs
+  =+  via=(end [3 p.a] q.a)
+  =+  vib=(end [3 p.b] q.b)
+  [(add p.a p.b) (add via (lsh [3 p.a] vib))]
+:: 
+::  Assemble octs
+::
+++  can-octs
+  |=  a=(list octs)
+  ^-  octs
+  ?~  a  [0 0]
+  (reel `(list octs)`a cat-octs)
 ::
 ::  Is the stream dry?
 ::

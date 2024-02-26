@@ -64,6 +64,10 @@
                   ==
 +$  config-key  [@tas (unit @t)]
 +$  reference  path
+::  This should be a mop. 
+::  Otherwise how are we going to efficiently 
+::  search for a tag?
+::
 +$  refs  (map reference hash)
 +$  remote  [url=@t =refs]
 +$  ref-spec  @t

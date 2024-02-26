@@ -1,6 +1,6 @@
 /+  default-agent, dbug
 /+  server, agentio
-/+  git
+/+  git, *git-http, stream
 |%
 +$  versioned-state
   $%  state-0
@@ -99,25 +99,56 @@
 ++  handle-http
   |=  [eyre-id=@ta =inbound-request:eyre]
   ^-  (quip card _state)
-  ~&  handle-http+url.request.inbound-request
-  ?+  url.request.inbound-request  !!
-    %'/git/info/refs?service=git-upload-pack'  
-      (handle-upload-pack eyre-id request.inbound-request)
-    %'/git/info/refs?service=git-receive-pack'
-      (handle-receive-pack eyre-id request.inbound-request)
+  =/  =request-line:server
+    (parse-request-line:server url.request.inbound-request)
+  ?>  ?=([%git @t %info %refs ~] site.request-line)
+  =+  repo=i.t.site.request-line
+  ~&  handle-http+[eyre-id request-line]
+  ?>  ?=([[%service @t] ~] args.request-line)
+  ?+  value.i.args.request-line  !!
+    %git-upload-pack
+      (handle-upload-pack repo eyre-id request.inbound-request)
+    %git-receive-pack
+      (handle-receive-pack repo eyre-id request.inbound-request)
   ==
 ++  handle-upload-pack
-  |=  [eyre-id=@ta request=request:http]
+  |=  [repo=@ta eyre-id=@ta request=request:http]
   ^-  (quip card _state)
-  ~&  handle-upload-pack+request
-  :_  state
-  %+  give-simple-payload:app:server  eyre-id
-    [[501 ~] ~]
+  =+  ver=(get-header:http 'git-protocol' header-list.request)
+  ?~  ver  !!
+  ~&  request
+  ::  Only support upload-pack
+  ::  v2 protocol
+  ::
+  ?>  =('version=2' u.ver)
+  =<
+  ?+  method.request
+    ~|  "upload-pack: unsupported method {<method.request>}"  !!
+  %'GET'  greet-client
+  %'POST'  ~&  handle-upload-pack+%post  !!
+  ==
+  |%
+  ++  greet-client
+    ^-  (quip card _state)
+    =/  payload=simple-payload:http
+      =-  [[200 ~[['git-protocol' 'version=2']]] -]
+      %-  some  %-  can-octs:stream
+        :~  (write-pkt-line-txt '# service=git-upload-pack')
+            (write-pkt-len flush-pkt)
+            (write-pkt-line-txt 'version 2')
+            (write-pkt-line-txt (cat 3 'agent=' git-agent))
+            (write-pkt-line-txt 'ls-refs=unborn')
+            (write-pkt-line-txt 'fetch=filter')
+            (write-pkt-line-txt 'object-format=sha1')
+            (write-pkt-len flush-pkt)
+        ==
+    :_  state
+    (give-simple-payload:app:server eyre-id payload)
+  --
 ++  handle-receive-pack
-  |=  [eyre-id=@ta request=request:http]
+  |=  [repo=@ta eyre-id=@ta request=request:http]
   ^-  (quip card _state)
   :_  state
   %+  give-simple-payload:app:server  eyre-id
     [[501 ~] ~]
 --
-

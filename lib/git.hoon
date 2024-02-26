@@ -11,12 +11,15 @@
 ::  
 ::  Repository interface
 ::
+::  put:~(store git repo)
+::  got:~(store git repo)
+::  (put:~(link git repo) ['HEAD' %] 0xcafe)
 ::  +git -- repository engine
-::    +refer -- references
-::    +store -- object store
-::    +track -- tracking braches
-::    +tweak -- configuration
-::    +phone -- remotes
+::    +store  -- object store
+::    +link   -- references
+::    +track  -- tracking braches
+::    +remote -- remotes
+::    +config -- configuration
 ::
 |%
 ::  

@@ -1,9 +1,10 @@
 ::  
-:: git-http is a library of smart HTTP protocol 
-:: component strands.
-:: 
-:: Only git protocol version 2 is supported.
+::  git-http is a library of smart HTTP protocol 
+::  component strands.
 ::
+::  Supports only protocol v2 for git-upload-pack and 
+::  protocol v0 for git-receive-pack functionality
+:: 
 /-  git, *git-http, spider
 /+  git, stream, strandio
 =,  strand=strand:spider
@@ -18,9 +19,9 @@
   ;<  ~  bind:m
   %-  send-request:strandio  
     :^  %'GET'
-        (cat 3 url upload-pack-url)
+        (cat 3 url '/info/refs?service=git-upload-pack')
         :~  ['Git-Protocol' 'version=2']
-            ['User-Agent' agent]
+            ['User-Agent' git-agent]
         ==
         ~
   ;<  res=client-response:iris  bind:m  take-client-response:strandio
@@ -62,7 +63,7 @@
     :^  %'GET'
         (cat 3 url '/info/refs?service=git-receive-pack')
         :~  ['Git-Protocol' 'version=0']
-            ['User-Agent' agent]
+            ['User-Agent' git-agent]
         ==
         ~
   ;<  res=client-response:iris  bind:m  take-client-response:strandio
@@ -100,19 +101,20 @@
   ::  Assemble request 
   ::
   =/  req=octs
-    %-  as-octt:mimes:html
-    ;:  weld
-      (print-pkt-line-txt "command={(trip cmd.request)}")
-      `tape`(zing (turn (turn caps.request trip) print-pkt-line-txt))
-      (print-pkt-len delim-pkt)
-      `tape`(zing (turn (turn args.request trip) print-pkt-line-txt))
-      (print-pkt-len flush-pkt)
+    %-  can-octs:stream
+    :~
+      (write-pkt-line-txt (crip "command={(trip cmd.request)}"))
+      (can-octs:stream (turn caps.request write-pkt-line-txt))
+      (write-pkt-len delim-pkt)
+      (can-octs:stream (turn args.request write-pkt-line-txt))
+      (write-pkt-len flush-pkt)
     ==
+  ~&  req+`@t`q.req
   %-  send-request:strandio
     :^  %'POST'
         (cat 3 url '/git-upload-pack')
         :~  ['Git-Protocol' 'version=2']
-            ['User-Agent' agent]
+            ['User-Agent' git-agent]
             ['Content-Type' 'application/x-git-upload-pack-request']
         ==
         `req
@@ -303,24 +305,10 @@
     pack
   --
 ::
-++  send-caps
-  |=  =caps
-  ^-  tape
-  %+  roll
-  ^-  (list tape)
-  %+  turn
-  ~(tap by caps)
-  |=  [key=@ta value=(unit @t)]
-  %-  print-pkt-line-txt
-  ?~  value
-  (trip key)
-  :(weld (trip key) "=" (trip u.value))
-  |=([a=tape b=tape] (weld a b))
-::
 ::  Server capabilities
 ::
 ++  cap
-  ::  key[=value]
+  ::  key[=value-1 value-2...]
   ::
   ;~  plug
   sym
@@ -345,22 +333,40 @@
 ++  flush-pkt  0
 ++  delim-pkt  1
 ++  end-pkt    2
-++  print-pkt-len
+++  write-pkt-len
   |=  len=@D
-  ^-  tape
-  ((x-co:co 4) len)
-::
-++  print-pkt-line-txt
-  |=  txt=tape
-  ^-  tape
-  ?>  (lte (lent txt) (sub 0xffff 4))
-  ::  len_txt_LF
+  ^-  octs
+  [4 (crip ((x-co:co 4) len))]
+++  write-pkt-line-txt
+  |=  txt=@t
+  ^-  octs
+  =+  len=(met 3 txt)
+  ::  XX split large requests across 
+  ::  multiple pkt lines
   ::
-  ;:  weld
-  (print-pkt-len (add (lent txt) 5))
-  txt
-  "\0a"
+  ?>  (lte (met 3 txt) (sub 0xffff 4))
+  ::  Assemble packet line
+  ::  cafe_data_LF
+  ::
+  %-  can-octs:stream
+  :~
+    (write-pkt-len (add len 5))
+    [(met 3 txt) txt]
+    [1 '\0a']
   ==
+++  write-pkt-line
+  |=  data=octs
+  ^-  octs
+  ::  XX split large requests across 
+  ::  multiple pkt lines
+  ::
+  ?>  (lte p.data (sub 0xffff 4))
+  ::  Assemble packet line
+  ::  cafe_data
+  ::
+  %+  cat-octs:stream
+    (write-pkt-len (add p.data 5))
+    data
 :: XX there is an input for which q.octs.pkt crashes!
 :: This looks like another 
 :: bug: 
@@ -405,7 +411,7 @@
     lap
   $(lap [pkt lap])
 ::
-:: XX return unit instead of crashing?
+:: XX Return unit instead of crashing?
 ::
 ++  read-pkt-line
   |=  [is-txt=? sea=stream:stream]
