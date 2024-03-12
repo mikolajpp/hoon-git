@@ -5,8 +5,8 @@
 ::  Supports only protocol v2 for git-upload-pack and 
 ::  protocol v0 for git-receive-pack functionality
 :: 
-/-  git, *git-http, spider
-/+  git, stream, strandio
+/-  *git, *git-http, spider
+/+  *git, stream, strandio
 =,  strand=strand:spider
 ~%  %git-http  ..part  ~
 |_  url=@t
@@ -121,7 +121,7 @@
 ::
 ++  ls-refs
   |=  args=(list @t)
-  =/  m  (strand ,(list [reference:git hash:git]))
+  =/  m  (strand ,(list [path hash]))
   ^-  form:m
   =+  caps=~
   ;<  ~  bind:m  (send-request %ls-refs caps args)
@@ -130,13 +130,12 @@
   ?~  full-file.res
   ~|  "No references received"  !!
   ::
-  =<
   =/  sea=stream:stream  0+data.u.full-file.res
   ::  XX we don't really need to flop here
   ::
   =^  pil  sea  (read-pkt-lines & sea)
   =+  lip=(flop pil)
-  =|  rel=(list [reference:git hash:git])
+  =|  rel=(list [path hash])
   =.  rel
   ::  Parse references
   ::
@@ -145,32 +144,17 @@
     rel
   =/  ref  
     ?>  ?=(%data -.i.lip)
-    (scan (trip q.octs.i.lip) reference)
+    (scan (trip q.octs.i.lip) parser-ref)
   $(rel [ref rel], lip t.lip)
   ::
   (pure:m (flop rel))
   ::
-  |%
-  ::  XX conform to git-check-ref-format
-  ::
-  ++  segment
-    (cook crip (plus ;~(less fas prn)))
-  ++  paf
-    ;~  pose
-      ;~(plug (jest 'HEAD') (easy ~))
-      ;~(plug segment (star ;~(pfix fas segment)))
-    ==
-  ++  reference
-    %+  cook 
-      |=([hax=@ux =path] [path hax])
-      ;~(plug hax-sha-1:obj:git ;~(pfix ace paf))
-  --
 ::
 ::  Fetch references
 ::
 ++  fetch
-  |=  [have=(list hash:git) want=(list hash:git)]
-  =/  m  (strand ,pack:git)
+  |=  [have=(list hash) want=(list hash)]
+  =/  m  (strand ,pack)
   ^-  form:m
   =+  caps=~
   =/  args
@@ -179,12 +163,12 @@
     ::
     %+  turn
       have
-    |=  hax=hash:git
+    |=  hax=hash
     (crip "have {((x-co:co 40) hax)}")
     ::
     %+  turn
       want
-    |=  hax=hash:git
+    |=  hax=hash
     (crip "want {((x-co:co 40) hax)}")
     ==
   ;<  ~  bind:m  (send-request %fetch caps args)
@@ -203,14 +187,14 @@
   =^  sal  sea  (read-shallow-info sea)
   =^  wef  sea  (read-wanted-refs sea)
   =^  pur  sea  (read-pack-uris sea)
-  =^  pak=pack:git  sea  (read-pack sea)
-  :: =+  pak=*pack:git
+  =^  pak=pack  sea  (read-pack sea)
+  :: =+  pak=*pack
   (pure:m pak)
   ::
   |%
   ++  read-acks
     |=  sea=stream:stream
-    ^-  [(list hash:git) stream:stream]
+    ^-  [(list hash) stream:stream]
     =|  red=stream:stream
     =^  pkt  red  (read-pkt-line & sea)
     ?@  pkt
@@ -240,7 +224,7 @@
     ::  possessed by the server.
     ::
     =.  sea  red
-    =|  ack=(list hash:git)
+    =|  ack=(list hash)
     =<
     |-
     ?:  (is-dry:stream sea)
@@ -264,11 +248,11 @@
       :: this does not work properly
       :: |=  pkt=$>(%data pkt-line)
       |=  pkt=pkt-line
-      ^-  hash:git
+      ^-  hash
       ?<  ?=(@ pkt)
       %+  scan
         (trip q.octs.pkt)
-      ;~(pfix (jest 'ACK ') hax-sha-1:obj:git)
+      ;~(pfix (jest 'ACK ') parser-sha-1)
     --
   ++  read-shallow-info
     |=  sea=stream:stream 
@@ -284,7 +268,7 @@
     ~
   ++  read-pack
     |=  sea=stream:stream
-    ^-  [pack:git stream:stream]
+    ^-  [pack stream:stream]
     ::  Read header
     ::
     =^  pkt  sea  (read-pkt-line & sea)
@@ -293,19 +277,19 @@
         ~|  "Expected packfile stream"  !!
       ~&  %read-pack-empty
       :_  sea
-      *pack:git
+      *pack
     ?>  =('packfile' q.octs.pkt)
     ::  Read packfile
     ::
     =^  red=stream:stream  sea  (stream-pkt-lines-on-band 1 sea)
-    =/  pack-file  -:(read:pak:git red)
+    =/  pack-file  -:(read:pak red)
     ~&  read-pack+header.pack-file
-    =+  pack=(index:pak:git pack-file)
+    =+  pack=(index:pak pack-file)
     :_  sea
     pack
   --
 ::
-::  Server capabilities
+::  Capability
 ::
 ++  cap
   ::  key[=value-1 value-2...]
@@ -327,6 +311,22 @@
   =/  cap=[@ta (unit @t)]
     (scan txt cap)
   $(caps (~(put by caps) cap), lap t.lap)
+++  parse-caps-stream
+  |=  sea=stream:stream
+  ^-  [caps stream:stream]
+  =|  =caps
+  |-
+  ?:  (is-dry:stream sea)
+    [caps sea]
+  =/  [pkt=pkt-line red=stream:stream]
+    (read-pkt-line & sea)
+  ?@  pkt
+    [caps sea]
+  ?>  ?=(%data -.pkt)
+  =+  txt=(trip q.octs.pkt)
+  =/  cap=[@ta (unit @ta)]
+    (scan txt cap)
+  $(caps (~(put by caps) cap), sea red)
 ::
 ::  Pkt-line
 ::
@@ -344,14 +344,14 @@
   ::  XX split large requests across 
   ::  multiple pkt lines
   ::
-  ?>  (lte (met 3 txt) (sub 0xffff 4))
+  ?>  (lte +(len) (sub 0xffff 4))
   ::  Assemble packet line
   ::  cafe_data_LF
   ::
   %-  can-octs:stream
   :~
-    (write-pkt-len (add len 5))
-    [(met 3 txt) txt]
+    (write-pkt-len ;:(add 4 len 1))
+    [len txt]
     [1 '\0a']
   ==
 ++  write-pkt-line
@@ -365,7 +365,7 @@
   ::  cafe_data
   ::
   %+  cat-octs:stream
-    (write-pkt-len (add p.data 5))
+    (write-pkt-len (add p.data 4))
     data
 :: XX there is an input for which q.octs.pkt crashes!
 :: This looks like another 

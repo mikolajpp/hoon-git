@@ -1,6 +1,7 @@
 |%
 ++  git-agent  'hoon-git/0.1'
 +$  caps  (map @ta (unit @t))
+::  XX data=octs
 +$  pkt-line  $@  $?(%flush %delim %end)
                   [%data =octs]
 +$  command  $?(%ls-refs %fetch)

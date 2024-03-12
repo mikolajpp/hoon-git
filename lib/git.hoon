@@ -5,7 +5,6 @@
 ::  Git core library
 ::
 ::  Helper cores
-::
 ::  +obj -- objects
 ::  +pak -- packfiles 
 ::  
@@ -16,7 +15,7 @@
 ::  (put:~(link git repo) ['HEAD' %] 0xcafe)
 ::  +git -- repository engine
 ::    +store  -- object store
-::    +link   -- references
+::    +refs   -- references
 ::    +track  -- tracking braches
 ::    +remote -- remotes
 ::    +config -- configuration
@@ -55,13 +54,26 @@
     (add (sub dit 'a') 10)
   (sub dit '0')
   $(a (rsh [3 1] a), hex (add (lsh [2 1] hex) val))
+::  XX conform to git-check-ref-format
+::
+++  parser-sha-1  (bass 16 (stun [40 40] six:ab))
+++  parser-sha-256  !!
+++  parser-segment  (cook crip (plus ;~(less fas prn)))
+++  parser-path
+  ;~  pose
+    ;~(plug (jest 'HEAD') (easy ~))
+    ;~(plug parser-segment (star ;~(pfix fas parser-segment)))
+  ==
+++  parser-path-ext  ;~(sfix parser-path (punt fas))
+++  parser-ref
+  %+  cook 
+    |=([=hash =path] [path hash])
+    ;~(plug parser-sha-1 ;~(pfix ace parser-path))
 ::
 ::  Object
 ::
 ++  obj
   |%
-  ++  hax-sha-1  (bass 16 (stun [40 40] six:ab))
-  ++  hax-sha-256  !!
   ::
   ++  type
     |=  tip=@ud
@@ -151,8 +163,8 @@
     ::
     ++  eol  (just '\0a')
     ++  hax  ?-  hat
-             %sha-1    hax-sha-1
-             %sha-256  hax-sha-256
+             %sha-1    parser-sha-1
+             %sha-256  parser-sha-256
              ==
     ::  Commit rules
     ::
@@ -340,7 +352,7 @@
 ::
 ++  pak
   ~%  %pak  ..pak  ~
-  |_  =pack:git
+  |%
   ++  read
     |=  sea=stream:stream
     ?>  (gte p.octs.sea (met 3 q.octs.sea))
@@ -399,7 +411,7 @@
     ?:  (is-dry:stream sea)
       ~|  "Expected {<count.header.pack-file>} objects ({<count>} processed)"
         !!
-    ~?  =(0 (mod count 10.000))  
+    ~?  &(=(0 (mod count 10.000)) (gth count 0))
       pack-index+"{<+(count)>}/{<count.header.pack-file>}"
     =+  beg=pos.sea
     =^  pob=pack-object  sea  (read-pack-object sea)
@@ -410,7 +422,7 @@
     ?:  (~(has by index) hax)
       ~|  "Object {<hax>} duplicated: indexed at {<(~(get by index) hax)>}"  !!
     %=  $
-      index  (put:pion:git index hax beg)
+      index  (put:pack-on:git index hax beg)
       count  +(count)
     ==
     :: XX verify pack integrity
@@ -420,7 +432,7 @@
       (read-bytes:stream (pack-hash-bytes header.pack-file) sea)
     ?~  hax
       ~|  "Pack file is corrupted: no checksum found"  !!
-    ~&  pack-checksum+`@ux`q:(need hax)
+    :: ~&  pack-checksum+`@ux`q:(need hax)
     :-  (pack-hash-type header.pack-file)
     [index [pos octs.sea]]
   ::
@@ -722,44 +734,44 @@
     ^-  ?
     ?=(?(%ofs-delta %ref-delta) -.kob)
   ++  get-raw
-    |=  hax=hash
+    |=  [=pack:git hax=hash]
     ^-  (unit raw-object)
-    =+  pin=(get:pion index.pack hax)
+    =+  pin=(get:pack-on index.pack hax)
     ?~  pin
       ~
     =+  sea=[u.pin octs.data.pack]
     =^  pob  sea  (read-pack-object sea)
     `(resolve-object pob sea)
   ++  get
-    |=  hax=hash
+    |=  [=pack:git hax=hash]
     ^-  (unit object)
-    =+  obe=(get-raw hax)
+    =+  obe=(get-raw pack hax)
     ::  XX Why is this function called a bind?
     ::
     (bind obe (cury parse-raw:obj hash-type.pack))
   ++  got-raw
-    |=  hax=hash
+    |=  [=pack:git hax=hash]
     ^-  raw-object
-    =+  pin=(get:pion index.pack hax)
+    =+  pin=(get:pack-on index.pack hax)
     ?~  pin  !!
     =+  sea=[u.pin octs.data.pack]
     =^  pob  sea  (read-pack-object sea)
     (resolve-object pob sea)
   ++  got
-    |=  hax=hash
+    |=  [=pack:git hax=hash]
     ^-  object
-    =+  obe=(got-raw hax)
+    =+  obe=(got-raw pack hax)
     (parse-raw:obj hash-type.pack obe)
   ++  has
-    |=  hax=hash
+    |=  [=pack:git =hash]
     ^-  ?
-    (~(has by index.pack) hax)
+    (has:pack-on index.pack hash)
   ::
   ::  Find objects whose hashes match the 
   ::  key @a
   ::
   ++  find-by-key
-    |=  a=@ta
+    |=  [=pack:git a=@ta]
     ^-  (list hash)
     =+  kex=(to-hex a)
     =+  key=[(met 3 a) kex]
@@ -770,11 +782,11 @@
     =+  end=(lsh [2 fen] +(kex))
     =|  hey=(list @ux)
     =<  -  
-    %^  (dip:pion _hey)  
+    %^  (dip:pack-on _hey)  
       index.pack
     hey
       |=  [hey=(list @ux) item=[hash @ud]]
-      ?.  (compare:pion -.item end)
+      ?.  (compare:pack-on -.item end)
         [`+.item & hey]
       ?:  (match-key (key-size hash-type.pack) key -.item)
         [`+.item & [-.item hey]]
@@ -806,7 +818,7 @@
   ::
   ::  XX The configuration does not belong in libgit. 
   ::  Configuration should affects user tooling by altering.
-  ::  Settings which actually serve as data stores (remote, brench etc.)
+  ::  Settings which actually serve as data stores (remote, branch etc.)
   ::  should be part of the repository structure proper.
   ::
   ++  config 
@@ -829,14 +841,12 @@
     =.  repo  (put core/~ bare+l+&)
     repo
     --
-  --
-  ++  link  ~
   ++  remote
     |%
-    ++  fetch
-      |=  [remote-name=@tas =pack refs=(list reference)]
-      ^-  repository
-      *repository
+    :: ++  fetch
+    ::   |=  [remote-name=@tas =pack refs=(list reference)]
+    ::   ^-  repository
+      :: *repository
     ::   =+  remote=(got:~(phone git repo) remote-name)
     ::   ::  Update remote-tracking references
     ::   ::  XX This should only concern branches
@@ -874,23 +884,47 @@
     --
   ++  store
     |%
-    ::
-    ::  XX validate hash type?
-    ::
-    :: ++  get
-    ::   |=  haz=@ux
-    ::   ^-  (unit object)
-    ::   (~(get by object-store.repo) haz)
-    :: ::
-    :: ++  got
-    ::   |=  haz=@ux
-    ::   ^-  object
-    ::   (~(got by object-store.repo) haz)
-    :: ::
-    :: ++  has
-    ::   |=  haz=@ux
-    ::   ^-  ?
-    ::   (~(has by object-store.repo) haz)
+    ++  add-pack
+      |=  =pack
+      ^-  repository
+      ::  XX verify collisions with existing object in the archive?
+      ::  XX verify repository integrity?
+      ::
+      repo(archive.object-store [pack archive.object-store.repo])
+    :: :: ++  get
+    :: ::   |=  haz=@ux
+    :: ::   ^-  (unit object)
+    :: ::   (~(get by object-store.repo) haz)
+    :: :: ::
+    ++  get
+      |=  hash=@ux
+      ^-  (unit object)
+      =+  obj=(~(get by loose.object-store.repo) hash)
+      ?^  obj
+        obj
+      %+  roll  `(list pack)`archive.object-store.repo
+        |=  [=pack obj=(unit object)]
+        ?~  obj
+          (get:pak pack hash)
+        obj
+    ++  get-archive
+      |=  hash=@ux
+      ^-  (unit object)
+      %+  roll  archive.object-store.repo
+        |=  [=pack obj=(unit object)]
+        ?~  obj
+          (get:pak pack hash)
+        obj
+    ++  got
+      |=  hash=@ux
+      ^-  object
+      (need (get hash))
+    ++  has
+      |=  =hash
+      ^-  ?
+      ?|  (~(has by loose.object-store.repo) hash)
+          (lien archive.object-store.repo (curr has:pak hash))
+      ==
     :: ::
     :: ++  put
     ::   |=  obe=object
@@ -939,5 +973,5 @@
     ::     $(kel t.kel, hey [i.kel hey])
     ::   $(kel t.kel)
     --
-  ++  trail  ~
+  --
 --

@@ -18,11 +18,13 @@
 +$  person  [name=tape email=tape]
 +$  signature  [%gpg @t]
 +$  commit-header  $:  tree=hash
-                       parent=(list hash)
+                       parents=(list hash)
                        author=[person date=[@ud ? tape]]
                        committer=[person date=[@ud ? tape]]
                        sign=(unit signature)
                    ==
+::  XX do not face the header
+::
 +$  commit      $:  header=commit-header
                     message=tape
                 ==
@@ -50,36 +52,31 @@
 +$  pack-file    [header=pack-header data=stream:libstream]
 ::  XX different comparison functions 
 ::  do not throw error!
+::
 +$  pack-index   ((mop hash @ud) lth)
-++  pion  ((on hash @ud) lth)
+++  pack-on  ((on hash @ud) lth)
 +$  pack  [=hash-type index=pack-index data=stream:libstream]
 ::
 +$  config-value  $%  [%l ?]
                       [%u @ud]
                       [%s @t]
                   ==
+::  XX seb - a set structure specialized 
+::  for enumeration types (up to 64 members?)
 ::
 +$  object-store  $:  loose=(map hash object)
                       archive=(list pack)
                   ==
 +$  config-key  [@tas (unit @t)]
-+$  reference  path
-::  This should be a mop. 
-::  Otherwise how are we going to efficiently 
-::  search for a tag?
-::
-+$  refs  (map reference hash)
++$  ref  $@(hash [%symref path])
++$  refs  (axal ref)
 +$  remote  [url=@t =refs]
 +$  ref-spec  @t
-+$  trail-spec  [remote=@tas =ref-spec]
-::  XX repository is a type 
-::  parametrized by the hash-type
-::
 +$  repository
   $:  =hash-type
       =object-store
       =refs
-      trail=(map reference trail-spec)
+      :: trail=(map reference trail-spec)
       remotes=(map @tas remote)
       config=(mip:libmip config-key @tas config-value)
   ==

@@ -22,6 +22,7 @@
 ::
 ~%  %stream  ..part  ~
 |%
+++  as-octt  as-octt:mimes:html
 ::
 ::  Concatenate octs
 ::
@@ -176,4 +177,16 @@
   :+  pos.red
     (add p.octs.red n)
   (add q.octs.red (lsh [3 p.octs.red] q.u.data))
+::
+::  Append octs to stream
+::
+++  append-octs
+  ~/  %append-octs
+  |=  [sea=stream data=octs]
+  ^-  stream
+  ?:  =(p.data 0)
+    sea
+  :-  pos.sea
+  :-  (add p.octs.sea p.data)
+  (add q.octs.sea (lsh [3 p.octs.sea] q.data))
 --
