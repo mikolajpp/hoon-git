@@ -11,7 +11,7 @@
   ++  mime  
     |=  m=(pair mite octs) 
     ^-  bundle:git-bundle 
-    =<(- (read:git-bundle 0+q.m))
+    (read:git-bundle 0+q.m)
   --
 ++  grow  
   |%

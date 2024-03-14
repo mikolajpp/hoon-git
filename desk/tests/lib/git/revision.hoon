@@ -1,5 +1,5 @@
 /+  *test
-/+  revision=git-revision, git-bundle, git
+/+  revision=git-revision, git-bundle, git=git-repository
 ::  Load test repository
 ::  Putting this on top result in u3R->ski.gul assertion 
 ::  fail in pkg/noun/manage.c:1312
@@ -20,7 +20,7 @@
   (turn taps |=([t=tape w=?] [(scan t parser-sha-1:git) w]))
 ++  test-walk-sort-time
   =/  repo=repository:git
-    %-  clone:git-bundle
+    %-  clone-from-bundle:git
       .^(bundle:git-bundle %cx /~dev/git/247/tests/lib/git/narnia/bdl)
   ?<  ?=(~ archive.object-store.repo)
   ;:  weld
@@ -49,7 +49,7 @@
       "c3b15884747aed2af6c23f7527cf93c31a5ee586"
     ==
   %+  expect-eq
-    !>  ~>  %bout  (turn =<(- (walk-revs:revision repo seed)) head)
+    !>  (turn =<(- (walk-revs:revision repo seed)) head)
     !>  commits
   ::  git rev-list master ^cb4fb
   ::
@@ -72,7 +72,7 @@
       "35c416b48dc8828f9e9a010d3d49fb2f08e88d31"
     ==
   %+  expect-eq
-    !>  ~>  %bout  (turn =<(- (walk-revs:revision repo seed)) head)
+    !>  (turn =<(- (walk-revs:revision repo seed)) head)
     !>  commits
   ==
 --

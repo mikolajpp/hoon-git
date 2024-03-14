@@ -1,6 +1,6 @@
-/-  spider
-/+  strandio
-/+  *git, git-http, stream
+/-  *git, spider
+/+  strandio, stream
+/+  git=git-repository, git-http, git-pack
 =,  strand=strand:spider
 ^-  thread:spider
 |=  arg=vase
@@ -22,7 +22,7 @@
 ::     +.i.refs
 ::   $(refs t.refs)
 :: ;<  pack=pack:git  bind:m  (fetch:http ~ ~)
-;<  pack=pack:git  bind:m
+;<  pack=pack:git-pack  bind:m
   %+  fetch:http
     ::  have
     ::

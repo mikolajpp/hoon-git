@@ -1,18 +1,17 @@
 /+  default-agent, dbug
 /+  server, agentio
 /+  stream
-/+  *git, *git-http, git-graph
-:: /+  *git
+/+  git=git-repository, *git-http, git-pack, git-graph
 |%
 +$  versioned-state
   $%  state-0
   ==
-+$  repo-store  (map @tas repository)
++$  repo-store  (map @tas repository:git)
 +$  state-0  [%0 =repo-store]
 +$  card  card:agent:gall
 +$  command
-  $%  [%put name=@tas =repository]
-      [%update name=@tas =repository]
+  $%  [%put name=@tas =repository:git]
+      [%update name=@tas =repository:git]
       [%delete name=@tas]
   ==
 --
@@ -80,23 +79,23 @@
 ::
 |_  =bowl:gall
 ++  put
-  |=  [name=@tas repo=repository]
+  |=  [name=@tas repo=repository:git]
   ^-  (quip card _state)
   ?:  (~(has by repo-store.state) name)
-    ~|  "Repository {<name>} already exists"  !!
+    ~|  "repository:git {<name>} already exists"  !!
   `state(repo-store (~(put by repo-store.state) name repo))
 ++  update 
-  |=  [name=@tas repo=repository]
+  |=  [name=@tas repo=repository:git]
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
-    ~|  "Repository {<name>} does not exist"  !!
+    ~|  "repository:git {<name>} does not exist"  !!
   `state(repo-store (~(put by repo-store.state) name repo))
 ++  delete
   |=  name=@tas
   ~&  delete-repo+name
   ^-  (quip card _state)
   ?:  (~(has by repo-store.state) name)
-    ~&  "Deleted Git repository {<name>}"
+    ~&  "Deleted Git repository:git {<name>}"
     `state(repo-store (~(del by repo-store.state) name))
   `state
 ++  handle-http
@@ -127,7 +126,7 @@
       (handle-receive-pack u.repo eyre-id request.inbound-request)
   ==
 ++  handle-upload-pack
-  |=  [repo=repository eyre-id=@ta request=request:http]
+  |=  [repo=repository:git eyre-id=@ta request=request:http]
   ^-  (quip card _state)
   =+  ver=(get-header:http 'git-protocol' header-list.request)
   ?~  ver  !!
@@ -169,13 +168,13 @@
       =-  :_  -
         [200 ~[['content-type' 'application/x-git-upload-pack-advertisement']]]
       %-  some  %-  can-octs:stream
-        :~  (write-pkt-line-txt '# service=git-upload-pack')
+        :~  (write-pkt-lines-txt '# service=git-upload-pack')
             (write-pkt-len flush-pkt)
-            (write-pkt-line-txt 'version 2')
-            (write-pkt-line-txt (cat 3 'agent=' git-agent))
-            (write-pkt-line-txt 'ls-refs')
-            (write-pkt-line-txt 'fetch=wait-for-done')
-            (write-pkt-line-txt 'object-format=sha1')
+            (write-pkt-lines-txt 'version 2')
+            (write-pkt-lines-txt (cat 3 'agent=' git-agent))
+            (write-pkt-lines-txt 'ls-refs')
+            (write-pkt-lines-txt 'fetch=wait-for-done')
+            (write-pkt-lines-txt 'object-format=sha1')
             (write-pkt-len flush-pkt)
         ==
     :_  state
@@ -215,7 +214,7 @@
       |-
       ?~  ref-prefix
         sea
-      =/  axe=refs
+      =/  axe=refs:git
         (~(dip of refs.repo) i.ref-prefix)
       =+  path=(crip "{(tail (spud i.ref-prefix))}")
       =.  sea
@@ -227,10 +226,10 @@
           ?^  u.fil.axe  !!
           %+  append-octs:stream
             sea
-          %-  write-pkt-line-txt
+          %-  write-pkt-lines-txt
             (cat 3 (crip "{((x-co:co 20) u.fil.axe)} ") path)
         %-  ~(rep by dir.axe)
-          |=  [[name=@ta =refs] sea=_sea]
+          |=  [[name=@ta =refs:git] sea=_sea]
           ^-  stream:stream
           %+  append-octs:stream
             ^$(axe refs, path ;:((cury cat 3) path '/' name))
@@ -329,24 +328,35 @@
       ::  ack packet lines and an object-store with modified 
       ::  flags (XX is it structural sharing friendly?)
       ::
-      =/  [acks=(list octs) have-set=(set hash)]
+      =/  [acks=(list octs) oldest-have=@ud have-set=(set hash)]
+        ::  XX to reel or to roll?
+        ::
         %+  reel  have
-          |=  [=hash acc=[acks=(list octs) have-set=(set hash)]]
-          ^-  [(list octs) (set ^hash)]
+          |=  [=hash acc=[acks=(list octs) oldest-have=@ud have-set=(set hash)]]
+          ^-  [(list octs) @ud (set ^hash)]
           ::  XX Cache on get
           ::
           =+  obj=(get:~(store git repo) hash)
           ?~  obj
             acc
-          :-  [(write-pkt-line-txt (crip "ACK {((x-co:co 20) hash)}")) acks.acc]
+          :+  [(write-pkt-lines-txt (crip "ACK {((x-co:co 20) hash)}")) acks.acc]
             ?.  ?=(%commit -.u.obj)
-              (~(put in have-set.acc) hash)
-            =.  have-set.acc
-              (~(put in have-set.acc) hash)
-            %+  roll  parents.header.u.obj
-              |=  [=^hash have-set=_have-set.acc]
-              (~(put in have-set) hash)
-      ~&  [acks=acks have-set=have-set]
+              oldest-have.acc
+            =+  time=-.date.committer.header.u.obj
+            ?:  |(=(0 oldest-have.acc) (lth time oldest-have.acc))
+              time
+            oldest-have.acc
+          ?.  ?=(%commit -.u.obj)
+            (~(put in have-set.acc) hash)
+          =.  have-set.acc
+            (~(put in have-set.acc) hash)
+          ::  If they have a commit, they must 
+          ::  also have its parents
+          ::
+          %+  roll  parents.header.u.obj
+            |=  [=^hash have-set=_have-set.acc]
+            (~(put in have-set) hash)
+      ~&  [acks=acks have-set=have-set oldest-have=oldest-have]
       ::
       ::  done and wait-for-done logic
       ::
@@ -363,9 +373,9 @@
       ::
       =?  red  !done.args
         =.  red
-          (append-octs:stream red (write-pkt-line-txt 'acknowledgements'))
+          (append-octs:stream red (write-pkt-lines-txt 'acknowledgements'))
         ?~  acks
-          (append-octs:stream red (write-pkt-line-txt 'NAK'))
+          (append-octs:stream red (write-pkt-lines-txt 'NAK'))
         %+  roll  `(list octs)`acks
           |=  [=octs red=_red]
           ^-  stream:stream
@@ -374,26 +384,28 @@
       ::  or it does not say wait-for-done, while we can reach
       ::  everything he needs.
       ::
-      ~&  can-all-reach-from+(~(can-all-reach-from git-graph repo) want have-set)
-      ?.  ?|  done.args  
-            ?&  !wait-for-done.args 
-              ::  XX optimize using commit time or generation 
-              ::  cutoff, determined from the oldest commit 
-              ::  in the have set
-              ::
-              (~(can-all-reach-from git-graph repo) want have-set)
-            ==
-          ==
+      =/  can-reach=?
+        (~(can-all-reach-from git-graph repo) want have-set oldest-have)
+      ?.  |(done.args &(!wait-for-done.args can-reach))
         (append-octs:stream red (write-pkt-len flush-pkt))
-      ::  Send the packfile
+      ::  Build and send the packfile
       ::
+      ::  We have wants list and have-set. 
+      ::  Using these two sets, we aim to build a beatiful packfile.
+      ::
+      :: =+  pack=(~(build git-pack repo) want have-set)
+      :: =.  red  (append-octs:stream red (write-pkt-lines-txt 'packfile'))
+      :: ::  XX implement the pack mark and use it to grow a pack 
+      :: ::  into octs
+      :: ::
+      :: (append-octs:stream red (write-pkt-lines (to-octs:git-pack pack)))
       red
     :_  state
     %+  give-simple-payload:app:server  eyre-id
     [[200 ~] ?:(=(0 p.octs.red) ~ `octs.red)]
   --
 ++  handle-receive-pack
-  |=  [repo=repository eyre-id=@ta request=request:http]
+  |=  [repo=repository:git eyre-id=@ta request=request:http]
   ^-  (quip card _state)
   :_  state
   %+  give-simple-payload:app:server  eyre-id

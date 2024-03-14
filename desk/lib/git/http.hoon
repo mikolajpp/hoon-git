@@ -5,9 +5,22 @@
 ::  Supports only protocol v2 for git-upload-pack and 
 ::  protocol v0 for git-receive-pack functionality
 :: 
-/-  *git, *git-http, spider
-/+  *git, stream, strandio
+/-  *git, spider
+/+  stream, strandio
+/+  *git, git-pack
 =,  strand=strand:spider
+|%
+++  git-agent  'hoon-git/0.1'
++$  caps  (map @ta (unit @t))
+::  XX data=octs
++$  pkt-line  $@  $?(%flush %delim %end)
+                  [%data =octs]
++$  command  $?(%ls-refs %fetch)
++$  request  $:  cmd=command
+                 caps=(list @t)
+                 args=(list @t)
+             ==
+--
 ~%  %git-http  ..part  ~
 |_  url=@t
 ::
@@ -103,10 +116,10 @@
   =/  req=octs
     %-  can-octs:stream
     :~
-      (write-pkt-line-txt (crip "command={(trip cmd.request)}"))
-      (can-octs:stream (turn caps.request write-pkt-line-txt))
+      (write-pkt-lines-txt (crip "command={(trip cmd.request)}"))
+      (can-octs:stream (turn caps.request write-pkt-lines-txt))
       (write-pkt-len delim-pkt)
-      (can-octs:stream (turn args.request write-pkt-line-txt))
+      (can-octs:stream (turn args.request write-pkt-lines-txt))
       (write-pkt-len flush-pkt)
     ==
   ~&  req+`@t`q.req
@@ -154,7 +167,7 @@
 ::
 ++  fetch
   |=  [have=(list hash) want=(list hash)]
-  =/  m  (strand ,pack)
+  =/  m  (strand ,pack:git-pack)
   ^-  form:m
   =+  caps=~
   =/  args
@@ -187,9 +200,8 @@
   =^  sal  sea  (read-shallow-info sea)
   =^  wef  sea  (read-wanted-refs sea)
   =^  pur  sea  (read-pack-uris sea)
-  =^  pak=pack  sea  (read-pack sea)
-  :: =+  pak=*pack
-  (pure:m pak)
+  =^  pack=pack:git-pack  sea  (read-pack sea)
+  (pure:m pack)
   ::
   |%
   ++  read-acks
@@ -268,7 +280,7 @@
     ~
   ++  read-pack
     |=  sea=stream:stream
-    ^-  [pack stream:stream]
+    ^-  [pack:git-pack stream:stream]
     ::  Read header
     ::
     =^  pkt  sea  (read-pkt-line & sea)
@@ -277,16 +289,13 @@
         ~|  "Expected packfile stream"  !!
       ~&  %read-pack-empty
       :_  sea
-      *pack
+      *pack:git-pack
     ?>  =('packfile' q.octs.pkt)
     ::  Read packfile
     ::
     =^  red=stream:stream  sea  (stream-pkt-lines-on-band 1 sea)
-    =/  pack-file  -:(read:pak red)
-    ~&  read-pack+header.pack-file
-    =+  pack=(index:pak pack-file)
     :_  sea
-    pack
+    (read:git-pack red)
   --
 ::
 ::  Capability
@@ -337,7 +346,7 @@
   |=  len=@D
   ^-  octs
   [4 (crip ((x-co:co 4) len))]
-++  write-pkt-line-txt
+++  write-pkt-lines-txt
   |=  txt=@t
   ^-  octs
   =+  len=(met 3 txt)
@@ -354,7 +363,7 @@
     [len txt]
     [1 '\0a']
   ==
-++  write-pkt-line
+++  write-pkt-lines
   |=  data=octs
   ^-  octs
   ::  XX split large requests across 

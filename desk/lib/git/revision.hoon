@@ -13,14 +13,14 @@
 ::  =^  rev  walk  ~(get revision walk)
 ::  =^  rev  walk  ~(get revision walk)
 ::
-/+  *git
+/+  *git, git=git-repository
 |%
 ::  XX Why does it need manual structure mode?
 ::
 +$  seed-mop  ((mop @ud (list (pair hash commit))) gth)
 ++  seed-on  ((on @ud (list (pair hash commit))) gth)
 +$  rev-walk 
-  $:  repo=repository
+  $:  repo=repository:git
       ::  Seed for a walk: pushes and hides
       ::  - a push is an interesting commit
       ::  - a hide is a dull commit
@@ -53,7 +53,7 @@
 ::  from the seed list
 ::
 ++  walk-revs
-  |=  [repo=repository seed=(list [hash walk=?])]
+  |=  [repo=repository:git seed=(list [hash walk=?])]
   ^-  [(list [hash commit]) rev-walk]
   =.  walk  *rev-walk
   =.  repo.walk  repo

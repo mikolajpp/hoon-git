@@ -1,13 +1,14 @@
 ::
 ::  Commit graph utilities
 ::
-/+  *git
-|_  repo=repository
+/+  *git, git=git-repository
+|_  repo=repository:git
 ::  Can every commit in @from 
 ::  reach at least one commit in @have
-::
+::  
+::  XX optimize using generation number
 ++  can-all-reach-from
-  |=  [from=(list hash) have=(set hash)]
+  |=  [from=(list hash) have=(set hash) oldest-have=@ud]
   ^-  ?
   |-
   ?~  from
@@ -26,7 +27,12 @@
     ::  in the loose map
     ::
     =+  obj=(got:~(store git repo) hash)
-    ?>  ?=(%commit -.obj)
+    ::  Not a commit object, do not worry about reachability
+    ::
+    ?.  ?=(%commit -.obj)
+      &
+    ?:  (lth -.date.committer.header.obj oldest-have)
+      |
     %+  roll  parents.header.obj
       |=  [=^hash reach=?]
       ^-  ?
