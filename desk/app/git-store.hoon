@@ -1,7 +1,8 @@
 /+  default-agent, dbug
 /+  server, agentio
-/+  stream
-/+  git=git-repository, *git-http, git-pack, git-graph
+/+  stream, zlib
+/+  git=git-repository, *git-http
+/+  git-revision, git-pack, git-pack-objects, git-graph
 |%
 +$  versioned-state
   $%  state-0
@@ -9,6 +10,7 @@
 +$  repo-store  (map @tas repository:git)
 +$  state-0  [%0 =repo-store]
 +$  card  card:agent:gall
+::  XX allow @ta as a name
 +$  command
   $%  [%put name=@tas =repository:git]
       [%update name=@tas =repository:git]
@@ -131,9 +133,9 @@
   =+  ver=(get-header:http 'git-protocol' header-list.request)
   ?~  ver  !!
   ~&  header-list.request
-  ~?  ?!(?=(~ body.request))
-    ::  XX why does q.body.request not work here?
-    `@t`q:(need body.request)
+  :: ~?  ?!(?=(~ body.request))
+  ::   ::  XX why does q.body.request not work here?
+  ::   `@t`q:(need body.request)
   ::  Only support git-upload-pack in
   ::  v2
   ::
@@ -142,9 +144,19 @@
   ?+  method.request
     ~|  "upload-pack: unsupported method {<method.request>}"  !!
   %'GET'   greet-client
-  %'POST'  
+  %'POST'
     ?~  body.request  !!
-    =/  sea=stream:stream  0+u.body.request
+    ::  Check for compression
+    ::
+    =/  body=octs
+      =+  cen=(get-header:http 'content-encoding' header-list.request)
+      ?~  cen
+        u.body.request
+      ?>  =('gzip' u.cen)
+      ~&  %http-gzip-encoded
+      -:(expand:zlib 0+u.body.request)
+    ~&  `@t`q.body
+    =/  sea=stream:stream  0+body
     ::  Extract command name
     ::
     =^  cmd=pkt-line  sea  (read-pkt-line & sea)
@@ -227,7 +239,7 @@
           %+  append-octs:stream
             sea
           %-  write-pkt-lines-txt
-            (cat 3 (crip "{((x-co:co 20) u.fil.axe)} ") path)
+            (cat 3 (crip "{(print-sha-1 u.fil.axe)} ") path)
         %-  ~(rep by dir.axe)
           |=  [[name=@ta =refs:git] sea=_sea]
           ^-  stream:stream
@@ -262,7 +274,7 @@
       ?@  pkt
         ?>  ?=(%flush pkt)
         args
-      ~&  `@t`q.octs.pkt
+      :: ~&  `@t`q.octs.pkt
       ::  XX arguments library for Hoon
       ::
       =/  arg
@@ -342,7 +354,7 @@
           :+  [(write-pkt-lines-txt (crip "ACK {((x-co:co 20) hash)}")) acks.acc]
             ?.  ?=(%commit -.u.obj)
               oldest-have.acc
-            =+  time=-.date.committer.header.u.obj
+            =+  time=-.date.committer.commit.u.obj
             ?:  |(=(0 oldest-have.acc) (lth time oldest-have.acc))
               time
             oldest-have.acc
@@ -351,9 +363,10 @@
           =.  have-set.acc
             (~(put in have-set.acc) hash)
           ::  If they have a commit, they must 
-          ::  also have its parents
+          ::  also have its parents. This is an assumption
+          ::  made by git.
           ::
-          %+  roll  parents.header.u.obj
+          %+  roll  parents.commit.u.obj
             |=  [=^hash have-set=_have-set.acc]
             (~(put in have-set) hash)
       ~&  [acks=acks have-set=have-set oldest-have=oldest-have]
@@ -389,17 +402,22 @@
       ?.  |(done.args &(!wait-for-done.args can-reach))
         (append-octs:stream red (write-pkt-len flush-pkt))
       ::  Build and send the packfile
+      ::  
+      ::  Currently this only sends all the packfiles 
+      ::  in the repository. For full functionality we 
+      ::  need to implement git build-pack. 
       ::
-      ::  We have wants list and have-set. 
-      ::  Using these two sets, we aim to build a beatiful packfile.
+      ::  XX We throw away a ready made have-set, only
+      ::  to rebuild it later
       ::
-      :: =+  pack=(~(build git-pack repo) want have-set)
-      :: =.  red  (append-octs:stream red (write-pkt-lines-txt 'packfile'))
-      :: ::  XX implement the pack mark and use it to grow a pack 
-      :: ::  into octs
-      :: ::
-      :: (append-octs:stream red (write-pkt-lines (to-octs:git-pack pack)))
-      red
+      =+  pack-octs=(write-packs:git-pack-objects archive.object-store.repo)
+      =+  pack-pkt-lines=(write-pkt-lines-on-band [0 pack-octs] 1)
+      =.  red  (append-octs:stream red (write-pkt-lines-txt 'packfile'))
+      =.  red  %+  append-octs:stream  red
+                  (write-pkt-lines-txt-on-band git-agent 2)
+      =.  red  (append-octs:stream red pack-pkt-lines)
+      (append-octs:stream red (write-pkt-len flush-pkt))
+    ~&  transfer-bytes+p.octs.red
     :_  state
     %+  give-simple-payload:app:server  eyre-id
     [[200 ~] ?:(=(0 p.octs.red) ~ `octs.red)]

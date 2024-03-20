@@ -26,8 +26,8 @@
   ;:  weld
   ::  git rev-list master
   ::
-  =/  seed=(list [hash:git walk=?])
-      %-  to-hash-list-walk
+  =/  want=(list hash:git)
+      %-  to-hash-list
       :~
         "5dbb9f4e4fb73618c956c25c55363d0a06c05a2c"
       ==
@@ -49,15 +49,19 @@
       "c3b15884747aed2af6c23f7527cf93c31a5ee586"
     ==
   %+  expect-eq
-    !>  (turn =<(- (walk-revs:revision repo seed)) head)
     !>  commits
+    !>  (turn (walk:revision repo want ~) head)
   ::  git rev-list master ^cb4fb
   ::
-  =/  seed=(list [hash:git walk=?])
-      %-  to-hash-list-walk-with
+  =/  want
+      %-  to-hash-list
       :~
-        ["5dbb9f4e4fb73618c956c25c55363d0a06c05a2c" &]
-        ["cb4fb2000a2a71ff32e1539a42eb1e35ac40493c" |]
+        "5dbb9f4e4fb73618c956c25c55363d0a06c05a2c"
+      ==
+  =/  exclude
+      %-  to-hash-list
+      :~
+        "cb4fb2000a2a71ff32e1539a42eb1e35ac40493c"
       ==
   =/  commits=(list hash:git)
     %-  to-hash-list
@@ -72,7 +76,7 @@
       "35c416b48dc8828f9e9a010d3d49fb2f08e88d31"
     ==
   %+  expect-eq
-    !>  (turn =<(- (walk-revs:revision repo seed)) head)
     !>  commits
+    !>  (turn (walk:revision repo want exclude) head)
   ==
 --

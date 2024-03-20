@@ -20,8 +20,8 @@
 ;<  refs=(list reference:git)  bind:m  (ls-refs:gitio ~)
 =+  have=~(val by refs.remote)
 =/  want=(list hash:git)
-  ::  As we all learned in the kindergarden
-  ::  -- +< is the sample
+  ::  As we all learned in the kindergarden -- 
+  ::  +< is the sample
   ::
   (turn refs |=(reference:git +<+))
 ;<  pack=pack:git  bind:m  (fetch:gitio have want)

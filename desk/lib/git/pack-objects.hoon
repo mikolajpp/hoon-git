@@ -1,6 +1,296 @@
 ::
+::
 ::::  Git object packing
   ::
-/+  *git, pack=git-pack
+/+  *git, git=git-repository, revision=git-revision, pack=git-pack
+=>
 |%
+++  version  2
+::  As we walk over objects, we need to keep 
+::  track if we have seen the object already, 
+::  and whether it is dull. 
+::
++$  flag  ?(%seen %dull)
++$  walk-store  (map hash (set flag))
++$  brick-object
+  $:  id=hash
+      object-header
+      offset=@ud
+      ::  Name hint hash
+      name-hash=@ux
+      delta=hash
+      delta-child=hash
+      delta-sibling=hash
+  ==
++$  store  (map hash brick-object)
++$  state  $:  =walk-store
+               =store
+               brick-list=(list [@ud brick-object])
+               count=@ud
+           ==
+--
+=|  state
+=*  state  -
+|_  repo=repository:git
+++  has-flag
+  |=  [=hash =flag]
+  ^-  ?
+  (~(has in (~(got by walk-store) hash)) flag)
+++  has-any-flag
+  |=  [=hash test=(list flag)]
+  ^-  ?
+  =+  flags=(~(get by walk-store) hash)
+  ?~  flags
+    |
+  ?=(^ (~(int in u.flags) (silt test)))
+++  put-flag
+  |=  [=hash =flag]
+  ^-  ^walk-store
+  =+  flags=(~(get by walk-store) hash)
+  (~(put by walk-store) hash (~(put in ?~(flags ~ u.flags)) flag))
+++  mark-blob-dull
+  |=  =hash
+  ^-  ^walk-store
+  ::  Use zipper
+  ::
+  ?:  (has-flag hash %dull)
+    walk-store
+  (put-flag hash %dull)
+++  mark-tree-dull
+  |=  =hash
+  ^-  ^walk-store
+  ?:  (has-flag hash %dull)
+    walk-store
+  =.  walk-store  (put-flag hash %dull)
+  =+  obj=(got:~(store git repo) hash)
+  ?>  ?=(%tree -.obj)
+  =+  tree=tree.obj
+  ::
+  |-  ?~  tree  walk-store
+  =+  obj=(got:~(store git repo) hash)
+  %=  $  tree  t.tree
+    walk-store
+    ?-  -.obj
+      %blob  (mark-blob-dull hash.i.tree)
+      %tree  (mark-tree-dull hash.i.tree)
+      ::  It is a submodule or something unknown, skip it
+      ::
+      %commit  walk-store
+    ==
+  ==
+++  object-type-as-ud
+  |=  type=pack-object-type:pack
+  ^-  @ud
+  ?-  type
+    %commit  1
+    %tree    2
+    %blob    3
+    %tag     4
+    ::  5 is reserved
+    %ofs-delta  6
+    %ref-delta  7
+  ==
+++  brick-cmp
+  |=  [[ia=@ud a=brick-object] [ib=@ud b=brick-object]]
+  ^-  ?
+  =+  ta=(object-type-as-ud type.a)
+  =+  tb=(object-type-as-ud type.b)
+  ::  First, order by type (delta, tag, blob, tree, commit)
+  ::  Second, order by size, greater object first
+  ::  XX Third, order by name hint hash
+  ::  Fourth, order by recency, newest first
+  ::
+  ?:  (gth ta tb)
+    &
+  ?:  (lth ta tb)
+    |
+  ?:  (gth size.a size.b)
+    &
+  ?:  (lth size.a size.b)
+    |
+  ?:  (gth name-hash.a name-hash.b)
+    &
+  ?:  (lth name-hash.a name-hash.b)
+    |
+  ?:  (lth ia ib)
+    &
+  |
+::  Create a sortable number from the last sixteen 
+::  non-whitespace characters
+::
+++  hash-name
+  ::  XX implement jet
+  :: ~/  %hash-name
+  |=  name=@t
+  ^-  @ux
+  ?:  =(0 name)
+    0x0
+  =|  hash=@ux
+  =+  len=(met 3 name)
+  =+  i=0 
+  |-
+  ?.  (lth i len)
+    hash
+  =/  c=@uxD  (cut 3 [0 i] name)
+  ::  XX implement isspace
+  ?:  =(c ' ')
+    $
+  $(i +(i), hash (end [3 4] (add (rsh [2 1] hash) (lsh [3 3] c))))
+++  insert-object
+  |=  [=hash name=@t]
+  ^-  ^state
+  ::  XX use zipper
+  ::  XX (~(pat by store) hash obj) :: put if it does not exist
+  ::
+  ?:  (~(has by store) hash)
+    state
+  ~&  insert-object+[hash name]
+  =+  header=(got-header:~(store git repo) hash)
+  =|  brick=brick-object
+  =.  brick
+    %=  brick
+      id    hash
+      type  type.header
+      size  size.header
+      name-hash  (hash-name name)
+    ==
+  %=  state
+    store  (~(put by store) hash brick)
+    brick-list  [[count brick] brick-list]
+    count  +(count)
+  ==
+++  insert-tree
+  =|  name=@t
+  |=  [=hash =tree]
+  ^-  ^state
+  ?:  (~(has by store) hash)
+    ~&  insert-tree-have+hash
+    state
+  ~&  insert-tree+hash
+  =.  state  (insert-object hash '')
+  ::
+  |-  ?~  tree  state
+  =+  obj=(got:~(store git repo) hash.i.tree)
+  =+  name=(cat 3 name name.i.tree)
+  %=  $  tree  t.tree
+    state
+    ?-  -.obj
+      %blob  (insert-object hash.i.tree name)
+      %tree  ^$(name name, hash hash.i.tree, tree tree.obj)
+      %commit  state
+    ==
+  ==
+++  insert-commit
+  |=  [=hash =commit]
+  ^-  ^state
+  ~&  insert-commit+hash
+  =.  state  (insert-object hash '')
+  ::  XX (got-tree:~(store git repo) tree.commit)
+  =+  obj=(got:~(store git repo) tree.commit)
+  ~&  tree.commit
+  ?>  ?=(%tree -.obj)
+  (insert-tree tree.commit tree.obj)
+++  find-deltas
+  |=  brick-list=(list [@ud brick-object])
+  ^-  (list [@ud brick-object])
+  ::  XX This is useful when actually
+  ::  finding deltas
+  :: =+  delta-list=(sort brick-list brick-cmp)
+  ::  If the object is delta in the pack:
+  ::  (1) Get the chain of delta objects
+  ::  (2) Resolve the base and compress it
+  ::  (3) Uncompress each delta, compress it and write 
+  ::  it to the pack as REF_DELTA object
+  ::
+  =|  pack-list=(list [@ud brick-object])
+  =|  rev-index=(map @ud hash)
+  |-  ?~  brick-list  pack-list
+  =+  brick=i.brick-list
+  $(brick-list t.brick-list)
+  :: ?.  ?&  ?=(^ archive.object-store.repo)
+  ::         (has:pack i.archive.object-store.repo id.brick)
+  ::     ==
+  ::   ~&  find-deltas-loose+id.brick  !!
+  :: ~&  find-deltas-packed+id.brick
+  :: =+  pack=i.archive.object-store.repo
+  :: =/  [pob=pack-object:^pack pin=@ud]
+  ::   =+  pin=(got:pack-on:^pack index.pack id.brick)
+  ::   :_  pin
+  ::   -:(read-pack-object:^pack [pin octs.data.pack])
+  :: ::  Already resolved, write as is
+  :: ::
+  :: ?.  ?=(pack-delta-object:^pack pob)
+  ::   =/  =octs
+  ::     %+  cat-octs:stream
+  ::       (write-type-size:^pack type.pob size.pob)
+  ::       (compress:zlib octs.data.pob)
+  ::   $(brick-list t.brick-list)
+++  pack-objects
+  |=  [want=(list hash) exclude=(list hash)]
+  ^-  octs
+  ::  Prepare packbuilder
+  ::  (1) Walk over the exclude list, mark all trees and blobs as dull
+  ::  (2) Perform a revision walk
+  ::  (3) For each commit that we have not seen and which is not a
+  ::  dull commit, insert it to the packbuilder.
+  ::
+  ::  (1)
+  =.  walk-store
+    |-  ?~  exclude  walk-store 
+    =+  hash=i.exclude
+    ::  XX Use caching
+    ::
+    =+  obj=(got:~(store git repo) hash)
+    ?>  ?=(%commit -.obj)
+    %=  $
+      exclude  t.exclude
+      walk-store  (mark-tree-dull tree.commit.obj)
+    ==
+  :: (2) & (3)
+  =+  commits=(walk:revision repo want exclude)
+  ~&  pack-objects-walk+"Inserting {<(lent commits)>} commits"
+  =.  state
+    |-  ?~  commits  state
+    =+  hash=-.i.commits
+    =+  commit=+.i.commits
+    ?:  (has-any-flag hash ~[%seen %dull])
+      $(commits t.commits)
+    =.  walk-store  (put-flag hash %seen)
+    =.  state  (insert-commit hash commit)
+    $(commits t.commits)
+  ::  Prepare deltas
+  ::
+  ::  Sort by type, size, name hash and recency
+  ::
+  =.  brick-list  (flop brick-list)
+  ~&  pack-objects-brick-count+count
+  =+  pack-list=(find-deltas brick-list)
+  =|  sea=stream:stream
+  ::  Write header
+  ::
+  =.  sea  (write-txt:stream sea 'PACK')
+  =.  sea  (append-octs:stream sea (as-byts:stream [4 version]))
+  =.  sea  (append-octs:stream sea (as-byts:stream [4 count]))
+  octs.sea
+++  write-packs
+  |=  archive=(list pack:pack)
+  ^-  octs
+  =/  count=@ud
+    %+  roll  archive
+      |=  [=pack:pack c=@ud]
+      (add count.pack c)
+  =|  sea=stream:stream
+  =.  sea  (write-txt:stream sea 'PACK')
+  =.  sea  (append-octs:stream sea (as-byts:stream [4 version]))
+  =.  sea  (append-octs:stream sea (as-byts:stream [4 count]))
+  =.  sea  %+  roll  archive
+    |=  [=pack:pack =_sea]
+    %+  append-octs:stream  sea
+      ::  Discard hash
+      :-  (sub end-pos.pack pos.data.pack)
+      ::  Discard header
+      (rsh [3 pos.data.pack] q.octs.data.pack)
+  =+  hash=(hash-octs-sha-1:obj octs.sea)
+  =.  sea  (append-octs:stream sea [20 hash])
+  octs.sea
 --

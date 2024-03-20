@@ -13,7 +13,8 @@
       %blob
       %tag
   ==
-+$  raw-object  [type=object-type data=stream:libstream]
++$  object-header  [type=object-type size=@ud]
++$  raw-object  [type=object-type size=@ud data=stream:libstream]
 ::
 +$  person  [name=tape email=tape]
 +$  signature  [%gpg @t]
@@ -25,14 +26,15 @@
                    ==
 ::  XX do not face the header
 ::
-+$  commit      $:  header=commit-header
++$  commit      $:  commit-header
                     message=tape
                 ==
-+$  tree-entry  [[mode=@ta node=@ta] =hash]
++$  tree-entry  [[mode=@ta name=@ta] =hash]
++$  tree  (list tree-entry)
 ::
 +$  object
-  $%  [%blob =octs]
-      [%commit commit]
-      [%tree (list tree-entry)]
+  $%  [%blob size=@ud =octs]
+      [%commit size=@ud =commit]
+      [%tree size=@ud =tree]
   ==
 --

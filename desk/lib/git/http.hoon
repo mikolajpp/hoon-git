@@ -90,7 +90,6 @@
   =+  lip=(flop pil)
   ?~  lip 
     ~|  "Server response empty"  !!
-  ~&  `@t`q.data.u.full-file.res
   ::  Handle non-standard behaviour
   ::  of servers advertising the service name
   ::
@@ -122,7 +121,6 @@
       (can-octs:stream (turn args.request write-pkt-lines-txt))
       (write-pkt-len flush-pkt)
     ==
-  ~&  req+`@t`q.req
   %-  send-request:strandio
     :^  %'POST'
         (cat 3 url '/git-upload-pack')
@@ -176,13 +174,13 @@
     ::
     %+  turn
       have
-    |=  hax=hash
-    (crip "have {((x-co:co 40) hax)}")
+    |=  =hash
+    (crip "have {(print-sha-1 hash)}")
     ::
     %+  turn
       want
-    |=  hax=hash
-    (crip "want {((x-co:co 40) hax)}")
+    |=  =hash
+    (crip "want {(print-sha-1 hash)}")
     ==
   ;<  ~  bind:m  (send-request %fetch caps args)
   ;<  res=client-response:iris  bind:m  take-client-response:strandio
@@ -293,7 +291,7 @@
     ?>  =('packfile' q.octs.pkt)
     ::  Read packfile
     ::
-    =^  red=stream:stream  sea  (stream-pkt-lines-on-band 1 sea)
+    =^  red=stream:stream  sea  (read-pkt-lines-on-band sea 1)
     :_  sea
     (read:git-pack red)
   --
@@ -346,6 +344,24 @@
   |=  len=@D
   ^-  octs
   [4 (crip ((x-co:co 4) len))]
+++  write-pkt-lines-txt-on-band
+  |=  [txt=@t band=@udD]
+  ^-  octs
+  =+  len=(met 3 txt)
+  ::  XX split large requests across 
+  ::  multiple pkt lines
+  ::
+  ?>  (lte +(len) (sub 0xffff 5))
+  ::  Assemble packet line
+  ::  cafe_data_LF
+  ::
+  %-  can-octs:stream
+  :~
+    (write-pkt-len ;:(add 5 len 1))
+    [1 band]
+    [len txt]
+    [1 '\0a']
+  ==
 ++  write-pkt-lines-txt
   |=  txt=@t
   ^-  octs
@@ -386,13 +402,54 @@
   ^-  ?
   ?<  ?=(@ pkt)
   =(band (cut 3 [0 1] q.octs.pkt))
+:: 
+::  Split octs into pkt-lines
+::
+::  XX What's preventing us from invoking
+::  a jet with wrong arguments directly from nock?
+::  Do most jet verify their arguments?
+::
+++  write-pkt-lines-on-band
+  ~/  %write-pkt-lines-on-band
+  |=  [sea=stream:stream band=@ud]
+  ^-  octs
+  =+  chunk-size=8.192
+  ::  chunk-size - pkt-line-len - band byte
+  ::  
+  ::  XX  Alternative syntax for monadic bind
+  ::  ;<  monad
+  ::  a b
+  ::  c d
+  ::  ==
+  =+  max-len=(sub chunk-size 5)
+  =|  pkt-lines=octs
+  |-  
+  ?:  (is-dry:stream sea)
+    pkt-lines
+  =+  sea-len=(sub p.octs.sea pos.sea)
+  =/  len=@ud
+    ?:  (gth sea-len max-len)
+      max-len
+    sea-len
+  ~&  write-on-band+"{<pos.sea>}/{<p.octs.sea>}"
+  =^  data  sea  (read-bytes:stream len sea)
+  ?~  data  !!
+  ?>  =(p.u.data len)
+  =/  new-line=octs
+    ;:  cat-octs:stream
+      (write-pkt-len (add len 5))
+      [1 band]
+      u.data
+    ==
+  ?>  =(p.new-line (add len 5))
+  $(pkt-lines (cat-octs:stream pkt-lines new-line))
 ::
 :: 
 ::  Assemble pkt-lines into a stream, filtering on band
 ::
-++  stream-pkt-lines-on-band
-  ~/  %stream-pkt-lines-on-band
-  |=  [band=@ud sea=stream:stream]
+++  read-pkt-lines-on-band
+  ~/  %read-pkt-lines-on-band
+  |=  [sea=stream:stream band=@ud]
   ^-  [stream:stream stream:stream]
   =|  red=stream:stream
   |-

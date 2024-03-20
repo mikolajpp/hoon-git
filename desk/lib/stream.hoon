@@ -22,6 +22,11 @@
 ::
 ~%  %stream  ..part  ~
 |%
+++  as-byts
+  |=  =octs
+  ^-  byts
+  [p.octs (rev 3 octs)]
+++  as-octs  as-octt:mimes:html
 ++  as-octt  as-octt:mimes:html
 ::
 ::  Concatenate octs
@@ -146,6 +151,7 @@
   ?:  =(fit bat)
     `pin
   $(pin +(pin))
+::  XX Improve naming of below arms
 ::
 ::  Append n bytes to red from sea without advancing sea
 ::
@@ -161,7 +167,9 @@
   :_  sea
   :+  pos.red
     (add p.octs.red n)
-  (add q.octs.red (lsh [3 p.octs.red] q.u.data))
+  %+  add
+    (end [3 p.octs.red] q.octs.red)
+  (lsh [3 p.octs.red] q.u.data)
 ::
 ::  Append n bytes to red from sea, advancing sea
 ::
@@ -176,7 +184,9 @@
   :_  sea
   :+  pos.red
     (add p.octs.red n)
-  (add q.octs.red (lsh [3 p.octs.red] q.u.data))
+  %+  add
+    (end [3 p.octs.red] q.octs.red)
+  (lsh [3 p.octs.red] q.u.data)
 ::
 ::  Append octs to stream
 ::
@@ -188,5 +198,16 @@
     sea
   :-  pos.sea
   :-  (add p.octs.sea p.data)
-  (add q.octs.sea (lsh [3 p.octs.sea] q.data))
+  ::  XX review logic in hoon.hoon: are byts/octs with 
+  ::  atom greater than its stated length gracefully handled?
+  ::
+  %+  add
+    (end [3 p.octs.sea] q.octs.sea)
+  (lsh [3 p.octs.sea] q.data)
+++  write-txt
+  |=  [sea=stream txt=@t]
+  ^-  stream
+  =/  data=octs
+    [(met 3 txt) txt]
+  (append-octs sea data)
 --

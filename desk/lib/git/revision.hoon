@@ -1,8 +1,7 @@
 ::
 ::  Revision walking
-::
 ::  Revision walker accepts a list of user supplied 
-::  commits, some of which can be marked as uninteresting (dull).
+::  commits, some of which can be marked as dull.
 ::
 ::  Subsequently, the revision walker prepares its internal state 
 ::  for walking the revision tree.
@@ -31,7 +30,7 @@
       ::  they were parents, but have not been 
       ::  reached otherwise, the map will contain 
       ::  a null. This is useful during expansion
-      ::  of the cliff set -- we mark grandparents cliff
+      ::  of the dull set -- we mark grandparents dull
       ::  only if the parent was stored as a full object.
       ::
       store=(map hash (unit commit))
@@ -41,27 +40,34 @@
       seed-stack=(list (pair hash commit))
       ::  Walk limits
       ::
-      cliff=(set hash)
+      dull=(set hash)
       ::  Commits already processed
       ::
       done=(set hash)
       
   ==
 --
-|_  walk=rev-walk
+|_  state=rev-walk
 ::  Walk over revisions, growing the walk 
 ::  from the seed list
-::
-++  walk-revs
-  |=  [repo=repository:git seed=(list [hash walk=?])]
-  ^-  [(list [hash commit]) rev-walk]
-  =.  walk  *rev-walk
-  =.  repo.walk  repo
+::  
+++  walk
+  |=  [repo=repository:git want=(list hash) exclude=(list hash)]
+  ^-  (list (pair hash commit))
+  =.  repo.state  repo
+  ::  XX prepare should also use want/exclude lists
+  ::
+  =/  seed=(list [hash ?])
+    %+  weld
+    (turn want |=(a=hash [a &]))
+    (turn exclude |=(a=hash [a |]))
   (prepare seed)
+::  XX Shouldn't this just be named put-by-store?
+::
 ++  put-unit-by-store
   |=  [=hash commit=(unit commit)]
   ^-  rev-walk
-  walk(store (~(put by store.walk) hash commit))
+  state(store (~(put by store.state) hash commit))
 ::  Retrieve a commit from the walk
 ::  store. If it does not exist, 
 ::  reach out to the repository store, crash if not found.
@@ -70,15 +76,14 @@
 ::
 ++  got-unit-by-store
   |=  =hash
-  ^-  [(unit commit) _walk]
-  =+  obj=(~(get by store.walk) hash)
+  ^-  [(unit commit) rev-walk]
+  =+  obj=(~(get by store.state) hash)
   ?^  obj
-    [u.obj walk]
+    [u.obj state]
   =/  obj=object
-    (got:~(store git repo.walk) hash)
+    (got:~(store git repo.state) hash)
   ?>  ?=(%commit -.obj)
-  =+  commit=+.obj
-  [`commit (put-unit-by-store hash `commit)]
+  [`commit.obj (put-unit-by-store hash `commit.obj)]
 ::  Retrieve a commit from the walk
 ::  store. If it does not exist, 
 ::  reach out to the repository store.
@@ -88,96 +93,95 @@
 ++  got-by-store
   |=  =hash
   ^-  [commit rev-walk]
-  =+  obj=(~(get by store.walk) hash)
+  =+  obj=(~(get by store.state) hash)
   ?:  &(?=(^ obj) ?=(^ u.obj))
-    [u.u.obj walk]
+    [u.u.obj state]
   =/  obj=object
-    (got:~(store git repo.walk) hash)
+    (got:~(store git repo.state) hash)
   ?>  ?=(%commit -.obj)
-  =+  commit=+.obj
-  [commit (put-unit-by-store hash `commit)]
+  [commit.obj (put-unit-by-store hash `commit.obj)]
 ++  put-on-seed
   |=  [=hash =commit]
   ^-  rev-walk
   ::  XX use a zipper
   ::
-  =+  time=-.date.committer.header.commit
+  =+  time=-.date.committer.commit
   =/  sits=(unit (list [^hash ^commit]))
-    (get:seed-on seed.walk time)
+    (get:seed-on seed.state time)
   ?~  sits
-    walk(seed (put:seed-on seed.walk time [[hash commit] ~]))
+    state(seed (put:seed-on seed.state time [[hash commit] ~]))
   ::  Guard against duplicates
   ::
   ?^  (find ~[[hash commit]] u.sits)
-    walk
-  walk(seed (put:seed-on seed.walk time [[hash commit] u.sits]))
+    state
+  state(seed (put:seed-on seed.state time [[hash commit] u.sits]))
 ++  pop-on-seed
   ^-  [[hash commit] rev-walk]
-  =+  seed-stack=seed-stack.walk
+  =+  seed-stack=seed-stack.state
   ?^  seed-stack
-    =^  first  seed-stack.walk  seed-stack
-    [first walk]
-  =^  pop  seed.walk  (pop:seed-on seed.walk)
-  =^  first  seed-stack.walk  val.head.pop
-  [first walk]
-++  mark-parents-cliff
+    =^  first  seed-stack.state  seed-stack
+    [first state]
+  =^  pop  seed.state  (pop:seed-on seed.state)
+  =^  first  seed-stack.state  val.head.pop
+  [first state]
+++  mark-parents-dull
   |=  =commit
   ^-  rev-walk
   =|  stack=(list hash)
-  =+  parents=parents.header.commit
+  =+  parents=parents.commit
   =<
-  ::  Mark parents of the commit as cliff, 
+  ::  Mark parents of the commit as dull, 
   ::  possibly adding grandparents to the stack
   ::
-  =^  stack  cliff.walk
+  =^  stack  dull.state
     |-
     ?~  parents
-      [stack cliff.walk]
+      [stack dull.state]
     =+  hash=i.parents
-    =.  cliff.walk
-      (~(put in cliff.walk) hash)
-    =^  grands=(list ^hash)  walk  
-      (mark-one-parent-cliff hash)
+    =.  dull.state
+      (~(put in dull.state) hash)
+    =^  grands=(list ^hash)  state  
+      (mark-one-parent-dull hash)
     %=  $
       parents  t.parents
       stack  (weld grands stack)
     ==
   |-
   ?~  stack
-    walk
+    state
   =+  hash=i.stack
-  =^  parents=(list ^hash)  walk  (mark-one-parent-cliff hash)
+  =^  parents=(list ^hash)  state  (mark-one-parent-dull hash)
   $(stack (weld parents stack))
   ::
   |%
-  ++  mark-one-parent-cliff
+  ++  mark-one-parent-dull
     |=  =hash
     ^-  [(list ^hash) rev-walk]
-    ::  Do not jump off the cliff twice
+    ::  Do not jump off the dull twice
     ::
-    ?:  (~(has in cliff.walk) hash)
-      [~ walk]
-    :: ~&  mark-one-parent-cliff+hash
-    =.  cliff.walk  (~(put in cliff.walk) hash)
-    =^  mit  walk  (got-unit-by-store hash)
+    ?:  (~(has in dull.state) hash)
+      [~ state]
+    :: ~&  mark-one-parent-dull+hash
+    =.  dull.state  (~(put in dull.state) hash)
+    =^  mit  state  (got-unit-by-store hash)
     ?~  mit
-      [~ walk]
+      [~ state]
     ::  We have already got this commit,
     ::  add parents to the stack
     ::
-    :_  walk
-    parents.header.u.mit
+    :_  state
+    parents.u.mit
   --
 ++  process-parents
   |=  [=hash =commit]
   ^-  rev-walk
   ::  Processing parents
   ::  (1) Check if the commit has been processed (ADD flag)
-  ::  (2) For cliff commits that has already been parsed,
+  ::  (2) For dull commits that has already been parsed,
   ::      process each parent
-  ::    (a) Mark the parent cliff
+  ::    (a) Mark the parent dull
   ::    (b) Make it into a full object and mark 
-  ::        grandparents cliff
+  ::        grandparents dull
   ::    (c) If the object has not yet been added to the list (!SEEN),
   ::        add it in time order.
   ::  (3) For interesting commits, process each parent
@@ -186,79 +190,82 @@
   ::
   ::  XX use a zipper
   ::
-  ?:  (~(has in done.walk) hash)
-    walk
-  =.  done.walk  (~(put in done.walk) hash)
-  =+  parents=parents.header.commit
-  ::  Cliff commit
+  ?:  (~(has in done.state) hash)
+    state
+  =.  done.state  (~(put in done.state) hash)
+  =+  parents=parents.commit
+  ::  dull commit
   ::
-  ?:  (~(has in cliff.walk) hash)
+  ?:  (~(has in dull.state) hash)
     |-
     ?~  parents
-      walk
+      state
     =+  hash=i.parents
-    =^  mit  walk  (got-by-store hash)
-    =.  walk  (mark-parents-cliff mit)
-    =.  walk  (put-on-seed hash mit)
+    =^  mit  state  (got-by-store hash)
+    =.  state  (mark-parents-dull mit)
+    =.  state  (put-on-seed hash mit)
     $(parents t.parents)
   |-
   ?~  parents
-    walk
+    state
   =+  hash=i.parents
-  =^  mit  walk  (got-by-store hash)
-  =.  walk  (put-on-seed hash mit)
+  =^  mit  state  (got-by-store hash)
+  =.  state  (put-on-seed hash mit)
   $(parents t.parents)
-
+::  XX Make (list (pair [hash commit] ?))
+::  the standard output of revision state. 
+::  The flag indicates whether to state over the commit (&) 
+::  or it is a dull object. 
+::
 ++  prepare
   |=  seed=(list [hash walk=?])
-  ^-  [(list [hash commit]) rev-walk]
-  =.  walk
+  ^-  (list [hash commit])
+  =.  state
     |-
     ?~  seed 
-      walk
+      state
     =+  hash=-.i.seed
-    =+  cliff=!+.i.seed
-    :: ~&  prepare-commit+[hash cliff]
+    =+  dull=!+.i.seed
+    :: ~&  prepare-commit+[hash dull]
     ::  XX 1. Here we have a zipper focused at commit
     ::
-    =^  mit=commit  walk  (got-by-store hash)
-    =.  walk  (put-on-seed hash mit)
+    =^  mit=commit  state  (got-by-store hash)
+    =.  state  (put-on-seed hash mit)
     ::  XX 2. Here we use the zipper to update flags
     ::
-    =?  walk  cliff
-      =.  cliff.walk  (~(put in cliff.walk) hash)
-      (mark-parents-cliff mit)
+    =?  state  dull
+      =.  dull.state  (~(put in dull.state) hash)
+      (mark-parents-dull mit)
     $(seed t.seed)
   ::  Limit the list
   ::  (1) Pop the commit
   ::  (2) Handle max age (commit too old)
   ::  (3) Process parents
-  ::  (4) Handle uninteresting commit
+  ::  (4) Handle dull commit
   ::  (5) Handle min age (commit too young)
   ::  (6) Discard the commit if too old (if desired)
   ::  (7) Push the commit onto the stack
   ::
   =|  commits=(list [hash commit])
-  =^  commits  walk
+  =^  commits  state
     |-
     ::  XX typechecker goes haywire
     ::
-    =+  seed=seed.walk
+    =+  seed=seed.state
     ?~  seed
-      [commits walk]
-    =^  [=hash mit=commit]  walk  pop-on-seed
-    :: ~&  pop-seed+[hash parents.header.mit]
+      [commits state]
+    =^  [=hash mit=commit]  state  pop-on-seed
+    :: ~&  pop-seed+[hash parents.mit]
     ::  XX Handle max age
     ::  XX This modifies the seed mop
     ::
-    =.  walk  (process-parents hash mit)
-    =?  walk  (~(has in cliff.walk) hash)
-      (mark-parents-cliff mit)
+    =.  state  (process-parents hash mit)
+    =?  state  (~(has in dull.state) hash)
+      (mark-parents-dull mit)
     ::  XX Handle min age
     ::  XX Handle max age as filter
     $(commits [[hash mit] commits])
-  :_  walk
-  ::  XX Git probably uses cliff commits for something
+  ::  XX Git shows dull commits when requested with arguments
   ::
-  (flop (skip commits |=([=hash mit=*] (~(has in cliff.walk) hash))))
+  (flop (skip commits |=([=hash mit=*] (~(has in dull.state) hash))))
 --

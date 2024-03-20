@@ -40,7 +40,8 @@
   $(a (rsh [3 1] a), hex (add (lsh [2 1] hex) val))
 ::  XX conform to git-check-ref-format
 ::
-++  parser-sha-1  (bass 16 (stun [40 40] six:ab))
+++  parser-sha-1  %+  cook  |=(h=@ (rev 3 20 h))
+                  (bass 16 (stun [40 40] six:ab))
 ++  parser-sha-256  !!
 ++  parser-segment  (cook crip (plus ;~(less fas prn)))
 ++  parser-path
@@ -53,6 +54,10 @@
   %+  cook 
     |=([=hash =path] [path hash])
     ;~(plug parser-sha-1 ;~(pfix ace parser-path))
+++  print-sha-1
+  |=  =hash
+  ^-  tape
+  ((x-co:co 40) (rev 3 20 hash))
 ::
 ::  Object
 ::
@@ -85,16 +90,18 @@
     =/  hed  (rust txt ;~(plug sym ;~(pfix ace dip:ag)))
     ?~  hed
       ~|  "Object is corrupted: invalid header"  !!
-    ?.  =(+.u.hed (sub p.octs +(u.pin)))
+    =+  [type=@tas size=@ud]=u.hed
+    ?.  =(size (sub p.octs +(u.pin)))
       ~|  "Object is corrupted: incorrect object length"  !!
-    =/  typ=object-type
-    :: XX Can we somehow cast?
-      ?+  -.u.hed  ~|  "Unknown object type {<-.u.hed>}"  !!
+    =/  type=object-type
+    :: XX Can we somehow cast @tas to type?
+      ?+  type  ~|  "Object corrupted: unknown type {<type>}"  !!
           %blob    %blob
           %commit  %commit
           %tree    %tree
+          %tag  !!
       ==
-    [typ [+(u.pin) octs]]
+    [type size [+(u.pin) octs]]
   ::  Size of the data payload
   ::
   ++  raw-size
@@ -132,11 +139,10 @@
     ++  parse-blob
       |=  rob=raw-object
       ^-  object
-      ?>  ?=(%blob -.rob)
+      ?>  ?=(%blob type.rob)
       =+  len=(sub p.octs.data.rob pos.data.rob)
-      :+  %blob
-      len
-      (cut 3 [pos.data.rob len] q.octs.data.rob)
+      =+  data=(cut 3 [pos.data.rob len] q.octs.data.rob)
+      blob+[size.rob [len data]]
     ::
     ++  hash-bytes  ?-  hat
                     %sha-1  20
@@ -197,23 +203,21 @@
         ==
       ;~  sfix
         (stag %gpg (cook crip (plus ;~(less hep ;~(pose prn gah)))))
-        ;~(plug gpg-header-end eol ace)
+        ::  XX make this parser robust
+        ;~(plug gpg-header-end ;~(less prn (star gah)))
       ==
       
       ==
     ++  commit
       ;~  plug
-        ;~  sfix
-          ;~  plug
-            ;~(sfix tree eol)
-            (star ;~(sfix parent eol))
-            ;~(sfix author eol)
-            committer
-            (punt ;~(pfix eol commit-signature))
-          ==
-          eol
+        ;~  plug
+          ;~(sfix tree eol)
+          (star ;~(sfix parent eol))
+          ;~(sfix author eol)
+          committer
+          (punt ;~(pfix eol commit-signature))
         ==
-        ;~(pfix eol message)
+        message
       ==
     ::  Tree rules
     ::
@@ -226,18 +230,19 @@
       :: |=  rob=$>(%commit raw-object)
       |=  rob=raw-object
       ^-  object
-      ?>  ?=(%commit -.rob)
+      ?>  ?=(%commit type.rob)
       =+  txt=(trip q:(raw-data:obj rob))
       =+  com=(commit [[1 1] txt])
       ?~  q.com
+        ~&  txt
         ~|  "Failed to parse commit object: syntax error {<p.com>} in {txt}"  !!
-      commit+p.u.q.com
+      commit+[size.rob p.u.q.com]
     ::
     ++  parse-tree
       :: |=  rob=$>(%tree raw-object)
       |=  rob=raw-object
       ^-  object
-      ?>  ?=(%tree -.rob)
+      ?>  ?=(%tree type.rob)
       ::  XX better parsing of mode.
       ::  Is leading zero allowed in principle?
       ::
@@ -248,7 +253,7 @@
       =/  tes=(list tree-entry)  ~
       |-
       ?.  (lth pos.sea p.octs.sea)
-        tree+tes
+        tree+[size.rob tes]
       =+  pin=(find-byte:stream 0x0 sea)
       ?~  pin  !!
       =^  tex  sea  (read-bytes:stream (sub u.pin pos.sea) sea)
@@ -302,7 +307,7 @@
   ++  hash-octs-sha-1
     |=  =octs
     ^-  @ux
-    (sha-1l:sha p.octs (rev 3 p.octs q.octs))
+    (rev 3 20 (sha-1l:sha p.octs (rev 3 p.octs q.octs)))
   ::
   ::  Hash a raw git object
   ::

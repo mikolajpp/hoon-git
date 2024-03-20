@@ -15,6 +15,11 @@
 ::  Expand Zlib stream
 ::
 ::  This is a jet stub for now
+++  compress
+  ~/  %compress
+  |=  data=octs
+  ^-  octs
+  [0 0x0]
 ++  expand
   ~/  %expand
   |=  sea=stream

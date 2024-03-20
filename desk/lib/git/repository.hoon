@@ -12,13 +12,15 @@
                       [%u @ud]
                       [%s @t]
                   ==
-::  XX seb - a set structure specialized 
-::  for enumeration types (up to 64 members?)
-::
 +$  object-store  $:  loose=(map hash object)
                       archive=(list pack:git-pack)
                   ==
 +$  config-key  [@tas (unit @t)]
+::  XX Can you use an axal with ref-path instead 
+::  of path, especially from the aura typesystem 
+::  point of view?
+::
++$  ref-path  (list @t)
 +$  ref  $@(hash [%symref path])
 +$  refs  (axal ref)
 +$  remote  [url=@t =refs]
@@ -27,11 +29,13 @@
   $:  =hash-type
       =object-store
       =refs
-      :: trail=(map reference trail-spec)
+      track=(map @t [far=@t =ref])
       remotes=(map @tas remote)
       config=(mip:libmip config-key @tas config-value)
   ==
 --
+::  XX Switch to using id=hash argument 
+::  in gates
 |_  repo=repository
 +*  this  .
 ++  clone-from-bundle
@@ -143,28 +147,48 @@
   :: ::   (~(get by object-store.repo) haz)
   :: :: ::
   ++  get
-    |=  hash=@ux
+    |=  =hash
     ^-  (unit object)
-    =+  obj=(~(get by loose.object-store.repo) hash)
-    ?^  obj
-      obj
-    %+  roll  `(list pack:git-pack)`archive.object-store.repo
+    =+  loose=(~(get by loose.object-store.repo) hash)
+    ?^  loose
+      loose
+    ::  XX use a loop, why traverse when 
+    ::  obj has already been found?
+    ::
+    %+  roll  archive.object-store.repo
       |=  [=pack:git-pack obj=(unit object)]
       ?~  obj
+        ::  XX  (~(get-with-size git-pack pack) hash)
         (get:git-pack pack hash)
       obj
+  ++  got
+    |=  =hash
+    ^-  object
+    (need (get hash))
+  ++  get-header
+    |=  =hash
+    ^-  (unit object-header)
+    =+  loose=(~(get by loose.object-store.repo) hash)
+    ?^  loose
+      `[-.u.loose size.u.loose]
+    %+  roll  archive.object-store.repo
+      |=  [=pack:git-pack obj=(unit object-header)]
+      ?~  obj
+        ::  XX  (~(get-with-size git-pack pack) hash)
+        (get-header:git-pack pack hash)
+      obj
+  ++  got-header
+    |=  =hash
+    ^-  object-header
+    (need (get-header hash))
   ++  get-archive
-    |=  hash=@ux
+    |=  =hash
     ^-  (unit object)
     %+  roll  archive.object-store.repo
       |=  [=pack:git-pack obj=(unit object)]
       ?~  obj
         (get:git-pack pack hash)
       obj
-  ++  got
-    |=  hash=@ux
-    ^-  object
-    (need (get hash))
   ++  has
     |=  =hash
     ^-  ?

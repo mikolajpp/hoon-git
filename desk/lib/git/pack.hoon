@@ -4,19 +4,11 @@
 /+  *git, stream
 ~%  %git-pack  ..part  ~
 |%
-:: Below does not work, unless object-type
-:: is in the same file.
-:: +$  pack-object-type  $?  object-type
-::                           %ofs-delta
-::                           %ref-delta
-::                       ==
-+$  pack-object-type  $?  %commit
-                          %tree
-                          %blob
-                          %tag
++$  pack-object-type  $?  object-type 
                           %ofs-delta
                           %ref-delta
                       ==
++$  pack-object-header  [type=pack-object-type size=@ud]
 +$  pack-object  $%  raw-object
                      [%ofs-delta pos=@ud base-offset=@ud =octs]
                      [%ref-delta =octs]
@@ -31,14 +23,27 @@
 ::
 +$  pack-index   ((mop hash @ud) lth)
 ++  pack-on  ((on hash @ud) lth)
-+$  pack  [=hash-type index=pack-index data=stream:libstream]
++$  pack  [=hash-type count=@ud index=pack-index end-pos=@ud data=stream:libstream]
 ::
 ++  read
   |=  sea=stream:stream
   ^-  pack
-  ?>  (gte p.octs.sea (met 3 q.octs.sea))
+  :: ?>  (gte p.octs.sea (met 3 q.octs.sea))
+  =+  start=pos.sea
   =^  header=pack-header  sea  (read-header sea)
-  (index header sea)
+  =^  =pack  sea  (index header sea)
+  ::  Verify integrity
+  ::
+  =+  end=pos.sea
+  =^  hash  sea
+    (read-bytes:stream (pack-hash-bytes header) sea)
+  ?~  hash 
+    ~|  "Pack file is corrupted: no checksum found"  !!
+  ?>  =(pos.sea p.octs.sea)
+  =+  len=(sub end start)
+  =+  check=(hash-octs-sha-1:obj len (rsh [3 start] q.octs.sea))
+  ?>  =(q.u.hash check)
+  pack
 ::
 ++  read-header
   |=  sea=stream:stream
@@ -75,13 +80,14 @@
 ::
 ++  index
   |=  [header=pack-header sea=stream:stream]
-  ^-  pack
-  =+  pos=pos.sea
+  ^-  [pack stream:stream]
+  =+  start=pos.sea
   =|  count=@ud
   =|  index=pack-index
-  =.  index
+  =^  index  sea
     |-
     ?.  (lth count count.header)
+      :_  sea
       index
     ?:  (is-dry:stream sea)
       ~|  "Expected {<count.header>} objects ({<count>} processed)"
@@ -91,7 +97,7 @@
     =+  beg=pos.sea
     =^  pob=pack-object  sea  (read-pack-object sea)
     =/  rob=raw-object
-      (resolve-object pob sea)
+      (resolve-raw-object pob sea)
     =+  hax=(hash-raw:obj (pack-hash-type header) rob)
     ?>  (gte p.octs.data.rob (met 3 q.octs.data.rob))
     ?:  (~(has by index) hax)
@@ -100,18 +106,11 @@
       index  (put:pack-on index hax beg)
       count  +(count)
     ==
-  :: XX verify pack integrity
-  :: XX parametrize by hash type
-  ::
-  =^  hax  sea  
-    (read-bytes:stream (pack-hash-bytes header) sea)
-  ?~  hax
-    ~|  "Pack file is corrupted: no checksum found"  !!
-  :: ~&  pack-checksum+`@ux`q:(need hax)
+  :_  sea
   :-  (pack-hash-type header)
-  [index [pos octs.sea]]
+  [count.header index end-pos=pos.sea [start octs.sea]]
 ::
-++  resolve-object
+++  resolve-raw-object
   |=  [pob=pack-object sea=stream:stream]
   ^-  raw-object
   ?:  ?=(raw-object pob)
@@ -182,7 +181,7 @@
   :: ~&  expand-to+[type=type.base biz siz]
   ::  Verify base size
   ::
-  ?>  =((raw-size:obj base) biz)
+  ?>  =(size.base biz)
   ::  Expanded object data
   ::
   =|  red=stream:stream
@@ -193,8 +192,9 @@
   |-
   ?:  (is-dry:stream sea)
     ::  Verify target size
-    =+  rob=[type.base 0+octs.red]
-    ?>  =((raw-size:obj rob) siz)
+    =/  rob=raw-object
+      [type.base p.octs.red 0+octs.red]
+    ?>  =(size.rob siz)
     rob
     :: (parse-raw:obj octs.red)
   =^  byt  sea  (read-byte:stream sea)
@@ -295,20 +295,25 @@
       [offset octs.data.base]
   --
 ::
+++  read-with-index
+  |=  [=pack =hash]
+  ^-  [pack-object stream:stream]
+  =+  pin=(got:pack-on index.pack hash)
+  (read-pack-object [pin octs.data.pack])
 ++  read-pack-object
   |=  sea=stream:stream
   ^-  [pack-object stream:stream]
   =+  pos=pos.sea
-  =^  [typ=pack-object-type size=@ud]  sea
-    (read-object-type-size sea)
-  ?+  typ
+  =^  [type=pack-object-type size=@ud]  sea
+    (read-pack-object-header sea)
+  ?+  type
     =^  data=octs  sea  (expand:zlib sea)
     ?.  =(p.data size)
       ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<p.data>}b)"  !!
     :_  sea
     ::  XX parametrize by hash type
     ::
-    [typ 0+data]
+    [type size 0+data]
   ::
   %ofs-delta  (read-object-ofs pos sea)
   ::
@@ -318,7 +323,7 @@
 ::
 ++  read-object-ofs
   |=  [pos=@ud sea=stream:stream]
-  ^-  [pack-object stream:stream]
+  ^-  [pack-delta-object stream:stream]
   =^  base-offset=@ud  sea  (read-offset sea)
   ::  XX this check could be wrong
   ::  the stream position might
@@ -336,7 +341,7 @@
   =+  fet=0
   ::  XX put a safety stop
   ::  to prevent infinite loop here
-  ::  and at read-object-type-size
+  ::  and at read-pack-object-header
   ::
   |-
   ::  XX introduce unsafe read-byte?
@@ -354,13 +359,13 @@
 ::  XX This can be just computed
 ::  in a single loop
 ::
-++  read-object-type-size
+++  read-pack-object-header
   |=  sea=stream:stream
-  ^-  [[pack-object-type @ud] stream:stream]
+  ^-  [pack-object-header stream:stream]
   =^  bat  sea  (read-byte:stream sea)
   ?~  bat  !!
   =+  tap=(dis (rsh [2 1] u.bat) 0x7)
-  =/  typ  (object-type tap)
+  =/  typ  (to-object-type tap)
   ?~  typ
     ~|  "Invalid pack object type {<tap>}"  !!
   ::  Decode object size
@@ -390,9 +395,14 @@
     bits  (add bits 7)
   ==
 ::
-++  object-type
+++  to-object-type
   |=  ryt=@ud
   ^-  (unit pack-object-type)
+  ::  XX A case rune
+  ::  ?*  ryt  ~
+  ::  1  `%commit
+  ::  ...
+  ::
   ?+  ryt  ~
     %1  `%commit
     %2  `%tree
@@ -415,7 +425,7 @@
     ~
   =+  sea=[u.pin octs.data.pack]
   =^  pob  sea  (read-pack-object sea)
-  `(resolve-object pob sea)
+  `(resolve-raw-object pob sea)
 ++  get
   |=  [=pack hax=hash]
   ^-  (unit object)
@@ -423,6 +433,21 @@
   ::  XX Why is this function called a bind?
   ::
   (bind obe (cury parse-raw:obj hash-type.pack))
+++  get-header
+  |=  [=pack hax=hash]
+  ^-  (unit object-header)
+  =+  pin=(get:pack-on index.pack hax)
+  ?~  pin
+    ~
+  =+  offset=u.pin
+  |-
+  =+  sea=[offset octs.data.pack]
+  =^  header=pack-object-header  sea
+    (read-pack-object-header sea)
+  ?:  ?=(object-header header)
+    `header
+  ?>  ?=(%ofs-delta type.header)
+  $(offset (sub offset -:(read-offset sea)))
 ++  got-raw
   |=  [=pack hax=hash]
   ^-  raw-object
@@ -430,12 +455,16 @@
   ?~  pin  !!
   =+  sea=[u.pin octs.data.pack]
   =^  pob  sea  (read-pack-object sea)
-  (resolve-object pob sea)
+  (resolve-raw-object pob sea)
 ++  got
   |=  [=pack hax=hash]
   ^-  object
   =+  obe=(got-raw pack hax)
   (parse-raw:obj hash-type.pack obe)
+++  got-header
+  |=  [=pack =hash]
+  ^-  object-header
+  (need (get-header pack hash))
 ++  has
   |=  [=pack =hash]
   ^-  ?

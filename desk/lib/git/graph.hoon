@@ -31,9 +31,13 @@
     ::
     ?.  ?=(%commit -.obj)
       &
-    ?:  (lth -.date.committer.header.obj oldest-have)
+    ::  XX Such accessess are too long. Move
+    ::  commit stuff into /lib/git/commit/hoon 
+    ::  and provide compile-time accessors
+    ::
+    ?:  (lth -.date.committer.commit.obj oldest-have)
       |
-    %+  roll  parents.header.obj
+    %+  roll  parents.commit.obj
       |=  [=^hash reach=?]
       ^-  ?
       ?:  ?|(reach (~(has in have) hash))
