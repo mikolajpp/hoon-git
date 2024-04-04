@@ -16,7 +16,6 @@
 ::
 ::  This is a jet stub for now
 ++  compress
-  ~/  %compress
   |=  data=octs
   ^-  octs
   [0 0x0]

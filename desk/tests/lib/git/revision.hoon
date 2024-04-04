@@ -21,7 +21,7 @@
 ++  test-walk-sort-time
   =/  repo=repository:git
     %-  clone-from-bundle:git
-      .^(bundle:git-bundle %cx /~dev/git/247/tests/lib/git/narnia/bdl)
+      .^(bundle:git-bundle %cx /~dev/git/2/tests/lib/git/narnia/bdl)
   ?<  ?=(~ archive.object-store.repo)
   ;:  weld
   ::  git rev-list master

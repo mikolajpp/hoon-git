@@ -8,11 +8,15 @@
   $%  state-0
   ==
 +$  repo-store  (map @tas repository:git)
-+$  state-0  [%0 =repo-store]
++$  access  (map @tas (set @p))
++$  state-0  [%0 =repo-store =access]
 +$  card  card:agent:gall
 ::  XX allow @ta as a name
 +$  command
   $%  [%put name=@tas =repository:git]
+      [%allow-access name=@tas ship=@p]
+      [%set-private name=@tas]
+      [%set-public name=@tas]
       [%update name=@tas =repository:git]
       [%delete name=@tas]
   ==
@@ -28,7 +32,7 @@
     do   ~(. +> bowl)
 ++  on-init
   ^-  (quip card _this)
-  :_  this(state [%0 ~])
+  :_  this(state *state-0)
   ::  Handle HTTP requests on /git
   ::
   ::  XX can we just assume the binding was successful?
@@ -56,6 +60,9 @@
   =+  cmd=!<(command vase)
     ?-  -.cmd
       %put     (put:do +.cmd)
+      %set-private  (set-private:do +.cmd)
+      %allow-access  (allow-access:do +.cmd)
+      %set-public   (set-public:do +.cmd)
       %update  (update:do +.cmd)
       %delete  (delete:do +.cmd)
     ==
@@ -97,9 +104,47 @@
   ~&  delete-repo+name
   ^-  (quip card _state)
   ?:  (~(has by repo-store.state) name)
-    ~&  "Deleted Git repository:git {<name>}"
+    ~&  "Deleted Git repository {<name>}"
     `state(repo-store (~(del by repo-store.state) name))
   `state
+++  set-private
+  |=  name=@tas
+  ~&  set-private+name
+  ^-  (quip card _state)
+  ?.  (~(has by repo-store.state) name)
+    `state
+  ~&  "Restricted Git repository {<name>}"
+  `state(access (~(put by access.state) name ~))
+++  allow-access
+  |=  [name=@tas ship=@p]
+  ~&  allow-access+[name ship]
+  ^-  (quip card _state)
+  ?.  ?&  (~(has by repo-store.state) name)
+          (~(has by access.state) name)
+      ==
+    `state
+  ~&  "Restricted Git repository {<name>}"
+  ::  XX double get
+  =+  allow=(~(got by access.state) name)
+  =.  allow  (~(put in allow) ship)
+  `state(access (~(put by access.state) name allow))
+++  set-public
+  |=  name=@tas
+  ~&  set-public+name
+  ^-  (quip card _state)
+  ?.  (~(has by repo-store.state) name)
+    `state
+  ~&  "Git repository {<name>} is now public"
+  `state(access (~(del by access.state) name))
+++  is-authorized
+  |=  =inbound-request:eyre
+  ^-  ?
+  =+  auth=(get-header:http 'authorization' header-list.request.inbound-request)
+  ?~  auth
+    |
+  =+  pass=(scan (trip u.auth) ;~(pfix (jest 'Basic ') (star prn)))
+  :: ~&  `@t`q:(need (de:base64:mimes:html (crip pass)))
+  =('git:git' q:(need (de:base64:mimes:html (crip pass))))
 ++  handle-http
   |=  [eyre-id=@ta =inbound-request:eyre]
   ^-  (quip card _state)
@@ -108,9 +153,17 @@
   ~&  handle-http+[eyre-id request-line]
   ?>  ?=([%git @t *] site.request-line)
   =+  repo=(~(get by repo-store.state) i.t.site.request-line)
-  ::  XX per-ship access control
-  ::
   ?<  ?=(~ repo)
+  =+  access=(~(get by access) i.t.site.request-line)
+  ?.  ?|  ?=(~ access)
+          (is-authorized inbound-request)
+      ==
+    ::  Access restricted
+    ::
+    :_  state
+    %+  give-simple-payload:app:server  eyre-id
+      :-  [401 ~[['www-authenticate' 'Basic realm="access to git repo"']]] 
+      `(as-octt:mimes:html "Access denied")
   ?+  site.request-line  !!
     ::  Handshake
     ::
