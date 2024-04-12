@@ -1,6 +1,7 @@
 /-  libstream=stream
 /+  libmip=mip
 |%
+::  XX rename to hash-algo
 +$  hash-type
   $?  %sha-256
       %sha-1

@@ -362,6 +362,7 @@
     [len txt]
     [1 '\0a']
   ==
+::  XX rename to write-pkt-line-txt
 ++  write-pkt-lines-txt
   |=  txt=@t
   ^-  octs

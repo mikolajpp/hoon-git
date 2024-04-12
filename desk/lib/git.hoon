@@ -40,6 +40,8 @@
   $(a (rsh [3 1] a), hex (add (lsh [2 1] hex) val))
 ::  XX conform to git-check-ref-format
 ::
+::  XX rename to parse-sha-1
+::
 ++  parser-sha-1  %+  cook  |=(h=@ (rev 3 20 h))
                   (bass 16 (stun [40 40] six:ab))
 ++  parser-sha-256  !!
@@ -102,6 +104,18 @@
           %tag  !!
       ==
     [type size [+(u.pin) octs]]
+  ++  as-octs
+    |=  rob=raw-object
+    ^-  octs
+    ::  XX will not work of data is a slice
+    ?>  =(0 pos.data.rob)
+    ;:  cat-octs:stream
+      (as-octs:mimes:html type.rob)
+      [1 ' ']
+      (as-octs:mimes:html (scot %ud size.rob))
+      [1 0x0]
+      octs.data.rob
+    ==
   ::  Size of the data payload
   ::
   ++  raw-size
@@ -275,7 +289,7 @@
   ::
   :: Render a git object raw
   ::
-  ++  rare
+  ++  as-raw 
     |=  obe=object
     ^-  raw-object
     ?-  -.obe
@@ -324,7 +338,7 @@
   ++  hash
     |=  [hat=hash-type obe=object]
     ^-  @ux
-    (hash-raw hat (rare obe))
+    (hash-raw hat (as-raw obe))
   ::
   ++  print-hash
     |=  [hat=hash-type haz=hash]

@@ -187,6 +187,27 @@
   %+  add
     (end [3 p.octs.red] q.octs.red)
   (lsh [3 p.octs.red] q.u.data)
+++  write-octs
+  |=  [sea=stream data=octs]
+  ^-  stream
+  ?:  =(p.data 0)
+    sea
+  :-  (add pos.sea p.data)
+  ::  XX review logic in hoon.hoon: are byts/octs with 
+  ::  atom greater than its stated length gracefully handled?
+  ::
+  :: |----p---------|
+  ::      |-data-|
+  =+  len=(add pos.sea p.data)
+  =/  tal=@ud
+    ?:  (gte len p.octs.sea)
+      0
+    (sub p.octs.sea len)
+  ;:  cat-octs
+    [pos.sea (end [3 pos.sea] q.octs.sea)]
+    data
+    [tal (rsh [3 len] q.octs.sea)]
+  ==
 ::
 ::  Append octs to stream
 ::
@@ -207,7 +228,5 @@
 ++  write-txt
   |=  [sea=stream txt=@t]
   ^-  stream
-  =/  data=octs
-    [(met 3 txt) txt]
-  (append-octs sea data)
+  (write-octs sea (as-octs:mimes:html txt))
 --

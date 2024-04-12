@@ -275,22 +275,31 @@
 ++  write-packs
   |=  archive=(list pack:pack)
   ^-  octs
+  ~&  write-no-packs+(lent archive)
   =/  count=@ud
     %+  roll  archive
       |=  [=pack:pack c=@ud]
       (add count.pack c)
+  ~&  write-pack-objects+count
   =|  sea=stream:stream
   =.  sea  (write-txt:stream sea 'PACK')
-  =.  sea  (append-octs:stream sea (as-byts:stream [4 version]))
-  =.  sea  (append-octs:stream sea (as-byts:stream [4 count]))
-  =.  sea  %+  roll  archive
+  =.  sea  (write-octs:stream sea (as-byts:stream [4 version]))
+  ~&  count
+  =.  sea  (write-octs:stream sea (as-byts:stream [4 count]))
+  ~&  `@ux`q.octs.sea
+  ::  XX This could have terrible memory complexity
+  ::  We really want to operate on a single copy 
+  ::  of sea
+  ::
+  =.  sea  %+  reel  archive
     |=  [=pack:pack =_sea]
-    %+  append-octs:stream  sea
+    %+  write-octs:stream  sea
+      ~&  pack-size+p.octs.data.pack
       ::  Discard hash
       :-  (sub end-pos.pack pos.data.pack)
       ::  Discard header
       (rsh [3 pos.data.pack] q.octs.data.pack)
   =+  hash=(hash-octs-sha-1:obj octs.sea)
-  =.  sea  (append-octs:stream sea [20 hash])
+  =.  sea  (write-octs:stream sea [20 hash])
   octs.sea
 --

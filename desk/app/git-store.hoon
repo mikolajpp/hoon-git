@@ -152,7 +152,8 @@
     (parse-request-line:server url.request.inbound-request)
   ~&  handle-http+[eyre-id request-line]
   ?>  ?=([%git @t *] site.request-line)
-  =+  repo=(~(get by repo-store.state) i.t.site.request-line)
+  =+  repo-name=i.t.site.request-line
+  =+  repo=(~(get by repo-store.state) repo-name)
   ?<  ?=(~ repo)
   =+  access=(~(get by access) i.t.site.request-line)
   ?.  ?|  ?=(~ access)
@@ -171,17 +172,42 @@
       ?>  ?=([[%service @t] ~] args.request-line)
       ?+  value.i.args.request-line  !!
         %git-upload-pack
-          (handle-upload-pack u.repo eyre-id request.inbound-request)
+          (handle-upload-pack repo-name u.repo eyre-id request.inbound-request)
         %git-receive-pack
-          (handle-receive-pack u.repo eyre-id request.inbound-request)
+          (handle-receive-pack repo-name u.repo eyre-id request.inbound-request)
       ==
     [%git @t %git-upload-pack ~]
-      (handle-upload-pack u.repo eyre-id request.inbound-request)
+      (handle-upload-pack repo-name u.repo eyre-id request.inbound-request)
     [%git @t %git-receive-pack ~]
-      (handle-receive-pack u.repo eyre-id request.inbound-request)
+      (handle-receive-pack repo-name u.repo eyre-id request.inbound-request)
   ==
+::
+::  XX Move below utility functions to /lib/git/reference.hoon
+::
+++  write-ref
+  |=  [=refname:git =hash]
+  ^-  @t
+  ::  XX  handle reference peeling
+  ::
+  (print-ref refname hash)
+++  print-ref
+  |=  [=refname:git =hash]
+  ^-  @t
+  ;:  (cury cat 3)
+    (crip (print-sha-1 hash))
+    ' '
+    (print-refname refname)
+  ==
+++  print-refname
+  |=  =path
+  ^-  @t
+  (rsh [3 1] (spat path))
 ++  handle-upload-pack
-  |=  [repo=repository:git eyre-id=@ta request=request:http]
+  |=  $:  repo-name=@t 
+          repo=repository:git 
+          eyre-id=@ta 
+          request=request:http
+      ==
   ^-  (quip card _state)
   =+  ver=(get-header:http 'git-protocol' header-list.request)
   ?~  ver  !!
@@ -273,35 +299,28 @@
         [%ref-prefix *]  $(ref-prefix.args [path.arg ref-prefix.args])
       ==
     ~&  args
+    ~&  refs.repo
     =|  sea=stream:stream
     =+  ref-prefix=ref-prefix.args
-    =.  sea
-      |-
-      ?~  ref-prefix
-        sea
-      =/  axe=refs:git
-        (~(dip of refs.repo) i.ref-prefix)
-      =+  path=(crip "{(tail (spud i.ref-prefix))}")
-      =.  sea
-        |-
-        ::  XX =? with check for unit 
-        ::  does not work. 
-        ::
-        =.  sea  ?~  fil.axe  sea
-          ?^  u.fil.axe  !!
-          %+  append-octs:stream
-            sea
+    =.  sea  %+  roll  ?~(ref-prefix `(list refname:git)`~[~] ref-prefix)
+      |=  [prefix=refname:git =_sea]
+      %+  rep-prefix:~(refs git repo)  prefix 
+        |=  [[=refname:git =ref:git] =_sea]
+        ?@  ref
+          %+  append-octs:stream  sea
+            %-  write-pkt-lines-txt
+            (write-ref refname ref)
+        =+  hash=(got:~(refs git repo) refname.ref)
+        %+  append-octs:stream  sea
           %-  write-pkt-lines-txt
-            (cat 3 (crip "{(print-sha-1 u.fil.axe)} ") path)
-        %-  ~(rep by dir.axe)
-          |=  [[name=@ta =refs:git] sea=_sea]
-          ^-  stream:stream
-          %+  append-octs:stream
-            ^$(axe refs, path ;:((cury cat 3) path '/' name))
-            octs.sea
-      $(ref-prefix t.ref-prefix)
+          ;:  (cury cat 3)
+            (write-ref refname hash)
+            ' '
+            (crip "symref-target:{(trip (print-refname refname.ref))}")
+          ==
     =.  sea  %+  append-octs:stream  sea
       (write-pkt-len flush-pkt)
+    ~&  `@t`q.octs.sea
     :_  state
     (give-simple-payload:app:server eyre-id [[200 ~] `octs.sea])
   ++  fetch
@@ -377,7 +396,7 @@
       ::  
       ::  XX This seems to violate the specification 
       ::  for the flush command. We always send either 
-      ::  the acknowledgements or the packfile, or both. 
+      ::  the acknowledgments or the packfile, or both. 
       ::  Yet, the git implementation seems not to care. 
       ::
       ?:  ?&(?=(~ want) !wait-for-done.args)
@@ -439,7 +458,7 @@
       ::
       =?  red  !done.args
         =.  red
-          (append-octs:stream red (write-pkt-lines-txt 'acknowledgements'))
+          (append-octs:stream red (write-pkt-lines-txt 'acknowledgments'))
         ?~  acks
           (append-octs:stream red (write-pkt-lines-txt 'NAK'))
         %+  roll  `(list octs)`acks
@@ -452,6 +471,10 @@
       ::
       =/  can-reach=?
         (~(can-all-reach-from git-graph repo) want have-set oldest-have)
+      ::  XX Fix the NAK case -- the packfile should not be generated.
+      ::  If the have-set is empty, can-all-reach-from should logically
+      ::  return false
+      ::
       ?.  |(done.args &(!wait-for-done.args can-reach))
         (append-octs:stream red (write-pkt-len flush-pkt))
       ::  Build and send the packfile
@@ -466,6 +489,10 @@
       =+  pack-octs=(write-packs:git-pack-objects archive.object-store.repo)
       =+  pack-pkt-lines=(write-pkt-lines-on-band [0 pack-octs] 1)
       =.  red  (append-octs:stream red (write-pkt-lines-txt 'packfile'))
+      ::  XX This should properly be done in a thread. 
+      ::  The point of packet lines is not to send them all 
+      ::  at once.
+      ::
       =.  red  %+  append-octs:stream  red
                   (write-pkt-lines-txt-on-band git-agent 2)
       =.  red  (append-octs:stream red pack-pkt-lines)
@@ -476,9 +503,257 @@
     [[200 ~] ?:(=(0 p.octs.red) ~ `octs.red)]
   --
 ++  handle-receive-pack
-  |=  [repo=repository:git eyre-id=@ta request=request:http]
+  |=  $:  repo-name=@t 
+          repo=repository:git 
+          eyre-id=@ta 
+          request=request:http
+      ==
   ^-  (quip card _state)
-  :_  state
-  %+  give-simple-payload:app:server  eyre-id
-    [[501 ~] ~]
+  =<
+  ?+  method.request  !!
+    %'GET'   advertise-refs
+    %'POST'  update-refs
+  ==
+  |%
+  ::  There is no push protocol 
+  ::  in version 2. Below code implements 
+  ::  version 1 of the push protocol.
+  ::
+  ++  advertise-refs
+    |-
+    ^-  (quip card _state)
+    ::  Assemble advertised references
+    ::
+    =/  refs=(list [refname:git hash])
+      ::  XX These paths should be obtained 
+      ::  through repo interface and should 
+      ::  all be dereferenced to destination hash
+      ::
+      ::  XX Should we handle non-existent HEAD?
+      ::  Should all repos have a HEAD?
+      ::  A fresh repository will point to an unborn branch
+      ::  and thus will not have a head
+      ::
+      ::  If HEAD is a valid ref, it must appear as the 
+      ::  first ref. If HEAD is not a valid ref, it must 
+      ::  not be advertised at all. However, git seems 
+      ::  to support a symref capability, that can 
+      ::  be used to advertise a symref for an unborn head. 
+      ::
+      ::  XX advertise symrefs
+      ::
+      :-  [['HEAD' ~] (got:~(refs git repo) ['HEAD' ~])]
+      %+  weld
+        (tap-prefix-full:~(refs git repo) /refs/heads)
+        (tap-prefix-full:~(refs git repo) /refs/tags)
+    =|  red=stream:stream
+    =.  red  %+  append-octs:stream  red
+      ;:  cat-octs:stream
+        (write-pkt-lines-txt '# service=git-receive-pack')
+        (write-pkt-len flush-pkt)
+      ==
+    ::  Write head reference with caps
+    ::
+    =.  red  %+  append-octs:stream  red
+      ?:  ?=(~ refs)
+        (write-pkt-lines (write-caps |))
+      %-  write-pkt-lines
+        %+  cat-octs:stream
+          (as-octs:mimes:html (write-ref (head refs)))
+        (write-caps &)
+    ::  Write remaining references
+    ::
+    ::  XX As soon as we have the head reference, 
+    ::  we should use a rep-at-prefix
+    ::
+    =.  red  %+  append-octs:stream  red
+      %+  roll  (tail refs)
+      |=  [[=refname:git =hash] =octs]
+      %+  cat-octs:stream 
+        octs
+      (write-pkt-lines-txt (write-ref refname hash))
+    ::  XX handle shallow references
+    ::
+    ::  Write flush packet
+    =.  red  (append-octs:stream red (write-pkt-len flush-pkt))
+    ~&  `@t`q.octs.red
+    :_  state
+    %+  give-simple-payload:app:server  eyre-id
+    :-  :-  200
+      :~
+        ['content-type' 'application/x-git-receive-pack-advertisement']
+      ==
+    `octs.red
+  ++  write-caps
+    |=  have=?
+    ^-  octs
+    =+  caps='report-status delete-refs ofs-delta'
+    ?:  have
+      ::  XX implement more options
+      ::  report-status-v2 delete-refs ofs-delta atomic push-options
+      ;:  cat-octs:stream
+        [1 0x0]
+        (as-octs:mimes:html caps)
+        [1 '\0a']
+      ==
+    ;:  cat-octs:stream
+      ::  Zero-id
+      ::  XX parametrize by hash type
+      ::
+      [20 0x0]
+      [1 ' ']
+      (as-octs:mimes:html 'capabilities^{}')
+      [1 0x0]
+      (as-octs:mimes:html caps)
+      [1 '\0a']
+    ==
+  +$  cap  $?  %delete-refs 
+               %ofs-delta 
+               %report-status
+           ==
+  +$  push-cmd  [old=hash:git new=hash:git ref-name=path]
+  ++  parse-push-cmd
+    ;~  plug
+      parser-sha-1
+      ;~(pfix ace parser-sha-1)
+      ;~(pfix ace parser-path)
+    ==
+  ++  update-refs
+    |-
+    ^-  (quip card _state)
+    ::  XX verify headers
+    ?>  .=  (need (get-header:http 'content-type' header-list.request))
+            'application/x-git-receive-pack-request'
+    =/  sea=stream:stream  0+(need body.request)
+    ::  Parse head command and capabilities
+    ::
+    =^  pkt  sea  (read-pkt-line & sea)
+    ?>  ?=(%data -.pkt)
+    =+  pin=(need (find-byte:stream 0x0 0+octs.pkt))
+    =+  cmd-txt=(cut 3 [0 pin] q.octs.pkt)
+    =+  caps-txt=(cut 3 [+(pin) (sub (dec p.octs.pkt) pin)] q.octs.pkt)
+    =/  caps=(set cap)  %-  silt
+      %+  scan  (trip caps-txt)
+        %-  star
+        ;~  pfix  ace
+          ;~  pose
+            (cold %delete-refs (jest 'delete-refs'))
+            (cold %ofs-delta (jest 'ofs-delta'))
+            (cold %report-status (jest 'report-status'))
+          ==
+        ==
+    ~&  caps
+    =/  cmd-list=(list push-cmd)
+      ~[(scan (trip cmd-txt) parse-push-cmd)]
+    ::  Parse remaining commands
+    ::
+    =^  cmd-list  sea
+      |-
+      =^  pkt  sea  (read-pkt-line & sea)
+      ?@  pkt
+        ?>  ?=(%flush pkt)
+        :_  sea
+        cmd-list
+      ?>  ?=(%data -.pkt)
+      =+  cmd=(scan (trip q.octs.pkt) parse-push-cmd)
+      $(cmd-list [cmd cmd-list])
+    ~&  cmd-list
+    ::  Read packfile
+    ::
+    ::  The git logic for processing the packfile is the following:
+    ::  1. Index the packfile with git-index-pack, thickening it with --fix-thin, 
+    ::  and prevent git-repack from deleting the newly received packfile 
+    ::  with --keep
+    ::  2. Save file to disk
+    ::
+    =|  status=stream:stream
+    =/  =pack:git-pack
+      %+  read-thin:git-pack  sea
+        |=  =hash
+        ~&  resolving-obj+hash
+        (get-raw:~(store git repo) hash)
+    =.  status  %+  append-octs:stream  status
+      (write-pkt-lines-txt 'unpack ok')
+    =.  repo  (add-pack:~(store git repo) pack)
+    ::  Update references
+    ::
+    ~&  (~(dip of refs.repo) /refs/heads)
+    ::  XX should return a list of (each @t @t)
+    ::  with [& 'ok'] indicating success and 
+    ::  [| 'failure description'] indicating failure
+    ::
+    =^  status=stream:stream  refs.repo
+      %+  roll  cmd-list
+      ::  XX a refs zipper would be most efficient here
+      ::
+      |=  [cmd=push-cmd [=_status =_refs.repo]]
+      ::  Create reference
+      ::
+      ?:  =(0x0 old.cmd)
+        ?:  (~(has of refs) ref-name.cmd)
+          :-  %+  append-octs:stream  status 
+              %-  write-pkt-lines-txt  %-  crip
+                "ng {(trip (print-refname ref-name.cmd))} reference already exists"
+          refs
+        ?.  (has:~(store git repo) new.cmd)
+          :-  %+  append-octs:stream  status 
+              %-  write-pkt-lines-txt  %-  crip
+                "ng {(trip (print-refname ref-name.cmd))} object {<new.cmd>} not found"
+          refs
+        :-  %+  append-octs:stream  status
+            %-  write-pkt-lines-txt  %-  crip
+              "ok {(trip (print-refname ref-name.cmd))}"
+        ~&  ref-create+cmd
+        (~(put of refs) ref-name.cmd new.cmd)
+      ::  Delete reference
+      ::
+      ?:  =(0x0 new.cmd)
+        ?.  (~(has of refs) ref-name.cmd)
+          :-  %+  append-octs:stream  status 
+              %-  write-pkt-lines-txt  %-  crip
+                "ng {(trip (print-refname ref-name.cmd))} reference not found"
+          refs
+        ?.  .=  (~(get of refs) ref-name.cmd)
+                old.cmd
+          :-  %+  append-octs:stream  status 
+              %-  write-pkt-lines-txt  %-  crip
+                "ng {(trip (print-refname ref-name.cmd))} object id mismatch"
+          refs
+        :-  %+  append-octs:stream  status
+            %-  write-pkt-lines-txt  %-  crip
+              "ok {(trip (print-refname ref-name.cmd))}"
+        ~&  ref-delete+ref-name.cmd
+        (~(del of refs) ref-name.cmd)
+      ::  Update reference
+      ::
+      ::  XX A zipper would be useful here
+      ::
+      ?.  .=  (need (~(get of refs) ref-name.cmd))
+              old.cmd
+        :-  %+  append-octs:stream  status 
+            %-  write-pkt-lines-txt  %-  crip
+              "ng {(trip (print-refname ref-name.cmd))} object id mismatch"
+        refs
+      ~&  ref-update+cmd
+      :-  %+  append-octs:stream  status
+          %-  write-pkt-lines-txt  %-  crip
+            "ok {(trip (print-refname ref-name.cmd))}"
+      (~(put of refs) ref-name.cmd new.cmd)
+    ::  XX update repository
+    ~&  `@t`q.octs.status
+    =.  status  %+  append-octs:stream  status
+                  (write-pkt-len flush-pkt)
+    ~&  (~(dip of refs.repo) /refs/heads)
+    ::  XX We should only keep the pack if the update is successful
+    ::  for at least one reference. What's the git logic 
+    ::  in case of failure? Does it extract objects 
+    ::  associated with the succesful update?
+    ::
+    =.  repo-store.state
+      (~(put by repo-store.state) repo-name repo)
+    ~&  no-packs+(lent archive.object-store.repo)
+    :_  state
+    %+  give-simple-payload:app:server  eyre-id
+    [[200 ~] `octs.status]
+  --
 --

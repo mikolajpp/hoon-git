@@ -1,28 +1,30 @@
 ::  Repository engine
 ::
-::    +store -- object store
-::    +link  -- references
-::    +trail -- tracking braches
+::    +store  -- object store
+::    +refs   -- references
 ::    +remote -- remotes
 ::    +config -- configuration
 ::
 /+  *git, git-pack, git-bundle
 |%
++$  object-store  $:  loose=(map hash object)
+                      archive=(list pack:git-pack)
+                  ==
 +$  config-value  $%  [%l ?]
                       [%u @ud]
                       [%s @t]
-                  ==
-+$  object-store  $:  loose=(map hash object)
-                      archive=(list pack:git-pack)
                   ==
 +$  config-key  [@tas (unit @t)]
 ::  XX Can you use an axal with ref-path instead 
 ::  of path, especially from the aura typesystem 
 ::  point of view?
 ::
-+$  ref-path  (list @t)
-+$  ref  $@(hash [%symref path])
++$  refname  (list @t)
++$  ref  $@(hash [%symref =refname])
 +$  refs  (axal ref)
+::  XX does removing a remote in git
+::  cause its references to disappear?
+::
 +$  remote  [url=@t =refs]
 +$  ref-spec  @t
 +$  repository
@@ -50,7 +52,7 @@
     %+  roll  refs.header.bundle
       ::  XX is there no way to write 
       ::  it compactly?
-      |=  [ref=(pair path hash) =refs]
+      |=  [ref=(pair path hash) =^refs]
       ?>  (has:store q.ref)
       (~(put of refs) ref)
   ==
@@ -159,7 +161,7 @@
       |=  [=pack:git-pack obj=(unit object)]
       ?~  obj
         ::  XX  (~(get-with-size git-pack pack) hash)
-        (get:git-pack pack hash)
+        (~(get git-pack pack) hash)
       obj
   ++  got
     |=  =hash
@@ -175,7 +177,7 @@
       |=  [=pack:git-pack obj=(unit object-header)]
       ?~  obj
         ::  XX  (~(get-with-size git-pack pack) hash)
-        (get-header:git-pack pack hash)
+        (~(get-header git-pack pack) hash)
       obj
   ++  got-header
     |=  =hash
@@ -187,13 +189,44 @@
     %+  roll  archive.object-store.repo
       |=  [=pack:git-pack obj=(unit object)]
       ?~  obj
-        (get:git-pack pack hash)
+        (~(get git-pack pack) hash)
+      obj
+  ++  get-raw
+    |=  =hash
+    ^-  (unit raw-object)
+    =+  loose=(~(get by loose.object-store.repo) hash)
+    ?^  loose
+      (some (as-raw:obj u.loose))
+    ::  XX use a loop, why traverse when 
+    ::  obj has already been found?
+    ::
+    %+  roll  archive.object-store.repo
+      |=  [=pack:git-pack obj=(unit raw-object)]
+      ?~  obj
+        ::  XX This is a workaround to retrieve objects 
+        ::  from thin packs. Thin packs in the archive 
+        ::  currently arise because we lack the ability
+        ::  to create new packfiles from scratch. 
+        ::  Once git-pack-objects is implemented, 
+        ::  we can thicken received packs, at the risk 
+        ::  of duplicating the objects. It seems 
+        ::  that is how git does it. For instance, 
+        ::  git-receive-pack will thicken each received pack, 
+        ::  and finally run git-gc, which presumably will detect
+        ::  duplicate objects. However, does not that mean 
+        ::  if a 2GB file was modified, git will temporalily 
+        ::  create a 2GB copy (thus using 4GB of space?)
+        ::  As we keep everything in memory, this will not 
+        ::  do for us -- we have to be smarter than git here.
+        ::
+        (~(get-raw-thin git-pack pack) hash get-raw)
       obj
   ++  has
     |=  =hash
     ^-  ?
     ?|  (~(has by loose.object-store.repo) hash)
-        (lien archive.object-store.repo (curr has:git-pack hash))
+        %+  lien  archive.object-store.repo
+          |=(=pack:git-pack (~(has git-pack pack) hash))
     ==
   :: ::
   :: ++  put
@@ -242,5 +275,77 @@
   ::   ?:  (match-key key i.kel)
   ::     $(kel t.kel, hey [i.kel hey])
   ::   $(kel t.kel)
+  --
+++  refs
+  |%
+  ++  has
+    |=  =refname
+    ^-  ?
+    (~(has of refs.repo) refname)
+  ++  got
+    |=  =refname
+    ^-  hash
+    ::  XX With axal we have no way to tell
+    ::  if an empty path has been stored. Does it matter?
+    ::
+    =+  fil=(~(get of refs.repo) refname)
+    ?~  fil  !!
+    ?@  u.fil
+      u.fil
+    $(refname refname.u.fil)
+  ++  tap  (tap-prefix ~)
+  ++  tap-prefix
+    |=  prefix=refname
+    %+  turn
+      ~(tap of (~(dip of refs.repo) prefix))
+    |=  [=refname =ref]
+    ?@  ref
+      [refname ref]
+    [refname (got refname)]
+  ++  tap-prefix-full
+    |=  prefix=refname
+    %+  turn
+      ~(tap of (~(dip of refs.repo) prefix))
+    |=  [=refname =ref]
+    ?@  ref
+      [(weld prefix refname) ref]
+    [(weld prefix refname) (got refname)]
+  ::  Accumulate product with a user 
+  ::  supplied gate
+  ::
+  ++  rep
+    |=  b=$-([[refname ref] *] *)
+    (rep-prefix ~ b)
+  ++  rep-prefix
+    |*  $:  prefix=refname
+            b=_=>(~ |=([[* *] *] +<+))
+        ==
+    ^+  +<+.b
+    =+  axal=(~(dip of refs.repo) prefix)
+    =/  =refname
+      prefix
+    |-
+    ::  Accumulate from fil
+    ::
+    =?  +<+.b  ?=(^ fil.axal)
+      :: =/  =hash
+      ::   ?^  u.fil.axal
+      ::     (got refname.u.fil.axal)
+      ::   u.fil.axal
+      (b [refname u.fil.axal] +<+.b)
+    ::  Accumulate from subaxals
+    ::
+    =+  map=dir.axal
+    |-
+    ?~  map
+      +<+.b
+    =.  +<+.b
+      %=  ^$
+        axal  q.n.map
+        refname  (snoc refname p.n.map)
+      ==
+    =.  +<+.b
+      $(map l.map)
+    $(map r.map)
   --
 --

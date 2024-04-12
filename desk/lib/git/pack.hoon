@@ -1,8 +1,8 @@
 ::
 ::::  Git pack
   ::
+/-  *git-pack, *git-object-store
 /+  *git, stream
-~%  %git-pack  ..part  ~
 |%
 +$  pack-object-type  $?  object-type 
                           %ofs-delta
@@ -11,7 +11,7 @@
 +$  pack-object-header  [type=pack-object-type size=@ud]
 +$  pack-object  $%  raw-object
                      [%ofs-delta pos=@ud base-offset=@ud =octs]
-                     [%ref-delta =octs]
+                     [%ref-delta pos=@ud =hash =octs]
                  ==
 +$  pack-delta-object  $>(?(%ofs-delta %ref-delta) pack-object)
 
@@ -23,15 +23,30 @@
 ::
 +$  pack-index   ((mop hash @ud) lth)
 ++  pack-on  ((on hash @ud) lth)
-+$  pack  [=hash-type count=@ud index=pack-index end-pos=@ud data=stream:libstream]
-::
++$  pack  $:  =hash-type 
+              count=@ud 
+              index=pack-index 
+              ::  Checksum position
+              end-pos=@ud 
+              data=stream:libstream
+          ==
++$  store-raw-get  $-(hash (unit raw-object))
+--
+~%  %git-pack  ..part  ~
+|%
 ++  read
   |=  sea=stream:stream
+  ^-  pack
+  (read-thin sea |=(* !!))
+++  read-thin
+  |=  [sea=stream:stream get=store-raw-get]
   ^-  pack
   :: ?>  (gte p.octs.sea (met 3 q.octs.sea))
   =+  start=pos.sea
   =^  header=pack-header  sea  (read-header sea)
-  =^  =pack  sea  (index header sea)
+  =+  beg-pos=pos.sea
+  =^  [=pack miss=(list raw-object)]  
+    sea  (index header sea get)
   ::  Verify integrity
   ::
   =+  end=pos.sea
@@ -43,7 +58,11 @@
   =+  len=(sub end start)
   =+  check=(hash-octs-sha-1:obj len (rsh [3 start] q.octs.sea))
   ?>  =(q.u.hash check)
-  pack
+  ::  XX read-thin should return the list 
+  ::  of missing objects instead of thickening the pack
+  ::
+  :: =+  pack=(insert-objects pack miss)
+  pack(pos.data beg-pos)
 ::
 ++  read-header
   |=  sea=stream:stream
@@ -64,6 +83,40 @@
   ?>  ?=(%2 ver)
   :_  sea
   [ver cot]
+++  insert-objects
+  |=  [=pack list=(list raw-object)]
+  ^-  ^pack
+  ::  XX modify header to increase the count
+  ::
+  ::  Assemble object data
+  ::
+  ?~  list
+    pack
+  =+  start=pos.data.pack
+  =.  pos.data.pack  end-pos.pack
+  =.  pack
+    ::  XX can the type system be improved to avoid this cast?
+    ::
+    %+  roll  `(^list raw-object)`list
+      |=  [rob=raw-object =_pack]
+      %=  pack
+        data
+          ::  XX add write-octs function to libstream
+          ::
+          %+  write-octs:stream  data.pack
+            (as-octs:obj rob)
+        index
+          =+  hash=(hash-raw:obj %sha-1 rob)
+          %^  put:pack-on  index.pack
+            hash
+          pos.data.pack
+        count  +(count.pack)
+      ==
+  =+  sea=data.pack
+  =+  end-pos=pos.sea
+  =+  hash=(hash-octs-sha-1:obj octs.sea)
+  =.  sea  (append-octs:stream sea [20 hash])
+  pack(data sea(pos start))
 ::
 ++  pack-hash-bytes
   |=  hed=pack-header
@@ -77,17 +130,25 @@
   ?-  version.hed
     %2  %sha-1
   ==
+:: 
+::  Index a pack, returning index together 
+::  with a list of objects missing from the pack.
 ::
 ++  index
-  |=  [header=pack-header sea=stream:stream]
-  ^-  [pack stream:stream]
+  |=  $:  header=pack-header
+          sea=stream:stream
+          get=store-raw-get
+      ==
+  ^-  [[pack (list raw-object)] stream:stream]
   =+  start=pos.sea
   =|  count=@ud
   =|  index=pack-index
-  =^  index  sea
+  =|  miss=(list raw-object)
+  =^  [=_index =_miss]  sea
     |-
     ?.  (lth count count.header)
       :_  sea
+      :_  miss
       index
     ?:  (is-dry:stream sea)
       ~|  "Expected {<count.header>} objects ({<count>} processed)"
@@ -96,31 +157,43 @@
       pack-index+"{<+(count)>}/{<count.header>}"
     =+  beg=pos.sea
     =^  pob=pack-object  sea  (read-pack-object sea)
-    =/  rob=raw-object
-      (resolve-raw-object pob sea)
-    =+  hax=(hash-raw:obj (pack-hash-type header) rob)
+    =/  [rob=raw-object miso=(unit raw-object)]
+      (resolve-raw-object-thin pob index sea get)
+    :: ~?  ?=(^ miso)  "Missing object: {<(hash-raw:obj %sha-1 u.miso)>}"
+    =+  hash=(hash-raw:obj (pack-hash-type header) rob)
     ?>  (gte p.octs.data.rob (met 3 q.octs.data.rob))
-    ?:  (~(has by index) hax)
-      ~|  "Object {<hax>} duplicated: indexed at {<(~(get by index) hax)>}"  !!
+    ?:  (~(has by index) hash)
+      ~|  "Object {<hash>} duplicated: indexed at {<(~(get by index) hash)>}"  !!
     %=  $
-      index  (put:pack-on index hax beg)
+      index  (put:pack-on index hash beg)
       count  +(count)
+      miss   ?~(miso miss [u.miso miss])
     ==
   :_  sea
+  :_  miss
   :-  (pack-hash-type header)
   [count.header index end-pos=pos.sea [start octs.sea]]
 ::
-++  resolve-raw-object
-  |=  [pob=pack-object sea=stream:stream]
-  ^-  raw-object
+::  Resolve raw object, potentially returning
+::  a missing object base object through the get gate
+::
+++  resolve-raw-object-thin
+  |=  $:  pob=pack-object 
+          index=pack-index
+          sea=stream:stream 
+          get=store-raw-get
+      ==
+  ^-  [raw-object (unit raw-object)]
   ?:  ?=(raw-object pob)
-    pob
-  (resolve-delta-object pob sea)
+    [pob ~]
+  (resolve-delta-object pob index sea get)
 ++  resolve-delta-object
-  |=  [delta=pack-delta-object sea=stream:stream]
-  ^-  raw-object
-  ::  XX  handle ref-delta
-  ?>  ?=(%ofs-delta -.delta)
+  |=  $:  delta=pack-delta-object 
+          index=pack-index
+          sea=stream:stream
+          get=store-raw-get
+      ==
+  ^-  [raw-object (unit raw-object)]
   ::  Generate chain of delta objects terminating 
   ::  at the first encountered non-delta object
   ::
@@ -131,20 +204,38 @@
     ~[delta]
   =^  base=raw-object  chain
     |-
-    :: ~&  i.chain
-    ::  XX is there a better way?
-    ::  use a lest?
-    ::
-    ?>  ?=(%ofs-delta -.i.chain)
-    =/  kob=pack-object  
-      =<  -
-      %+  read-pack-object
-        (sub pos.i.chain base-offset.i.chain)
-        octs.sea
+    =+  pob=i.chain
+    =/  kob=pack-object
+      ?-  -.pob
+
+        %ofs-delta
+        =+  pos=(sub pos.pob base-offset.pob)
+        =<(- (read-pack-object pos octs.sea))
+
+        %ref-delta
+        =/  pos=(unit @ud)
+          (get:pack-on index hash.pob)
+        ?~  pos
+          (need (get hash.pob))
+        =<(- (read-pack-object u.pos octs.sea))
+      ==
     ?:  ?=(pack-delta-object kob)
       $(chain [kob chain])
     [kob chain]
-  (resolve-delta-chain base chain sea)
+  =+  res=(resolve-delta-chain base chain sea)
+  :: Is the base missing?
+  ::
+  ?.  (has:pack-on index (hash-raw:obj %sha-1 base))
+    [res `base]
+  [res ~]
+++  resolve-raw-object
+  |=  $:  pob=pack-object 
+          index=pack-index
+          sea=stream:stream 
+          get=store-raw-get
+      ==
+  ^-  raw-object
+  -:(resolve-raw-object-thin pob index sea get)
 ::  Resolve a raw object from 
 ::  a base and a chain of delta objects
 ::
@@ -172,7 +263,6 @@
   !:
   |=  [base=raw-object delta=pack-delta-object]
   ^-  raw-object
-  ?>  ?=(%ofs-delta -.delta)
   =/  sea=stream:stream  0+octs.delta
   ::  Read base and target sizes
   ::
@@ -317,10 +407,23 @@
   ::
   %ofs-delta  (read-object-ofs pos sea)
   ::
-  %ref-delta  !!
+  %ref-delta  (read-object-ref pos sea)
   ::
   ==
 ::
+++  read-object-ref
+  |=  [pos=@ud sea=stream:stream]
+  ^-  [pack-delta-object stream:stream]
+  =^  =hash  sea  (read-hash sea)
+  =^  =octs  sea  (expand:zlib sea)
+  :_  sea
+  [%ref-delta pos hash octs]
+++  read-hash
+  |=  sea=stream:stream
+  ^-  [hash stream:stream]
+  =^  octs  sea  (read-bytes:stream 20 sea)
+  :_  sea
+  q:(need octs)
 ++  read-object-ofs
   |=  [pos=@ud sea=stream:stream]
   ^-  [pack-delta-object stream:stream]
@@ -417,31 +520,45 @@
   |=  kob=pack-object
   ^-  ?
   ?=(?(%ofs-delta %ref-delta) -.kob)
+--
+::  
+::  Pack interface
+::
+|_  pak=pack
 ++  get-raw
-  |=  [=pack hax=hash]
+  |=  hax=hash
   ^-  (unit raw-object)
-  =+  pin=(get:pack-on index.pack hax)
+  =+  pin=(get:pack-on index.pak hax)
   ?~  pin
     ~
-  =+  sea=[u.pin octs.data.pack]
+  =+  sea=[u.pin octs.data.pak]
   =^  pob  sea  (read-pack-object sea)
-  `(resolve-raw-object pob sea)
+  `(resolve-raw-object pob index.pak sea |=(* !!))
+++  get-raw-thin
+  |=  [hax=hash get=store-raw-get]
+  ^-  (unit raw-object)
+  =+  pin=(get:pack-on index.pak hax)
+  ?~  pin
+    ~
+  =+  sea=[u.pin octs.data.pak]
+  =^  pob  sea  (read-pack-object sea)
+  `(resolve-raw-object pob index.pak sea get)
 ++  get
-  |=  [=pack hax=hash]
+  |=  hax=hash
   ^-  (unit object)
-  =+  obe=(get-raw pack hax)
+  =+  obe=(get-raw hax)
   ::  XX Why is this function called a bind?
   ::
-  (bind obe (cury parse-raw:obj hash-type.pack))
+  (bind obe (cury parse-raw:obj hash-type.pak))
 ++  get-header
-  |=  [=pack hax=hash]
+  |=  hax=hash
   ^-  (unit object-header)
-  =+  pin=(get:pack-on index.pack hax)
+  =+  pin=(get:pack-on index.pak hax)
   ?~  pin
     ~
   =+  offset=u.pin
   |-
-  =+  sea=[offset octs.data.pack]
+  =+  sea=[offset octs.data.pak]
   =^  header=pack-object-header  sea
     (read-pack-object-header sea)
   ?:  ?=(object-header header)
@@ -449,49 +566,49 @@
   ?>  ?=(%ofs-delta type.header)
   $(offset (sub offset -:(read-offset sea)))
 ++  got-raw
-  |=  [=pack hax=hash]
+  |=  hax=hash
   ^-  raw-object
-  =+  pin=(get:pack-on index.pack hax)
+  =+  pin=(get:pack-on index.pak hax)
   ?~  pin  !!
-  =+  sea=[u.pin octs.data.pack]
-  =^  pob  sea  (read-pack-object sea)
-  (resolve-raw-object pob sea)
+  =+  sea=[u.pin octs.data.pak]
+  =^  pob=pack-object  sea  (read-pack-object sea)
+  (resolve-raw-object pob index.pak sea |=(* !!))
 ++  got
-  |=  [=pack hax=hash]
+  |=  hax=hash
   ^-  object
-  =+  obe=(got-raw pack hax)
-  (parse-raw:obj hash-type.pack obe)
+  =+  obe=(got-raw hax)
+  (parse-raw:obj hash-type.pak obe)
 ++  got-header
-  |=  [=pack =hash]
+  |=  =hash
   ^-  object-header
-  (need (get-header pack hash))
+  (need (get-header hash))
 ++  has
-  |=  [=pack =hash]
+  |=  =hash
   ^-  ?
-  (has:pack-on index.pack hash)
+  (has:pack-on index.pak hash)
 ::
 ::  Find objects whose hashes match the 
 ::  key @a
 ::
 ++  find-by-key
-  |=  [=pack a=@ta]
+  |=  a=@ta
   ^-  (list hash)
   =+  kex=(to-hex a)
   =+  key=[(met 3 a) kex]
   ::  The matching keys are in the range a..a+1
   ::
   =+  len=(met 3 (crip ((x-co:co 0) +(kex))))
-  =+  fen=(sub (key-size hash-type.pack) len)
+  =+  fen=(sub (key-size hash-type.pak) len)
   =+  end=(lsh [2 fen] +(kex))
   =|  hey=(list @ux)
   =<  -  
   %^  (dip:pack-on _hey)  
-    index.pack
+    index.pak
   hey
     |=  [hey=(list @ux) item=[hash @ud]]
     ?.  (compare:pack-on -.item end)
       [`+.item & hey]
-    ?:  (match-key (key-size hash-type.pack) key -.item)
+    ?:  (match-key (key-size hash-type.pak) key -.item)
       [`+.item & [-.item hey]]
     [`+.item | hey]
 ::  XX remove after moving out repository to its

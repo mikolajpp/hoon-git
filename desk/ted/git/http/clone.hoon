@@ -16,7 +16,7 @@
   bind:m  (ls-refs:http ~)
 ::  Filter references for /refs/heads and /refs/tags
 ::
-=|  remote-refs=refs:git
+=|  remote-refs=^refs:git
 =.  remote-refs
   |-
   ?~  refs
@@ -76,12 +76,14 @@
 =|  repo=repository:git
 =.  repo  (add-pack:~(store git repo) pack)
 =.  refs.repo 
-  %+  ~(put of *refs:git) 
+  %+  ~(put of *^refs:git) 
     /refs/heads/[default-branch]
   =+  hash=(need (~(get of remote-refs) /refs/heads/[default-branch]))
   ?^(hash !! hash)
 ::  XX handle symbolic references
-=.  refs.repo  (~(put of refs.repo) ['HEAD' ~] ?^(u.fil.head !! u.fil.head))
+=.  refs.repo  
+  %+  ~(put of refs.repo)  ['HEAD' ~]
+    ?^(u.fil.head !! [%symref /refs/heads/[default-branch]])
 =.  remotes.repo  (~(put by remotes.repo) %origin [(need url) remote-refs])
 ~&  refs.repo
 (pure:m !>(repo))

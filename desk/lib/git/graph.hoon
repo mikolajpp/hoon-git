@@ -10,6 +10,11 @@
 ++  can-all-reach-from
   |=  [from=(list hash) have=(set hash) oldest-have=@ud]
   ^-  ?
+  ::  XX Why does ?=(~ have)
+  ::  cause downstream type errors?
+  ::
+  ?:  =(~ have)
+    |
   |-
   ?~  from
     &
