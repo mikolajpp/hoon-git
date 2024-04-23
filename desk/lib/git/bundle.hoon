@@ -2,13 +2,14 @@
 ::::  Git bundle
   ::
 /+  stream
-/+  *git, git-pack
+::  XX Gather all parser into one library: git-parse
+/+  *git, git-refs, git-pack
 |%
 +$  bundle-header  
   $:  version=%2 
       hash=hash-type 
       need=(list hash) 
-      refs=(list (pair path hash))
+      refs=(list [p=path q=hash])
   ==
 +$  bundle  [header=bundle-header =pack:git-pack]
 ::
@@ -53,16 +54,24 @@
   ::
   ::  Parse references
   ::
-  =^  refs=(list (pair path hash))  sea
-    =|  refs=(list (pair path hash))
+  =^  refs=(list (pair refname:git-refs hash))  sea
+    =|  refs=(list (pair refname:git-refs hash))
     |-
     =+  [line red]=(read-line:stream sea)
     ?~  line 
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  ref  (rust (trip q.u.line) ;~(sfix parser-ref (just '\0a')))
+    =/  ref=(unit [=hash =refname:git-refs])
+      %+  rust  (trip q.u.line)
+        ;~  sfix
+          ;~  plug
+            parser-sha-1
+            ;~(pfix ace refname:parse:git-refs)
+          ==
+          (just '\0a')
+        ==
     ?~  ref
       [refs sea]
-    $(refs [u.ref refs], sea red)
+    $(refs [[refname.u.ref hash.u.ref] refs], sea red)
   :: Parse newline indicating end of bundle header
   ::
   =^  line  sea  (read-line:stream sea)

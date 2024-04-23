@@ -40,4 +40,14 @@
   !>  red
   ::
   ==
+++  test-seek-byte
+  =/  sea=stream  0+[4 0xbabe.cabe]
+  ;:  weld
+    %+  expect-eq
+    !>  `2
+    !>  (seek-byte 0xbe sea)
+    %+  expect-eq
+    !>  ~
+    !>  (seek-byte 0xff sea)
+  ==
 --

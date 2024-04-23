@@ -25,13 +25,15 @@
                        committer=[person date=[@ud ? tape]]
                        sign=(unit signature)
                    ==
-::  XX do not face the header
-::
 +$  commit      $:  commit-header
                     message=tape
                 ==
+::  XX refactor to [mode name hash]
+::
 +$  tree-entry  [[mode=@ta name=@ta] =hash]
 +$  tree  (list tree-entry)
+::  XX refactor objects so that fields are readily accessible
+::  XX are sizes here really necessary?
 ::
 +$  object
   $%  [%blob size=@ud =octs]

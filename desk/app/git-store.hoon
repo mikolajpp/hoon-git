@@ -1,24 +1,24 @@
 /+  default-agent, dbug
 /+  server, agentio
 /+  stream, zlib
-/+  git=git-repository, *git-http
+/+  git=git-repository, *git-http, git-refs
 /+  git-revision, git-pack, git-pack-objects, git-graph
 |%
 +$  versioned-state
   $%  state-0
   ==
-+$  repo-store  (map @tas repository:git)
-+$  access  (map @tas (set @p))
++$  repo-store  (map @ta repository:git)
++$  access  (map @ta (set @p))
 +$  state-0  [%0 =repo-store =access]
 +$  card  card:agent:gall
 ::  XX allow @ta as a name
 +$  command
-  $%  [%put name=@tas =repository:git]
-      [%allow-access name=@tas ship=@p]
-      [%set-private name=@tas]
-      [%set-public name=@tas]
-      [%update name=@tas =repository:git]
-      [%delete name=@tas]
+  $%  [%put name=@ta =repository:git]
+      [%allow-access name=@ta ship=@p]
+      [%set-private name=@ta]
+      [%set-public name=@ta]
+      [%update name=@ta =repository:git]
+      [%delete name=@ta]
   ==
 --
 %-  agent:dbug
@@ -88,19 +88,19 @@
 ::
 |_  =bowl:gall
 ++  put
-  |=  [name=@tas repo=repository:git]
+  |=  [name=@ta repo=repository:git]
   ^-  (quip card _state)
   ?:  (~(has by repo-store.state) name)
     ~|  "repository:git {<name>} already exists"  !!
   `state(repo-store (~(put by repo-store.state) name repo))
 ++  update 
-  |=  [name=@tas repo=repository:git]
+  |=  [name=@ta repo=repository:git]
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
     ~|  "repository:git {<name>} does not exist"  !!
   `state(repo-store (~(put by repo-store.state) name repo))
 ++  delete
-  |=  name=@tas
+  |=  name=@ta
   ~&  delete-repo+name
   ^-  (quip card _state)
   ?:  (~(has by repo-store.state) name)
@@ -108,15 +108,15 @@
     `state(repo-store (~(del by repo-store.state) name))
   `state
 ++  set-private
-  |=  name=@tas
+  |=  name=@ta
   ~&  set-private+name
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
     `state
   ~&  "Restricted Git repository {<name>}"
-  `state(access (~(put by access.state) name ~))
+  `state(access (~(put by access) name ~))
 ++  allow-access
-  |=  [name=@tas ship=@p]
+  |=  [name=@ta ship=@p]
   ~&  allow-access+[name ship]
   ^-  (quip card _state)
   ?.  ?&  (~(has by repo-store.state) name)
@@ -129,7 +129,7 @@
   =.  allow  (~(put in allow) ship)
   `state(access (~(put by access.state) name allow))
 ++  set-public
-  |=  name=@tas
+  |=  name=@ta
   ~&  set-public+name
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
@@ -143,8 +143,7 @@
   ?~  auth
     |
   =+  pass=(scan (trip u.auth) ;~(pfix (jest 'Basic ') (star prn)))
-  :: ~&  `@t`q:(need (de:base64:mimes:html (crip pass)))
-  =('git:git' q:(need (de:base64:mimes:html (crip pass))))
+  =('lagrev-nocfep:rri0e.e8nhc' q:(need (de:base64:mimes:html (crip pass))))
 ++  handle-http
   |=  [eyre-id=@ta =inbound-request:eyre]
   ^-  (quip card _state)
@@ -290,7 +289,7 @@
               (cold %peel (jest 'peel'))
               %+  stag  %ref-prefix
                 ;~  pfix  (jest 'ref-prefix ')
-                  ;~(plug parser-path-ext)
+                  ;~(plug refname-ext:parse:git-refs)
                 ==
             ==
       ?-  arg
@@ -616,7 +615,7 @@
     ;~  plug
       parser-sha-1
       ;~(pfix ace parser-sha-1)
-      ;~(pfix ace parser-path)
+      ;~(pfix ace refname:parse:git-refs)
     ==
   ++  update-refs
     |-
@@ -667,14 +666,19 @@
     ::  2. Save file to disk
     ::
     =|  status=stream:stream
-    =/  =pack:git-pack
-      %+  read-thin:git-pack  sea
-        |=  =hash
-        ~&  resolving-obj+hash
-        (get-raw:~(store git repo) hash)
-    =.  status  %+  append-octs:stream  status
-      (write-pkt-lines-txt 'unpack ok')
-    =.  repo  (add-pack:~(store git repo) pack)
+    =/  pack=(unit pack:git-pack)
+      ?:  (is-dry:stream sea)
+        ~
+      %-  some
+        %+  read-thin:git-pack  sea
+          |=  =hash
+          ~&  resolving-obj+hash
+          (get-raw:~(store git repo) hash)
+    =?  repo  ?=(^ pack)  
+      (add-pack:~(store git repo) u.pack)
+    =.  status
+      %+  append-octs:stream  status
+        (write-pkt-lines-txt 'unpack ok')
     ::  Update references
     ::
     ~&  (~(dip of refs.repo) /refs/heads)
@@ -713,7 +717,10 @@
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} reference not found"
           refs
-        ?.  .=  (~(get of refs) ref-name.cmd)
+        ::  XX Hoon should really have typed equality 
+        ::  to slap .= with typechecking
+        ::
+        ?.  .=  (need (~(get of refs) ref-name.cmd))
                 old.cmd
           :-  %+  append-octs:stream  status 
               %-  write-pkt-lines-txt  %-  crip

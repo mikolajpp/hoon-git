@@ -1,5 +1,6 @@
 /+  *test
 /+  revision=git-revision, git-bundle, git=git-repository
+/*  bundle  %bdl  /tests/lib/git/narnia/bdl
 ::  Load test repository
 ::  Putting this on top result in u3R->ski.gul assertion 
 ::  fail in pkg/noun/manage.c:1312
@@ -20,8 +21,7 @@
   (turn taps |=([t=tape w=?] [(scan t parser-sha-1:git) w]))
 ++  test-walk-sort-time
   =/  repo=repository:git
-    %-  clone-from-bundle:git
-      .^(bundle:git-bundle %cx /~dev/git/2/tests/lib/git/narnia/bdl)
+    (clone-from-bundle:git bundle)
   ?<  ?=(~ archive.object-store.repo)
   ;:  weld
   ::  git rev-list master

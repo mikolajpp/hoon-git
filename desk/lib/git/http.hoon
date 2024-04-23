@@ -5,9 +5,9 @@
 ::  Supports only protocol v2 for git-upload-pack and 
 ::  protocol v0 for git-receive-pack functionality
 :: 
-/-  *git, spider
+/-  spider
 /+  stream, strandio
-/+  *git, git-pack
+/+  *git, git-refs, git=git-repository, git-pack
 =,  strand=strand:spider
 |%
 ++  git-agent  'hoon-git/0.1'
@@ -20,11 +20,13 @@
                  caps=(list @t)
                  args=(list @t)
              ==
+++  default-caps  :~  (cat 3 'agent=' git-agent)
+                  ==
 --
 ~%  %git-http  ..part  ~
 |_  url=@t
 ::
-::  Greet the "upload" server service to obtain a map of capabilities
+::  Greet the pack upload service to obtain capabilities
 ::
 ++  greet-server-upload
   =/  m  (strand ,caps)
@@ -44,19 +46,18 @@
   ?~  full-file.res  !!
   ::
   =/  sea=stream:stream  0+data.u.full-file.res
+  ::  Read service string
+  ::
   =^  pil  sea  (read-pkt-lines & sea)
   =+  lip=(flop pil)
   ?~  lip 
     ~|  "Server response empty"  !!
-  ::  Handle non-standard behaviour
-  ::  of servers advertising the service name
-  ::
   ?>  ?=(%data -.i.lip)
-  =/  lip
-    ?:  =(q.octs.i.lip '# service=git-upload-pack')
-      =^  pil  sea  (read-pkt-lines & sea)
-      (flop pil)
-    lip
+  ?>  =(q.octs.i.lip '# service=git-upload-pack')
+  ::  Read capabilities
+  ::
+  =^  pil  sea  (read-pkt-lines & sea)
+  =+  lip=(flop pil)
   ?~  lip
     ~|  "Server response empty"  !!
   ::  Enforce version
@@ -130,12 +131,39 @@
         ==
         `req
 ::
+::  Parse ls-refs output to a triple of 
+::  refname, reference, and optional peeled hash
+::
 ++  ls-refs
-  |=  args=(list @t)
-  =/  m  (strand ,(list [path hash]))
+  =>  |%
+      :: XX Implement a show command for types
+      :: so that args can be automatically printed.
+      ::
+      +$  args
+        $:  symrefs=_|
+            peel=_|
+            ref-prefix=(list @t)
+        ==
+      --
+  |=  =args
+  ::  Return a triple of refname, reference, 
+  ::  and optional peeled hash.
+  ::
+  =/  m  (strand ,(list [refname:git-refs ref:git-refs (unit hash)]))
   ^-  form:m
-  =+  caps=~
-  ;<  ~  bind:m  (send-request %ls-refs caps args)
+  =+  cmd-caps=default-caps
+  =|  cmd-args=(list @t)
+  =.  cmd-args
+    %+  turn  ref-prefix.args
+    |=  pef=@t
+    (cat 3 'ref-prefix ' pef)
+  =?  cmd-args  peel.args
+    ['peel' cmd-args]
+  =?  cmd-args  symrefs.args
+    ['symrefs' cmd-args]
+  ~&  cmd-args
+  ::
+  ;<  ~  bind:m  (send-request %ls-refs cmd-caps cmd-args)
   ;<  res=client-response:iris  bind:m  take-client-response:strandio
   ?>  ?=(%finished -.res)
   ?~  full-file.res
@@ -146,16 +174,56 @@
   ::
   =^  pil  sea  (read-pkt-lines & sea)
   =+  lip=(flop pil)
-  =|  rel=(list [path hash])
-  =.  rel
   ::  Parse references
   ::
+  =>  |%
+      +$  attribute
+        $%  [%symref =refname:git]
+            [%peeled =hash]
+        ==
+      ++  ref-attribute
+        ;~  pose
+          (stag %symref ;~(pfix (jest ' symref-target:') refname:parse:git-refs))
+          (stag %peeled ;~(pfix (jest ' peeled:') parser-sha-1))
+        ==
+      ++  ref-parser
+        %+  cook 
+          |=  [=hash =refname:git attr=(unit (list attribute))]
+          ^-  [refname:git ref:git (unit ^hash)]
+          ?~  attr
+            ?>  (sane:git-refs refname)
+            [refname hash ~]
+          =|  peeled=(unit ^hash)
+          =|  symref=(unit refname:git)
+          =+  attr=u.attr
+          |-
+          ?~  attr
+            ?~  symref
+              [refname hash peeled]
+            ?>  (sane:git-refs refname)
+            ?>  (sane:git-refs u.symref)
+            [refname [%symref u.symref] peeled]
+          ?-  -.i.attr
+            %symref  $(symref `+.i.attr, attr t.attr)
+            %peeled  $(peeled `+.i.attr, attr t.attr)
+          ==
+          ::
+          ;~  plug
+            parser-sha-1 
+            ;~(pfix ace refname:parse:git-refs)
+            (punt (plus ref-attribute))
+          ==
+        --
+  ::  A list of triples: refname, ref,
+  ::  and optional peeled hash
+  ::
+  =|  rel=(list [refname:git ref:git (unit hash)])
+  =.  rel
   |-
   ?~  lip
     rel
-  =/  ref  
-    ?>  ?=(%data -.i.lip)
-    (scan (trip q.octs.i.lip) parser-ref)
+  ?>  ?=(%data -.i.lip)
+  =+  ref=(scan (trip q.octs.i.lip) ref-parser)
   $(rel [ref rel], lip t.lip)
   ::
   (pure:m (flop rel))

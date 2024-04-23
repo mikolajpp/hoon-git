@@ -42,20 +42,9 @@
 ::
 ::  XX rename to parse-sha-1
 ::
-++  parser-sha-1  %+  cook  |=(h=@ (rev 3 20 h))
+++  parser-sha-1  %+  cook  |=(hash=@ (rev 3 20 hash))
                   (bass 16 (stun [40 40] six:ab))
 ++  parser-sha-256  !!
-++  parser-segment  (cook crip (plus ;~(less fas prn)))
-++  parser-path
-  ;~  pose
-    ;~(plug (jest 'HEAD') (easy ~))
-    ;~(plug parser-segment (star ;~(pfix fas parser-segment)))
-  ==
-++  parser-path-ext  ;~(sfix parser-path (punt fas))
-++  parser-ref
-  %+  cook 
-    |=([=hash =path] [path hash])
-    ;~(plug parser-sha-1 ;~(pfix ace parser-path))
 ++  print-sha-1
   |=  =hash
   ^-  tape
@@ -281,7 +270,8 @@
         ~|  "Corrupted tree object: malformed hash"  !!
       ::  XX parametrize by hash type
       ::
-      =/  haz=@ux  (rev 3 hash-bytes q.u.hek)
+      =+  haz=q.u.hek
+      :: =/  haz=@ux  (rev 3 hash-bytes q.u.hek)
       =/  ren  (scan txt ;~(plug mode node))
       =/  ent=tree-entry  [ren haz]
       $(tes [ent tes])

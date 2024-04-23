@@ -5,7 +5,7 @@
 ::    +remote -- remotes
 ::    +config -- configuration
 ::
-/+  *git, git-pack, git-bundle
+/+  *git, *git-refs, git-pack, git-bundle
 |%
 +$  object-store  $:  loose=(map hash object)
                       archive=(list pack:git-pack)
@@ -15,23 +15,16 @@
                       [%s @t]
                   ==
 +$  config-key  [@tas (unit @t)]
-::  XX Can you use an axal with ref-path instead 
-::  of path, especially from the aura typesystem 
-::  point of view?
-::
-+$  refname  (list @t)
-+$  ref  $@(hash [%symref =refname])
-+$  refs  (axal ref)
 ::  XX does removing a remote in git
 ::  cause its references to disappear?
 ::
-+$  remote  [url=@t =refs]
++$  remote  [url=@t =refs refspec=(list refspec)]
 +$  ref-spec  @t
 +$  repository
   $:  =hash-type
       =object-store
       =refs
-      track=(map @t [far=@t =ref])
+      track=(map @t [remote=@tas merge=refname])
       remotes=(map @tas remote)
       config=(mip:libmip config-key @tas config-value)
   ==

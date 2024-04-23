@@ -1,7 +1,6 @@
 ::
 ::::  Git pack
   ::
-/-  *git-pack, *git-object-store
 /+  *git, stream
 |%
 +$  pack-object-type  $?  object-type 
