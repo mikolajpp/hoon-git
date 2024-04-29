@@ -1,89 +1,151 @@
 /-  *git, spider
-/+  strandio, stream
-/+  git=git-repository, git-http, git-pack
+/+  io=strandio, stream
+/+  git=git-repository, *git-refs, git-pack
+/+  git-clay, git-http
 =,  strand=strand:spider
+|%
+::  XX most arguments are optional, 
+::  making manual thread very inconvenient. 
+::  Can we create a little vase utility to handle 
+::  optionals automatically?
++$  args
+  $:  url=@t            :: URL to clone from
+      branch=(unit @t)  :: point HEAD to branch or tag
+      desk=(unit @tas)  :: clone to a desk
+      dir=path          :: at dir inside repository
+  ==
+--
 ^-  thread:spider
-|=  arg=vase
+|=  args=vase
 =/  m  (strand ,vase)
 ^-  form:m
-=/  url  !<((unit @t) arg)
-=*  http  ~(. git-http (need url))
+::  XX it seems to run out of memory
+::  on empty repos from github.
+::
+=+  args=(need !<((unit ^args) args))
+=*  http  ~(. git-http url.args)
+::
 ;<  caps=(map @ta (unit @t))  bind:m  greet-server-upload:http
-::  XX it seems git reference path can contain quite arbitrary
-::  characters, including @. We need a ref-path=(list @t) type
+;<  ls-refs=(list [refname:git ref:git (unit hash:git)])  bind:m  
+  =/  ref-prefix=(list @t)
+    :~  'HEAD'
+        'refs/heads'
+        'refs/tags'
+    ==
+  =|  args=^args:ls-refs:http
+  =.  symrefs.args  &
+  =.  ref-prefix.args  ref-prefix
+  (ls-refs:http args)
+=/  remote-refs=refs
+  %+  roll  ls-refs
+  |=  [[=refname:git =ref:git peel=(unit hash:git)] =refs]
+  =+  new-refs=(~(put of refs) refname ref)
+  new-refs
+=+  hed=(~(dip of remote-refs) ['HEAD' ~])
+~&  hed
+?~  fil.hed
+  ~|  "Remote HEAD not found"  !!
+=/  head-refs=(list refname)
+  ::  HEAD is a symref, no need to search
+  ::
+  ?^  u.fil.hed
+    ~[refname.u.fil.hed]
+  %+  turn
+    %+  skim  ls-refs
+      |=  [=refname:git =ref:git peel=(unit hash:git)]
+      ?&  ?=([%refs %heads @ta *] refname)
+          =(hash u.fil.hed)
+      ==
+  head
+::  No HEAD found, attempt to point to 
+::  default branch
 ::
-;<  refs=(list [path hash:git])  
-  bind:m  (ls-refs:http ~)
-::  Filter references for /refs/heads and /refs/tags
+::  XX Default branch should be sourced from config
 ::
-=|  remote-refs=^refs:git
-=.  remote-refs
-  |-
-  ?~  refs
-    remote-refs
-  =+  ref=i.refs
-  ?.  ?|  ?=([%refs %heads *] -.ref)
-          ?=([%refs %tags *] -.ref)
-          ?=([%'HEAD' ~] -.ref)
-      ==  
-    $(refs t.refs)
-  %=  $
-    remote-refs  (~(put of remote-refs) ref)
-    refs  t.refs
-  ==
-::  Find out the default branch: use 
-::  the first branch name which matches the hash of HEAD
-::
-~&  ~(tap of remote-refs)
-=+  head=(~(dip of remote-refs) ['HEAD' ~])
-?~  fil.head
-  ~|  "HEAD not found"  !!
-=/  refs-at-head=_refs
-  %+  skim  refs
-    |=  [=path =hash:git]
-    ?.  ?|  ?=([%refs %heads @ta *] path)
-            ?=(^ u.fil.head)
-        ==
-      |
-    =(hash u.fil.head)
-?~  refs-at-head
-  ~|  "Default branch name not found"  !!
-=/  default-branch=@t
-  -:(flop -.i.refs-at-head)
+=?  head-refs  ?=(~ head-refs)
+  =+  master=(~(get of remote-refs) /refs/head/master)
+  ?~  master
+    ~
+  ~[/refs/head/master]
+=/  default-branch=refname
+  (head head-refs)
+=/  head-hash=hash:git
+  =+  fil=(~(get of remote-refs) default-branch)
+  ?~  fil  !!
+  ?@  u.fil  u.fil  !!
 ~&  default-branch+default-branch
-=/  want=(list hash:git)
-  ::  XX traversal routines for axal
-  %+  turn  ~(tap of remote-refs)
-    |=  [=path =ref:git]
-    ?^  ref  !!
-    ref
+=|  want=(list hash:git)
+=.  want
+  %+  roll  ~(tap of remote-refs)
+    ::  XX The typechecker does not catch 
+    ::  invalid sample here
+    |=  [[=path =ref:git] =_want]
+    ?@  ref
+      [ref want]
+    want
 ;<  pack=pack:git-pack  bind:m  (fetch:http ~ want)
 ::
 ::  Repository setup after clone:
 ::  1. Insert the pack
 ::  2. Install references 
-::  3. Setup remote
-::  4. Setup tracking branches
-::
-::  Integrity: all objects in the pack have computed checksums, 
-::  thus their content matches the hash. 
-::
-::  Commit graph: If the top commit is trusted, the rest
-::  of the commit chain can be trusted as well.
-::
-::  XX Try a self-clone from an Urbit ship!
+::  3. Setup default branch
+::  4. Setup remote refs
+::  5. Setup tracking branches
 ::
 =|  repo=repository:git
 =.  repo  (add-pack:~(store git repo) pack)
+::  Install default branch
+::
 =.  refs.repo 
-  %+  ~(put of *^refs:git) 
-    /refs/heads/[default-branch]
-  =+  hash=(need (~(get of remote-refs) /refs/heads/[default-branch]))
+  %+  ~(put of *refs)
+    default-branch
+  =+  hash=(need (~(get of remote-refs) default-branch))
   ?^(hash !! hash)
-::  XX handle symbolic references
+::  Track default branch
+::
+=.  track.repo
+  ?>  ?=([%refs %heads @ %~] default-branch)
+  =/  branch=@t
+    i.t.t.default-branch
+  %+  ~(put by track.repo)  branch
+    [%origin /refs/heads/[branch]]
+::  Install HEAD
+::
 =.  refs.repo  
   %+  ~(put of refs.repo)  ['HEAD' ~]
-    ?^(u.fil.head !! [%symref /refs/heads/[default-branch]])
-=.  remotes.repo  (~(put by remotes.repo) %origin [(need url) remote-refs])
-~&  refs.repo
+    [%symref default-branch]
+::  Install tags 
+::
+::  XX Move ++of from /sys/arvo/hoon to
+::  /sys/hoon/hoon, extend it, and jet it, 
+::  also providing a type with more general path
+::
+=.  refs.repo  
+  %+  roll  ~(tap of (~(dip of remote-refs) /refs/tags))
+    |=  [[=refname =ref] =_refs.repo]
+    ?>  ?=([@ %~] refname)
+    (~(put of refs) /refs/tags/[i.refname] ref)
+::  Setup origin
+::
+=|  origin=^remote:git
+=.  refspec.origin
+  %+  turn  ~["+refs/heads/*:refs/remotes/origin/*"]
+  (curr scan refspec:parse)
+=.  refs.origin
+  (~(put of refs.origin) ~['HEAD'] u.fil.hed)
+=.  refs.origin
+  %+  roll  ~(tap of (~(dip of remote-refs) /refs/heads))
+    |=  [[=refname =ref] =_refs.repo]
+    (~(put of refs) (weld /refs/heads refname) ref)
+=.  remotes.repo
+  (~(put by remotes.repo) %origin origin)
+?~  desk.args
+  (pure:m !>(repo))
+=/  =soba:clay
+  (as-soba:git-clay repo default-branch dir.args)
+;<  dek=(set desk)  bind:m  (scry:io (set desk) /cd/$)
+?:  (~(has in dek) u.desk.args)
+  ~|  "Desk {<u.desk.args>} already exists"  !!
+;<  ~  bind:m
+  (send-raw-card:io %pass /clay %arvo %c %info u.desk.args &+soba)
 (pure:m !>(repo))

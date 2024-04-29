@@ -275,17 +275,24 @@
     |=  =refname
     ^-  ?
     (~(has of refs.repo) refname)
-  ++  got
+  ++  get
     |=  =refname
-    ^-  hash
+    ^-  (unit hash)
     ::  XX With axal we have no way to tell
     ::  if an empty path has been stored. Does it matter?
     ::
     =+  fil=(~(get of refs.repo) refname)
-    ?~  fil  !!
+    ?~  fil  ~
     ?@  u.fil
-      u.fil
+      fil
     $(refname refname.u.fil)
+  ++  got
+    |=  =refname
+    ^-  hash
+    =+  ref=(get refname)
+    ?~  ref
+      ~|  "Refname {<refname>} not found"  !!
+    u.ref
   ++  tap  (tap-prefix ~)
   ++  tap-prefix
     |=  prefix=refname

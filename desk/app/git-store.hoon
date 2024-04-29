@@ -1,7 +1,9 @@
+/-  ted-sync=git-ted-sync
 /+  default-agent, dbug
-/+  server, agentio
+/+  server, io=agentio
 /+  stream, zlib
-/+  git=git-repository, *git-http, git-refs
+/+  *git-refs, *git-http
+/+  git=git-repository
 /+  git-revision, git-pack, git-pack-objects, git-graph
 |%
 +$  versioned-state
@@ -9,16 +11,41 @@
   ==
 +$  repo-store  (map @ta repository:git)
 +$  access  (map @ta (set @p))
-+$  state-0  [%0 =repo-store =access]
++$  sync       $:  =refname
+                   dir=path
+                   desk=@tas 
+                   =aeon:clay  :: XX is this needed?
+                   =hash:git
+               ==
+::  Read-only
+::
++$  lock  (set @ta)
+::  Sync to clay
+::
++$  repo-sync  (map @ta sync)
+::
++$  state-0  $:  %0 
+                 =repo-store 
+                 =lock
+                 =access
+                 =repo-sync
+             ==
 +$  card  card:agent:gall
-::  XX allow @ta as a name
+::  XX refactor name -> repo
 +$  command
-  $%  [%put name=@ta =repository:git]
+  $%  [%store name=@ta =repository:git]
+      [%update name=@ta =repository:git]
+      [%delete name=@ta]
+      ::
+      [%lock name=@ta]  :: Read-only
+      [%unlock name=@ta]
+      ::
       [%allow-access name=@ta ship=@p]
       [%set-private name=@ta]
       [%set-public name=@ta]
-      [%update name=@ta =repository:git]
-      [%delete name=@ta]
+      ::
+      [%sync name=@ta =refname dir=path desk=@tas]
+      [%unsync name=@ta]
   ==
 --
 %-  agent:dbug
@@ -38,7 +65,7 @@
   ::  XX can we just assume the binding was successful?
   ::  XX does the binding survive suspend and load sequence?
   ::
-  ~[[%pass /connect %arvo %e %connect [~ [%git ~]] dap.bowl]]
+  [%pass /connect %arvo %e %connect [~ [%git ~]] dap.bowl]~
 ++  on-save
   ^-  vase
   !>(state)
@@ -58,14 +85,22 @@
   ?.  ?=(%noun mark)
     ~|  "Invalid request"  !!
   =+  cmd=!<(command vase)
-    ?-  -.cmd
-      %put     (put:do +.cmd)
-      %set-private  (set-private:do +.cmd)
-      %allow-access  (allow-access:do +.cmd)
-      %set-public   (set-public:do +.cmd)
-      %update  (update:do +.cmd)
-      %delete  (delete:do +.cmd)
-    ==
+  ~&  git-store-poke+cmd
+  ?-  -.cmd
+    %store   (store:do +.cmd)
+    %update  (update:do +.cmd)
+    %delete  (delete:do +.cmd)
+    ::
+    %lock  (lock:do +.cmd)
+    %unlock  (unlock:do +.cmd)
+    ::
+    %set-private   (set-private:do +.cmd)
+    %set-public    (set-public:do +.cmd)
+    %allow-access  (allow-access:do +.cmd)
+    ::
+    %sync    (sync:do +.cmd)
+    %unsync  (unsync:do +.cmd)
+  ==
   ::
   [cards this]
 ::
@@ -76,37 +111,102 @@
     `this
   (on-watch:def path)
 ++  on-leave   on-leave:def
-++  on-peek    on-peek:def
+++  on-peek
+  |=  =path
+  ^-  (unit (unit cage))
+  ~&  git-store-peek+path
+  ?>  ?=([%x @ta *] path)
+  =+  name=i.t.path
+  ?>  (~(has by repo-store.state) name)
+  ?:  ?=([%x @ta ~] path)
+    ``[%noun !>((~(got by repo-store.state) name))]
+  ?+  t.t.path  !!
+    [%lock ~]
+      ``[%noun !>((~(has in lock.state) name))]
+  ==
 ++  on-agent   on-agent:def
 ++  on-arvo
   |=  [=wire sign=sign-arvo]
   ^-  (quip card _this)
-  `this
+  ?+  wire  (on-arvo:def wire sign)
+    [%sync @tas ~]
+      ?>  ?=([%khan %arow *] sign)
+      ::  XX how to handle sync failure?
+      ::  Should we just print the error, or somehow 
+      ::  notify the user 
+      ::
+      ?:  ?=(%.n -.p.sign)
+        ((slog p.p.sign) `this)
+      `this
+  ==
 ::
 ++  on-fail    on-fail:def
 --
 ::
 |_  =bowl:gall
-++  put
+++  store
   |=  [name=@ta repo=repository:git]
   ^-  (quip card _state)
   ?:  (~(has by repo-store.state) name)
-    ~|  "repository:git {<name>} already exists"  !!
+    ~|  "Git repository {<name>} already exists"  !!
   `state(repo-store (~(put by repo-store.state) name repo))
 ++  update 
   |=  [name=@ta repo=repository:git]
   ^-  (quip card _state)
+  ::  XX why are state faces not accesible directly?
+  ::
   ?.  (~(has by repo-store.state) name)
-    ~|  "repository:git {<name>} does not exist"  !!
-  `state(repo-store (~(put by repo-store.state) name repo))
+    ~|  "Git repository {<name>} does not exist"  !!
+  =/  sync=(unit ^sync)
+    =+  sync=(~(get by repo-sync.state) name)
+    ?~  sync
+      ~
+    =+  tepo=(~(got by repo-store.state) name)
+    =/  old=(unit hash)
+      (get:~(refs git tepo) refname.u.sync)
+    =/  new=(unit hash)
+      (get:~(refs git repo) refname.u.sync)
+    ?:  =(old new)
+      ~
+    sync
+  ?~  sync
+    `state(repo-store (~(put by repo-store.state) name repo))
+  =/  [cards=(list card) =^^sync]
+    (run-sync name repo refname.u.sync dir.u.sync desk.u.sync)
+  :-  cards
+  %=  state
+    repo-store  (~(put by repo-store.state) name repo)
+    repo-sync   (~(put by repo-sync.state) name sync)
+  ==
 ++  delete
   |=  name=@ta
   ~&  delete-repo+name
   ^-  (quip card _state)
-  ?:  (~(has by repo-store.state) name)
-    ~&  "Deleted Git repository {<name>}"
-    `state(repo-store (~(del by repo-store.state) name))
-  `state
+  ?.  (~(has by repo-store.state) name)
+    ~|  "Git repository {<name>} does not exist"  !!
+  ~&  "Deleted git repository {<name>}"
+  :-  ~
+  %=  state
+    repo-store  (~(del by repo-store.state) name)
+    access  (~(del by access.state) name)
+    lock  (~(del in lock.state) name)
+    repo-sync  (~(del by repo-sync.state) name)
+  ==
+++  lock
+  |=  name=@ta
+  ~&  lock+name
+  ^-  (quip card _state)
+  ?>  (~(has by repo-store.state) name)
+  ?:  (~(has in lock.state) name)  !!
+  ~&  "Locked git repository {<name>}"
+  `state(lock (~(put in lock.state) name))
+++  unlock
+  |=  name=@ta
+  ~&  unlock+name
+  ^-  (quip card _state)
+  ?>  (~(has by repo-store.state) name)
+  ~&  "Unlocked git repository {<name>}"
+  `state(lock (~(del in lock.state) name))
 ++  set-private
   |=  name=@ta
   ~&  set-private+name
@@ -119,10 +219,10 @@
   |=  [name=@ta ship=@p]
   ~&  allow-access+[name ship]
   ^-  (quip card _state)
-  ?.  ?&  (~(has by repo-store.state) name)
-          (~(has by access.state) name)
-      ==
-    `state
+  ?.  (~(has by repo-store.state) name)
+    ~|  "Git repository {<name>} does not exist"  !!
+  ?.  (~(has by access.state) name)
+    ~|  "Git repository {<name>} is public"  !!
   ~&  "Restricted Git repository {<name>}"
   ::  XX double get
   =+  allow=(~(got by access.state) name)
@@ -133,9 +233,43 @@
   ~&  set-public+name
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
-    `state
+    ~|  "Git repository {<name>} does not exist"  !!
   ~&  "Git repository {<name>} is now public"
   `state(access (~(del by access.state) name))
+++  sync
+  |=  [name=@ta =refname dir=path desk=@tas]
+  ^-  (quip card _state)
+  ::  XX Really need to solve double get problem with zippers,
+  ::  or switch to unit get.
+  ::
+  ?.  (~(has by repo-store.state) name)
+    ~|  "Git repository {<name>} does not exist"  !!
+  ?:  (~(has by repo-sync.state) name)
+    =+  des=desk:(~(got by repo-sync.state) name)
+    ~|  "Git repository {<name>} already synced to {<des>}"  !!
+  =+  repo=(~(got by repo-store.state) name)
+  ~&  "Syncing repository {<name>} to {<desk>}"
+  =/  [cards=(list card) =^sync]
+    (run-sync name repo refname dir desk)
+  :-  cards
+  state(repo-sync (~(put by repo-sync.state) name sync))
+++  run-sync
+  |=  [name=@tas repo=repository:git =refname dir=path desk=@tas]
+  ^-  (quip card ^sync)
+  =/  =args:ted-sync
+    [repo `refname dir desk]
+  =/  fard=(fyrd:khan cage)
+    [%git %git-sync %noun !>(`args)]
+  :-  [%pass /sync/[name] %arvo %k %fard fard]~
+  :: XX store aeon
+  [refname dir desk 0 0x0]
+++  unsync
+  |=  name=@ta
+  ?.  (~(has by repo-sync.state) name)
+    `state
+  =+  des=desk:(~(got by repo-sync.state) name)
+  ~&  "Git repository sync {<name>} to {<des>} cancelled"
+  `state(repo-sync (~(del by repo-sync.state) name))
 ++  is-authorized
   |=  =inbound-request:eyre
   ^-  ?
@@ -758,6 +892,8 @@
     ::
     =.  repo-store.state
       (~(put by repo-store.state) repo-name repo)
+    ::  XX handle sync
+    ::
     ~&  no-packs+(lent archive.object-store.repo)
     :_  state
     %+  give-simple-payload:app:server  eyre-id

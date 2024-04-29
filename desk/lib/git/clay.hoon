@@ -4,13 +4,12 @@
 /+  *git, *git-refs, git=git-repository
 =,  clay
 |%
-::
-::  Export the tree at reference and directory from the repository
+::  Export the tree at :refname and directory
 ::  as soba, to be instantiated into a clay desk
 ::
-++  as-namespace
+++  as-soba
   |=  [repo=repository:git =refname dir=path]
-  ^-  (list [path page])
+  ^-  soba
   =/  obj 
     %-  got:~(store git repo)
       (got:~(refs git repo) refname)
@@ -44,36 +43,32 @@
         tree.obj
     ==
   =|  =path
-  =|  nase=(list [^path page])
+  =|  =soba  ::  (list [path miso])
   |-
   ?~  tree
-    nase
+    soba
   =+  entry=(got:~(store git repo) hash.i.tree)
   ?+  -.entry  !!
     %tree  
-      ~&  nase-tree+path
       %=  $
         tree  t.tree
-        nase  $(tree tree.entry, path [name.i.tree path])
+        soba  $(tree tree.entry, path [name.i.tree path])
       ==
     %blob
-      ~&  blob-name+name.i.tree
-      =/  [name=@ta ext=@ta]
-        %+  scan  (trip name.i.tree) 
+      =/  file=(unit [name=@ta ext=@ta])
+        %+  rust  (trip name.i.tree) 
           %+  cook
             |=([a=tape b=tape] [(crip a) (crip b)])
           ;~(plug (plus ;~(less dot prn)) ;~(pfix dot (plus prn)))
-      =+  path=[ext name path]
-      ~&  nase-blob+path
-      ::  All we have is mime /text/plain octs. 
-      ::  They need to be converted to whatever is the mark.
-      ::  However, for this we need scry!
-      ::  Alternatively, we should grab all /mar files, 
-      ::  build them on the fly, and use them for conversion, 
-      ::  which is what clay would do, it seems.
+      ?~  file
+        $(tree t.tree)
+      =+  path=[ext.u.file name.u.file path]
+      ::  XX make sure loose objects do not have the header 
       ::
-      =/  =page
-        [%mime /text/plain octs.entry]
-      $(tree t.tree, nase [[(flop path) page] nase])
+      =/  miso 
+        [%ins %mime !>([/text/plain octs.entry])]
+      $(tree t.tree, soba [[(flop path) miso] soba])
   ==
+  :: ~&  "Exporting {<refname>} to clay, found tree {<tree.commit>}"
+  :: *soba
 --
