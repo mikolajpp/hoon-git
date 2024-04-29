@@ -25,13 +25,14 @@
                        committer=[person date=[@ud ? tape]]
                        sign=(unit signature)
                    ==
-+$  commit      $:  commit-header
-                    message=tape
-                ==
++$  commit  $+  commit
+            $:  commit-header
+                message=tape
+            ==
 ::  XX refactor to [mode name hash]
 ::
 +$  tree-entry  [[mode=@ta name=@ta] =hash]
-+$  tree  (list tree-entry)
++$  tree  $+(tree (list tree-entry))
 ::  XX refactor objects so that fields are readily accessible
 ::  XX are sizes here really necessary?
 ::

@@ -11,11 +11,12 @@
   ==
 +$  job-id  @uv
 +$  job  $:  repo=@ta  :: target repository 
-             ted=@ta   :: hath to thread, relative to /ted/git/jobs/
+             ted=@ta   :: path to thread, relative to /ted/git/jobs/
              wait=@dr  :: recurrence time
              desc=@t   :: description
          ==
-+$  job-stats  $:  time=@da  :: Last run time
++$  job-stats  $:  last=@da  :: Last run time
+                   next=@da  :: Wake up time
                ==
 
 +$  jobs   (map job-id job)
@@ -25,11 +26,10 @@
                  =stats
              ==
 +$  card  card:agent:gall
-:: > git-auto [%job ~.lagoon /pull/hoon ~m5 'Update lagoon'
 +$  command
   $%  [%start =job]
       [%stop =job-id]
-      :: [%run =id]  :: Manually run the job 
+      :: [%run =id]  :: Trigger the job 
       :: [%cancel repo=@ta] :: Cancel all jobs for repository
   ==
 --
@@ -79,9 +79,9 @@
   ~&  on-agent+wire
   ?+  wire  (on-agent:def wire sign)
     [%lock @ta ~]
-      ~&  sign
       ?>  ?=(%poke-ack -.sign)
-      ?^  p.sign  !!
+      ?^  p.sign
+        ((slog u.p.sign) `this)
       =/  id=job-id
         (need (slaw %uv i.t.wire))
       =^  cards  state  (run:do id)
@@ -119,15 +119,33 @@
       =+  job=(~(get by jobs.state) id)
       ?~  job
         ~|  "Job {<id>} does not exist"  !!
-      ::  XX update with the thread result
-      =/  unlock
+      ?>  ?=([%khan %arow *] sign)
+      ?:  ?=(%| -.p.sign)
+        ::  XX How to best handle failed jobs?
+        ::  Should we re-run, or simply notify failure
+        ::  to the user and delete the job?
+        ::
+        ((slog p.p.sign) `this)
+      =/  repo
+        !<(repository:git q.p.p.sign)
+      :_  this
+      :*
+        ::  Unlock repository
+        ::
         %+  ~(poke-our pass:io /unlock/(scot %uv id))
           %git-store
           [%noun !>([%unlock repo.u.job])]
-      :_  this
-      :*  unlock
-          ?.  (gth wait.u.job 0)  ~
-          [%pass /run/(scot %uv id) %arvo %b %wait (add now.bowl wait.u.job)]~
+        ::  Update repository
+        ::
+        %+  ~(poke-our pass:io /update/(scot %uv id))
+          %git-store
+          [%noun !>([%update repo.u.job repo])]
+        ::  Schedule next run
+        ::
+        ?.  (gth wait.u.job 0)
+          ~
+        =+  next=(add now.bowl wait.u.job)
+        [(~(arvo pass:io /run/(scot %uv id)) %b %wait next)]~
       ==
   ==
     :: [%sync @tas ~]
@@ -187,5 +205,7 @@
 ++  stop
   |=  id=job-id
   ^-  (quip card _state)
-  `state
+  ::  XX Rest %behn's timer
+  ::
+  `state(jobs (~(del by jobs.state) id))
 --

@@ -6,7 +6,7 @@
 ::  of path from the aura typesystem 
 ::  point of view?
 ::
-+$  refs  (axal ref)
++$  refs  $+(refs (axal ref))
 +$  refspec
   $:  force=_|
       exclude=_|

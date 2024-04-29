@@ -21,6 +21,7 @@
 +$  remote  [url=@t =refs refspec=(list refspec)]
 +$  ref-spec  @t
 +$  repository
+  $+  repository
   $:  =hash-type
       =object-store
       =refs
@@ -86,6 +87,8 @@
   =.  repo  (put core/~ bare+l+&)
   repo
   --
+::  XX name clash with remote
+::
 ++  remote
   |%
   :: ++  fetch

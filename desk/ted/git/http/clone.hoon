@@ -128,6 +128,7 @@
 ::  Setup origin
 ::
 =|  origin=^remote:git
+=.  url.origin  url.args
 =.  refspec.origin
   %+  turn  ~["+refs/heads/*:refs/remotes/origin/*"]
   (curr scan refspec:parse)

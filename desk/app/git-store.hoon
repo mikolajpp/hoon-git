@@ -5,6 +5,7 @@
 /+  *git-refs, *git-http
 /+  git=git-repository
 /+  git-revision, git-pack, git-pack-objects, git-graph
+=,  html
 |%
 +$  versioned-state
   $%  state-0
@@ -33,14 +34,14 @@
 +$  card  card:agent:gall
 ::  XX refactor name -> repo
 +$  command
-  $%  [%store name=@ta =repository:git]
+  $%  [%put name=@ta =repository:git]
       [%update name=@ta =repository:git]
       [%delete name=@ta]
       ::
       [%lock name=@ta]  :: Read-only
       [%unlock name=@ta]
       ::
-      [%allow-access name=@ta ship=@p]
+      [%allow name=@ta ship=@p]
       [%set-private name=@ta]
       [%set-public name=@ta]
       ::
@@ -85,9 +86,8 @@
   ?.  ?=(%noun mark)
     ~|  "Invalid request"  !!
   =+  cmd=!<(command vase)
-  ~&  git-store-poke+cmd
   ?-  -.cmd
-    %store   (store:do +.cmd)
+    %put  (put:do +.cmd)
     %update  (update:do +.cmd)
     %delete  (delete:do +.cmd)
     ::
@@ -96,7 +96,7 @@
     ::
     %set-private   (set-private:do +.cmd)
     %set-public    (set-public:do +.cmd)
-    %allow-access  (allow-access:do +.cmd)
+    %allow  (allow:do +.cmd)
     ::
     %sync    (sync:do +.cmd)
     %unsync  (unsync:do +.cmd)
@@ -144,7 +144,7 @@
 --
 ::
 |_  =bowl:gall
-++  store
+++  put
   |=  [name=@ta repo=repository:git]
   ^-  (quip card _state)
   ?:  (~(has by repo-store.state) name)
@@ -157,6 +157,8 @@
   ::
   ?.  (~(has by repo-store.state) name)
     ~|  "Git repository {<name>} does not exist"  !!
+  ?:  (~(has in lock.state) name)
+    ~|  "Git repository {<name>} is read-only"  !!
   =/  sync=(unit ^sync)
     =+  sync=(~(get by repo-sync.state) name)
     ?~  sync
@@ -197,7 +199,8 @@
   ~&  lock+name
   ^-  (quip card _state)
   ?>  (~(has by repo-store.state) name)
-  ?:  (~(has in lock.state) name)  !!
+  ?:  (~(has in lock.state) name)
+    ~|  "Repository {<name>} is already locked"  !!
   ~&  "Locked git repository {<name>}"
   `state(lock (~(put in lock.state) name))
 ++  unlock
@@ -215,7 +218,7 @@
     `state
   ~&  "Restricted Git repository {<name>}"
   `state(access (~(put by access) name ~))
-++  allow-access
+++  allow
   |=  [name=@ta ship=@p]
   ~&  allow-access+[name ship]
   ^-  (quip card _state)
@@ -642,6 +645,11 @@
           request=request:http
       ==
   ^-  (quip card _state)
+  ?:  (~(has in lock.state) repo-name)
+    :_  state
+    %+  give-simple-payload:app:server  eyre-id
+    =-  [[503 ~] `(as-octs:mimes -)]
+    'Repository is locked read-only, try again later'
   =<
   ?+  method.request  !!
     %'GET'   advertise-refs
@@ -890,12 +898,13 @@
     ::  in case of failure? Does it extract objects 
     ::  associated with the succesful update?
     ::
-    =.  repo-store.state
-      (~(put by repo-store.state) repo-name repo)
-    ::  XX handle sync
-    ::
     ~&  no-packs+(lent archive.object-store.repo)
+    ::  XX rename repo-name -> name
+    ::
+    =^  cards  state  (update repo-name repo)
     :_  state
+    %+  weld
+      cards
     %+  give-simple-payload:app:server  eyre-id
     [[200 ~] `octs.status]
   --
