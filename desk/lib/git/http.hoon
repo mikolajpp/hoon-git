@@ -1,5 +1,7 @@
 ::  
-::  git-http is a library of smart HTTP protocol 
+::::  Git http
+  ::
+::  git-http is a library of git smart HTTP protocol 
 ::  component strands.
 ::
 ::  Supports only protocol v2 for git-upload-pack and 
@@ -7,7 +9,7 @@
 :: 
 /-  spider
 /+  stream, strandio
-/+  *git, git-refs, git=git-repository, git-pack
+/+  *git, git-pack, git=git-repository
 =,  strand=strand:spider
 |%
 ++  git-agent  'hoon-git/0.1'
@@ -149,7 +151,7 @@
   ::  Return a triple of refname, reference, 
   ::  and optional peeled hash.
   ::
-  =/  m  (strand ,(list [refname:git-refs ref:git-refs (unit hash)]))
+  =/  m  (strand ,(list [refname ref (unit hash)]))
   ^-  form:m
   =+  cmd-caps=default-caps
   =|  cmd-args=(list @t)
@@ -183,15 +185,15 @@
         ==
       ++  ref-attribute
         ;~  pose
-          (stag %symref ;~(pfix (jest ' symref-target:') refname:parse:git-refs))
-          (stag %peeled ;~(pfix (jest ' peeled:') parser-sha-1))
+          (stag %symref ;~(pfix (jest ' symref-target:') parse-refname))
+          ::  XX parametrize by hash-algo
+          (stag %peeled ;~(pfix (jest ' peeled:') parse-sha-1))
         ==
       ++  ref-parser
         %+  cook 
           |=  [=hash =refname:git attr=(unit (list attribute))]
           ^-  [refname:git ref:git (unit ^hash)]
           ?~  attr
-            ?>  (sane:git-refs refname)
             [refname hash ~]
           =|  peeled=(unit ^hash)
           =|  symref=(unit refname:git)
@@ -200,8 +202,6 @@
           ?~  attr
             ?~  symref
               [refname hash peeled]
-            ?>  (sane:git-refs refname)
-            ?>  (sane:git-refs u.symref)
             [refname [%symref u.symref] peeled]
           ?-  -.i.attr
             %symref  $(symref `+.i.attr, attr t.attr)
@@ -209,8 +209,8 @@
           ==
           ::
           ;~  plug
-            parser-sha-1 
-            ;~(pfix ace refname:parse:git-refs)
+            parse-sha-1
+            ;~(pfix ace parse-refname)
             (punt (plus ref-attribute))
           ==
         --
@@ -330,7 +330,7 @@
       ?<  ?=(@ pkt)
       %+  scan
         (trip q.octs.pkt)
-      ;~(pfix (jest 'ACK ') parser-sha-1)
+      ;~(pfix (jest 'ACK ') parse-sha-1)
     --
   ++  read-shallow-info
     |=  sea=stream:stream 

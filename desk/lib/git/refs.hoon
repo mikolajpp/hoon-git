@@ -1,23 +1,17 @@
-/-  *git
+/+  *git-hash
 |%
-+$  refname  (list @t)
++$  refname  $+(refname (list @t))
 +$  ref  $@(hash [%symref =refname])
 ::  XX Can you use an axal with ref-path instead 
 ::  of path from the aura typesystem 
 ::  point of view?
 ::
-+$  refs  $+(refs (axal ref))
-+$  refspec
-  $:  force=_|
-      exclude=_|
-      pattern=_|
-      hash=_|
-      ::
-      src=(unit refname)
-      dst=(unit refname)
-  ==
++$  refs  $+(git-refs (axal ref))
 --
 |%
+++  parse-refname  refname:parse
+++  parse-refname-ext  refname-ext:parse
+::
 ++  parse
   |%
   ::  Invalid characters
@@ -56,35 +50,6 @@
       ;~(plug segment (star ;~(pfix fas segment)))
     ==
   ++  refname-ext  ;~(sfix refname (punt fas))
-  ++  refspec
-    %+  cook
-      |=  [opt=(unit @t) src=(unit ^refname) dst=(unit ^refname)]
-      ^-  ^refspec
-      =/  force=?
-        ?&(?=(^ opt) =('+' u.opt))
-      =/  exclude=?
-        ?&(?=(^ opt) =('^' u.opt))
-      :: Negative refspecs only allow source, 
-      :: which must be present.
-      ::
-      ?<  ?&  exclude
-              ?|(?=(^ dst) ?=(~ src))
-          ==
-      :: XX handle hash
-      :: XX detect patterns
-      ::
-      =|  refspec=^refspec
-      %=  refspec
-        force  force
-        exclude  exclude
-        src  src
-        dst  dst
-      ==
-    ;~  plug
-      (punt ;~(pose lus ket))  :: force '+', or exclude '^'
-      (punt refname)
-      ;~(pfix col (punt refname))
-    ==
   --
 ++  sane
   |=  =refname
@@ -96,11 +61,5 @@
     |
   ::  XX handle pattern match: only one '*' is allowed
   ::
-  &
-++  sane-refspec
-  |=  =refspec
-  &
-++  sane-refspec-push
-  |=  =refspec
   &
 --

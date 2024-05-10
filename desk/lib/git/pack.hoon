@@ -1,9 +1,10 @@
 ::
 ::::  Git pack
   ::
-/+  *git, stream
+/+  stream, zlib
+/+  *git-hash, *git-object
 |%
-+$  pack-object-type  $?  object-type 
++$  pack-object-type  $?  object-type
                           %ofs-delta
                           %ref-delta
                       ==
@@ -22,12 +23,12 @@
 ::
 +$  pack-index   ((mop hash @ud) lth)
 ++  pack-on  ((on hash @ud) lth)
-+$  pack  $:  =hash-type 
++$  pack  $:  =hash-algo
               count=@ud 
               index=pack-index 
               ::  Checksum position
               end-pos=@ud 
-              data=stream:libstream
+              data=stream:stream
           ==
 +$  store-raw-get  $-(hash (unit raw-object))
 --
@@ -55,7 +56,7 @@
     ~|  "Pack file is corrupted: no checksum found"  !!
   ?>  =(pos.sea p.octs.sea)
   =+  len=(sub end start)
-  =+  check=(hash-octs-sha-1:obj len (rsh [3 start] q.octs.sea))
+  =+  check=(hash-octs-sha-1 len (rsh [3 start] q.octs.sea))
   ?>  =(q.u.hash check)
   ::  XX read-thin should return the list 
   ::  of missing objects instead of thickening the pack
@@ -103,9 +104,9 @@
           ::  XX add write-octs function to libstream
           ::
           %+  write-octs:stream  data.pack
-            (as-octs:obj rob)
+            (raw-as-octs rob)
         index
-          =+  hash=(hash-raw:obj %sha-1 rob)
+          =+  hash=(hash-raw %sha-1 rob)
           %^  put:pack-on  index.pack
             hash
           pos.data.pack
@@ -113,7 +114,7 @@
       ==
   =+  sea=data.pack
   =+  end-pos=pos.sea
-  =+  hash=(hash-octs-sha-1:obj octs.sea)
+  =+  hash=(hash-octs-sha-1 octs.sea)
   =.  sea  (append-octs:stream sea [20 hash])
   pack(data sea(pos start))
 ::
@@ -123,9 +124,9 @@
   ?-  version.hed
     %2  20
   ==
-++  pack-hash-type
+++  pack-hash-algo
   |=  hed=pack-header
-  ^-  hash-type
+  ^-  hash-algo
   ?-  version.hed
     %2  %sha-1
   ==
@@ -158,8 +159,8 @@
     =^  pob=pack-object  sea  (read-pack-object sea)
     =/  [rob=raw-object miso=(unit raw-object)]
       (resolve-raw-object-thin pob index sea get)
-    :: ~?  ?=(^ miso)  "Missing object: {<(hash-raw:obj %sha-1 u.miso)>}"
-    =+  hash=(hash-raw:obj (pack-hash-type header) rob)
+    :: ~?  ?=(^ miso)  "Missing object: {<(hash-raw %sha-1 u.miso)>}"
+    =+  hash=(hash-raw (pack-hash-algo header) rob)
     ?>  (gte p.octs.data.rob (met 3 q.octs.data.rob))
     ?:  (~(has by index) hash)
       ~|  "Object {<hash>} duplicated: indexed at {<(~(get by index) hash)>}"  !!
@@ -170,7 +171,7 @@
     ==
   :_  sea
   :_  miss
-  :-  (pack-hash-type header)
+  :-  (pack-hash-algo header)
   [count.header index end-pos=pos.sea [start octs.sea]]
 ::
 ::  Resolve raw object, potentially returning
@@ -206,17 +207,16 @@
     =+  pob=i.chain
     =/  kob=pack-object
       ?-  -.pob
-
         %ofs-delta
-        =+  pos=(sub pos.pob base-offset.pob)
-        =<(- (read-pack-object pos octs.sea))
+          =+  pos=(sub pos.pob base-offset.pob)
+          =<(- (read-pack-object pos octs.sea))
 
         %ref-delta
-        =/  pos=(unit @ud)
-          (get:pack-on index hash.pob)
-        ?~  pos
-          (need (get hash.pob))
-        =<(- (read-pack-object u.pos octs.sea))
+          =/  pos=(unit @ud)
+            (get:pack-on index hash.pob)
+          ?~  pos
+            (need (get hash.pob))
+          =<(- (read-pack-object u.pos octs.sea))
       ==
     ?:  ?=(pack-delta-object kob)
       $(chain [kob chain])
@@ -224,7 +224,7 @@
   =+  res=(resolve-delta-chain base chain sea)
   :: Is the base missing?
   ::
-  ?.  (has:pack-on index (hash-raw:obj %sha-1 base))
+  ?.  (has:pack-on index (hash-raw %sha-1 base))
     [res `base]
   [res ~]
 ++  resolve-raw-object
@@ -267,7 +267,6 @@
   ::
   =^  biz=@ud  sea  (read-object-size sea)
   =^  siz=@ud  sea  (read-object-size sea)
-  :: ~&  expand-to+[type=type.base biz siz]
   ::  Verify base size
   ::
   ?>  =(size.base biz)
@@ -285,7 +284,7 @@
       [type.base p.octs.red 0+octs.red]
     ?>  =(size.rob siz)
     rob
-    :: (parse-raw:obj octs.red)
+    :: (parse-raw octs.red)
   =^  byt  sea  (read-byte:stream sea)
   =+  bat=(need byt)
   ::  XX why is this needed?
@@ -548,7 +547,7 @@
   =+  obe=(get-raw hax)
   ::  XX Why is this function called a bind?
   ::
-  (bind obe (cury parse-raw:obj hash-type.pak))
+  (bind obe (cury parse-raw hash-algo.pak))
 ++  get-header
   |=  hax=hash
   ^-  (unit object-header)
@@ -576,7 +575,7 @@
   |=  hax=hash
   ^-  object
   =+  obe=(got-raw hax)
-  (parse-raw:obj hash-type.pak obe)
+  (parse-raw hash-algo.pak obe)
 ++  got-header
   |=  =hash
   ^-  object-header
@@ -597,7 +596,7 @@
   ::  The matching keys are in the range a..a+1
   ::
   =+  len=(met 3 (crip ((x-co:co 0) +(kex))))
-  =+  fen=(sub (key-size hash-type.pak) len)
+  =+  fen=(sub (key-size hash-algo.pak) len)
   =+  end=(lsh [2 fen] +(kex))
   =|  hey=(list @ux)
   =<  -  
@@ -607,7 +606,7 @@
     |=  [hey=(list @ux) item=[hash @ud]]
     ?.  (compare:pack-on -.item end)
       [`+.item & hey]
-    ?:  (match-key (key-size hash-type.pak) key -.item)
+    ?:  (match-key (key-size hash-algo.pak) key -.item)
       [`+.item & [-.item hey]]
     [`+.item | hey]
 ::  XX remove after moving out repository to its
@@ -626,7 +625,7 @@
   (sub dit '0')
   $(a (rsh [3 1] a), hex (add (lsh [2 1] hex) val))
 ++  key-size  
-  |=  hat=hash-type
+  |=  hat=hash-algo
   ?-  hat
     %sha-1    40
     %sha-256  !!

@@ -2,7 +2,8 @@
 /+  default-agent, dbug
 /+  server, io=agentio
 /+  stream, zlib
-/+  *git-refs, *git-http
+::
+/+  *git, *git-http
 /+  git=git-repository
 /+  git-revision, git-pack, git-pack-objects, git-graph
 =,  html
@@ -215,7 +216,7 @@
   ~&  set-private+name
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
-    `state
+    ~|  "Git repository {<name>} does not exist"  !!
   ~&  "Restricted Git repository {<name>}"
   `state(access (~(put by access) name ~))
 ++  allow
@@ -426,7 +427,7 @@
               (cold %peel (jest 'peel'))
               %+  stag  %ref-prefix
                 ;~  pfix  (jest 'ref-prefix ')
-                  ;~(plug refname-ext:parse:git-refs)
+                  ;~(plug parse-refname-ext)
                 ==
             ==
       ?-  arg
@@ -505,8 +506,9 @@
               (cold %include-tag (jest 'include-tag'))
               (cold %ofs-delta (jest 'ofs-delta'))
               (cold %wait-for-done (jest 'wait-for-done'))
-              ;~(pfix (jest 'want ') (stag %want parser-sha-1))
-              ;~(pfix (jest 'have ') (stag %have parser-sha-1))
+              ::  XX parametrize by hash algo
+              ;~(pfix (jest 'want ') (stag %want parse-sha-1))
+              ;~(pfix (jest 'have ') (stag %have parse-sha-1))
             ==
       ?-  arg
         %done           $(done.args &)
@@ -755,9 +757,9 @@
   +$  push-cmd  [old=hash:git new=hash:git ref-name=path]
   ++  parse-push-cmd
     ;~  plug
-      parser-sha-1
-      ;~(pfix ace parser-sha-1)
-      ;~(pfix ace refname:parse:git-refs)
+      parse-sha-1
+      ;~(pfix ace parse-sha-1)
+      ;~(pfix ace parse-refname)
     ==
   ++  update-refs
     |-
@@ -896,7 +898,7 @@
     ::  XX We should only keep the pack if the update is successful
     ::  for at least one reference. What's the git logic 
     ::  in case of failure? Does it extract objects 
-    ::  associated with the succesful update?
+    ::  associated with succesful update?
     ::
     ~&  no-packs+(lent archive.object-store.repo)
     ::  XX rename repo-name -> name

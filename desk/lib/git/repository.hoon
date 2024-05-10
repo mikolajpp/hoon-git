@@ -1,11 +1,8 @@
-::  Repository engine
 ::
-::    +store  -- object store
-::    +refs   -- references
-::    +remote -- remotes
-::    +config -- configuration
-::
-/+  *git, *git-refs, git-pack, git-bundle
+::::  Git repository
+  ::
+/+  libmip=mip
+/+  *git, git-refspec, git-pack, git-bundle
 |%
 +$  object-store  $:  loose=(map hash object)
                       archive=(list pack:git-pack)
@@ -18,11 +15,13 @@
 ::  XX does removing a remote in git
 ::  cause its references to disappear?
 ::
-+$  remote  [url=@t =refs refspec=(list refspec)]
-+$  ref-spec  @t
++$  remote  $:  url=@t
+                =refs
+                refspec=(list refspec:git-refspec)
+            ==
 +$  repository
   $+  repository
-  $:  =hash-type
+  $:  =hash-algo
       =object-store
       =refs
       track=(map @t [remote=@tas merge=refname])
@@ -30,6 +29,14 @@
       config=(mip:libmip config-key @tas config-value)
   ==
 --
+::
+::  Git repository engine
+::
+::  +store  -- object store
+::  +refs   -- references
+::  +remote -- remotes
+::  +config -- configuration
+::
 ::  XX Switch to using id=hash argument 
 ::  in gates
 |_  repo=repository
@@ -192,7 +199,7 @@
     ^-  (unit raw-object)
     =+  loose=(~(get by loose.object-store.repo) hash)
     ?^  loose
-      (some (as-raw:obj u.loose))
+      (some (as-raw u.loose))
     ::  XX use a loop, why traverse when 
     ::  obj has already been found?
     ::

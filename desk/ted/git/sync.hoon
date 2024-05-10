@@ -16,7 +16,6 @@
 ::  on empty repos from github.
 ::
 =+  args=(need !<((unit ^args) args))
-:: =*  http  ~(. git-http url.args)
 ::
 :: XX Improve performance: export the git workdir 
 :: as a clay namespace. Then compare the two maps, 

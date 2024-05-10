@@ -2,8 +2,8 @@
 ::
 ::::  Git object packing
   ::
-/+  *git, git=git-repository, revision=git-revision, pack=git-pack
-=>
+/+  git=git-repository, git-revision, git-pack
+/+  *git
 |%
 ++  version  2
 ::  As we walk over objects, we need to keep 
@@ -79,7 +79,7 @@
     ==
   ==
 ++  object-type-as-ud
-  |=  type=pack-object-type:pack
+  |=  type=pack-object-type:git-pack
   ^-  @ud
   ?-  type
     %commit  1
@@ -161,7 +161,7 @@
   ==
 ++  insert-tree
   =|  name=@t
-  |=  [=hash =tree]
+  |=  [=hash tree=tree]
   ^-  ^state
   ?:  (~(has by store) hash)
     ~&  insert-tree-have+hash
@@ -208,13 +208,13 @@
   =+  brick=i.brick-list
   $(brick-list t.brick-list)
   :: ?.  ?&  ?=(^ archive.object-store.repo)
-  ::         (has:pack i.archive.object-store.repo id.brick)
+  ::         (has:p i.archive.object-store.repo id.brick)
   ::     ==
   ::   ~&  find-deltas-loose+id.brick  !!
   :: ~&  find-deltas-packed+id.brick
   :: =+  pack=i.archive.object-store.repo
   :: =/  [pob=pack-object:^pack pin=@ud]
-  ::   =+  pin=(got:pack-on:^pack index.pack id.brick)
+  ::   =+  pin=(got:p-on:^pack index.pack id.brick)
   ::   :_  pin
   ::   -:(read-pack-object:^pack [pin octs.data.pack])
   :: ::  Already resolved, write as is
@@ -247,7 +247,7 @@
       walk-store  (mark-tree-dull tree.commit.obj)
     ==
   :: (2) & (3)
-  =+  commits=(walk:revision repo want exclude)
+  =+  commits=(walk:git-revision repo want exclude)
   ~&  pack-objects-walk+"Inserting {<(lent commits)>} commits"
   =.  state
     |-  ?~  commits  state
@@ -273,12 +273,12 @@
   =.  sea  (append-octs:stream sea (as-byts:stream [4 count]))
   octs.sea
 ++  write-packs
-  |=  archive=(list pack:pack)
+  |=  archive=(list pack:git-pack)
   ^-  octs
   ~&  write-no-packs+(lent archive)
   =/  count=@ud
     %+  roll  archive
-      |=  [=pack:pack c=@ud]
+      |=  [=pack:git-pack c=@ud]
       (add count.pack c)
   ~&  write-pack-objects+count
   =|  sea=stream:stream
@@ -292,14 +292,14 @@
   ::  of sea
   ::
   =.  sea  %+  reel  archive
-    |=  [=pack:pack =_sea]
+    |=  [=pack:git-pack =_sea]
     %+  write-octs:stream  sea
       ~&  pack-size+p.octs.data.pack
       ::  Discard hash
       :-  (sub end-pos.pack pos.data.pack)
       ::  Discard header
       (rsh [3 pos.data.pack] q.octs.data.pack)
-  =+  hash=(hash-octs-sha-1:obj octs.sea)
+  =+  hash=(hash-octs-sha-1 octs.sea)
   =.  sea  (write-octs:stream sea [20 hash])
   octs.sea
 --
