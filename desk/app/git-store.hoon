@@ -50,9 +50,9 @@
       [%unsync name=@ta]
   ==
 --
-%-  agent:dbug
 =|  state-0
 =*  state  -
+%-  agent:dbug
 ^-  agent:gall
 =<
 |_  =bowl:gall
@@ -112,10 +112,22 @@
     `this
   (on-watch:def path)
 ++  on-leave   on-leave:def
+::  Scries
+::
+::  XX investigate - plural v singular names
+::
+::  /x  -- return set of repository names
+::  /x/repo  -- return git repository
+::  /x/repo/here -- existence check
+::  /x/repo/lock  -- check lock status
+::  /x/repo/blobs/abcdefgh  -- retrieve a blob
+::
 ++  on-peek
   |=  =path
   ^-  (unit (unit cage))
   ~&  git-store-peek+path
+  ?:  ?=([%x ~] path)
+    ``[%noun !>(~(key by repo-store))]
   ?>  ?=([%x @ta *] path)
   =+  name=i.t.path
   ?>  (~(has by repo-store.state) name)

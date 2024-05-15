@@ -7,9 +7,9 @@
 +$  object-store  $:  loose=(map hash object)
                       archive=(list pack:git-pack)
                   ==
-+$  config-value  $%  [%l ?]
-                      [%u @ud]
-                      [%s @t]
++$  config-value  $%  [%f ?]
+                      [%ud @ud]
+                      [%t @t]
                   ==
 +$  config-key  [@tas (unit @t)]
 ::  XX does removing a remote in git
@@ -90,8 +90,8 @@
   ++  default
   |.
   ^-  repository
-  =.  repo  (put core/~ repositoryformatversion+u+0)
-  =.  repo  (put core/~ bare+l+&)
+  =.  repo  (put core/~ repository-format-version+ud+0)
+  =.  repo  (put core/~ bare+f+&)
   repo
   --
 ::  XX name clash with remote

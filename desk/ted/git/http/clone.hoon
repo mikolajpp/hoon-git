@@ -1,7 +1,7 @@
 /-  *git, spider
 /+  io=strandio, stream
-/+  git=git-repository, *git-refs, git-pack
-/+  git-clay, git-http
+/+  git=git-repository, *git-refs, *git-refspec, git-pack
+/+  git-http, git-clay
 =,  strand=strand:spider
 |%
 ::  XX most arguments are optional, 
