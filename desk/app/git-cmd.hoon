@@ -1,27 +1,50 @@
-/-  *git-cmd, *sole
+/-  *sole
 /+  shoe, verb, default-agent, dbug, agentio
-/+  *git, *git-cmd-parser
+/+  *git, *git-cmd
+::  XX Find a way to import commands in bulk
+::  Commands
+::
+/+  git-cmd-ls
+/+  git-cmd-cd
+/+  git-cmd-cat
+/+  git-cmd-clone
+::
 |%
 +$  state-0
   $:  dir=@tas      :: repository
-      head=ref      :: HEAD
+      head=ref      :: revision
   ==
 +$  versioned-state
   $%  [%0 state-0]
   ==
 +$  card  card:shoe
++$  command  $+  git-command
+  $%  [%ls args:git-cmd-ls]
+      [%cd args:git-cmd-cd]
+      [%cat args:git-cmd-cat]
+      [%lock %~]
+      ::
+      [%clone args:git-cmd-clone]
+      [%diff diff-args]
+      [%fetch fetch-args]
+      [%log log-args]
+      [%merge merge-args]
+      [%pull pull-args]
+  ==
++$  cat-file-args  ~
++$  diff-args  ~
++$  fetch-args  ~
++$  log-args  ~
++$  merge-args  ~
++$  pull-args  ~
 --
 =|  state-0
 =*  state  -
 %-  agent:dbug
 ^-  agent:gall
-%-  (agent:shoe cmd-and-opts)
-::  XX A bug in |*?
-::  Calling shoe:shoe with [command (list option)] 
-::  does not compile.
-::
-^-  (shoe:shoe cmd-and-opts)
-=<  :: helper core
+%-  (agent:shoe ,[command (list option)])
+^-  (shoe:shoe [command (list option)])
+=<
 |_  =bowl:gall
 +*  this  .
     def  ~(. (default-agent this %|) bowl)
@@ -41,12 +64,18 @@
 ++  command-parser
   |=  =sole-id
   ^+  |~(nail *(like [? command (list option)]))
-  %+  cook  
+  %+  cook
     |=  [cmd=command opts=(list option)]
     [| cmd opts]
+  ::  XX A weird bug: putting clone first results in 
+  ::  -find.p.roq error
+  ::
   ;~  pose
-    parse-ls
-    parse-cd
+    parse:git-cmd-ls
+    parse:git-cmd-cd
+    parse:git-cmd-cat
+    ::
+    parse:git-cmd-clone
   ==
 ++  tab-list
   |=  =sole-id
@@ -57,10 +86,13 @@
 ++  on-command
   |=  [=sole-id =command opts=(list option)]
   ^-  (quip card _this)
-  ~&  on-command+command
-  ~&  on-command+opts
+  ~&  cmd+command
+  ~&  opts+opts
   =^  cards  state
-    ?+  -.command  !!
+    ?+  -.command
+      :_   state
+      [%shoe ~[sole-id] %sole %txt "Unknown command: {(trip -.command)}"]~
+      ::
       %ls  (ls:do sole-id command ~)
       %cd  (cd:do sole-id command ~)
     ==
@@ -76,7 +108,7 @@
   =;  [to=(list _sole-id) fec=shoe-effect:shoe]
     [[%shoe to fec]~ this]
   :-  ~[sole-id]
-  [%sole %pro & %$ ~[' / > ']]
+  [%sole %pro & %$ ~[' /> ']]
 ++  on-disconnect  on-disconnect:des
 --
 |_  =bowl:gall
@@ -103,6 +135,6 @@
     [[%shoe to fec]~ state(dir name.cd)]
   :-  ~[sole-id]
   ?.  |(=(%$ name.cd) (~(has in repos) name.cd))
-    [%sole %txt "cd: no such repository: /{(trip name.cd)} "]
-  [%sole %pro & %$ ~[(crip " /{(trip name.cd)} > ")]]
+    [%sole %txt "cd: no such repository: /{(trip name.cd)}"]
+  [%sole %pro & %$ ~[(crip " /{(trip name.cd)}> ")]]
 --
