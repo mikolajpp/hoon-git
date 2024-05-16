@@ -56,60 +56,46 @@
   ?:  =(%$ o)
     (long-value opt kind)
   (long-or-short-value o opt kind)
-::  XX Handle options terminator '--'
-::
-++  fin  ;~(plug hep hep)
 ::  XX move this to hoon.hoon
+::  This should be |*
 ++  fail  |=(tub=nail ^-(edge [p=p.tub q=~]))
 ++  cmd
-  |=  $:  name=@tas 
-          rule=_|~(nail *(like command))
-          opt=_|~(nail *(like option))
-      ==
+  |*  [cmd=@tas args=rule opt-rule=rule]
   |=  tub=nail
-  ::  XX this parser could definitely 
-  ::  be written with combinators
-  ::
   ^-  (like [command (list option)])
-  ::  Parse front options
+  ::  Parse front options, command arguments
   ::
-  =/  vex=edge
-    ((star opt) tub)
-  :: [hair (unit p=nail q=*)]
+  ::  XX using , somehow changes output of 
+  ::  compiler error. 
+  ::
+  =/  vex=(like [(list option) (unit [@t @t]) command])
+    %.  tub
+    ;~  plug
+      (star opt-rule)
+      (punt ;~(plug hep hep))
+      (stag cmd ;~(pfix (jest cmd) args))
+    ==
   ?~  q.vex  vex
-  =+  front=q.u.q.vex
-  ::  Check for options terminator
-  ::
-  =/  fex
-    (fin p.u.q.vex)
-  ::  Parse program command and arguments
-  ::
-  =/  vex
-    %-  (stag name ;~(pfix name rule))
-    ?~(fex p.u.q.vex p.u.q.fex)
-  ?~  vex  vex
-  =+  cmd=q.u.q.vex
-  ?~  fex
-    [p.vex `[p.u.vex cmd front]]
-  ::  If no separator was found, parse remaining options
-  ::
-  =/  vex
-    ((star opt) p.u.q.vex)
-  ?~  vex  vex
-  =+  back=q.u.q.vex
-  [p.vex `[p.u.vex cmd (weld front back)]]
+  =/  [front=(list option) opt-end=(unit *) =command]
+    p.u.q.vex
+  :: ?~  opt-end
+  [p.vex `[[command front] q.u.q.vex]]
+  :: =/  vex
+  ::   ((star opt-rule) q.u.q.vex)
+  :: ?~  q.vex  q.vex
+  :: =+  back=p.u.q.vex
+  :: [p.vex `[[command (weld front back)] q.u.q.vex]]
 ++  parse-ls
-  %^  cmd  %ls  (easy ~)
-    fail
-  :: %+  cmd  %ls
-  :: (easy ~)
+  (stag %ls ;~(pfix (jest %ls) (easy %~)))
+  :: %^  cmd  %ls  (easy %~)
+  ::   fail
 ++  parse-cd
   =/  opt
    ;~  pose
     (opt %depth %d %ud)
     (opt %quiet %q %f)
    ==
-  %^  cmd  %cd 
+  %^  cmd  %cd
     ;~(pfix (punt ;~(plug ace fas)) urs)
-  `opt
+  opt
 --
