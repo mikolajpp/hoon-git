@@ -40,7 +40,7 @@
     ::  commit stuff into /lib/git/commit/hoon 
     ::  and provide compile-time accessors
     ::
-    ?:  (lth -.date.committer.commit.obj oldest-have)
+    ?:  (lth date.commit-time.commit.obj oldest-have)
       |
     %+  roll  parents.commit.obj
       |=  [=^hash reach=?]

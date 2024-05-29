@@ -2,7 +2,7 @@
 ::::  Git repository
   ::
 /+  libmip=mip
-/+  *git, git-refspec, git-pack, git-bundle
+/+  *git, *git-refspec, git-pack, git-bundle
 |%
 +$  object-store  $:  loose=(map hash object)
                       archive=(list pack:git-pack)
@@ -15,17 +15,27 @@
 ::  XX does removing a remote in git
 ::  cause its references to disappear?
 ::
-+$  remote  $:  url=@t
-                =refs
-                refspec=(list refspec:git-refspec)
++$  remote  $:  url=@t  :: url=[@t [%local @ta]] ?
+                fetch=(list refspec)
+                push=(list refspec)
             ==
++$  branch  $:  remote=@tas
+                push-remote=@tas
+                merge=(list refname)
+            ==
+:: Configuration in git confuses the actual
+:: configuration that influences behaviour of commands 
+:: with storage of state for particular objects. 
+:: hoon-git git extracts the latter and puts them 
+:: as part of the repository structure proper. 
+::
 +$  repository
   $+  repository
   $:  =hash-algo
       =object-store
       =refs
-      track=(map @t [remote=@tas merge=refname])
       remotes=(map @tas remote)
+      branches=(map refname branch)
       config=(mip:libmip config-key @tas config-value)
   ==
 --
@@ -98,6 +108,16 @@
 ::
 ++  remote
   |%
+  ::  XX What are allowed git remote names?
+  ++  get-url
+    |=  remote=@ta
+    ^-  (unit @t)
+    =+  remote=(~(get by remotes.repo) remote)
+    ?~  remote  ~
+    `url.u.remote
+  ++  got-url
+    |=  remote=@ta
+    (need (get-url remote))
   :: ++  fetch
   ::   |=  [remote-name=@tas =pack refs=(list reference)]
   ::   ^-  repository
@@ -284,6 +304,7 @@
   ++  has
     |=  =refname
     ^-  ?
+    :: XX rename to ref-store
     (~(has of refs.repo) refname)
   ++  get
     |=  =refname

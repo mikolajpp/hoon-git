@@ -34,12 +34,12 @@
              ==
 +$  card  card:agent:gall
 ::  XX refactor name -> repo
-+$  command
++$  action
   $%  [%put name=@ta =repository:git]
       [%update name=@ta =repository:git]
       [%delete name=@ta]
       ::
-      [%lock name=@ta]  :: Read-only
+      [%lock name=@ta]  :: Lock read-only
       [%unlock name=@ta]
       ::
       [%allow name=@ta ship=@p]
@@ -86,7 +86,8 @@
     (handle-http:do req)
   ?.  ?=(%noun mark)
     ~|  "Invalid request"  !!
-  =+  cmd=!<(command vase)
+  =+  cmd=!<(action vase)
+  ~&  git-store-poke+-.cmd
   ?-  -.cmd
     %put  (put:do +.cmd)
     %update  (update:do +.cmd)
@@ -112,20 +113,19 @@
     `this
   (on-watch:def path)
 ++  on-leave   on-leave:def
-::  Scries
+::  Scry Endpoints
 ::
-::  XX investigate - plural v singular names
-::
-::  /x  -- return set of repository names
-::  /x/repo  -- return git repository
-::  /x/repo/here -- existence check
-::  /x/repo/lock  -- check lock status
-::  /x/repo/blobs/abcdefgh  -- retrieve a blob
+::  /x                      -- return set of repository names
+::  /x/repo                 -- return git repository
+::  /x/repo/lock            -- check lock status
+::  /x/repo/blob/[hash]     -- retrieve a blob
+::  /x/repo/commit/[hash]   -- retrieve a commit
+::  /x/repo/tree/[hash]     -- retrieve a tree
 ::
 ++  on-peek
   |=  =path
   ^-  (unit (unit cage))
-  ~&  git-store-peek+path
+  :: ~&  git-store-peek+path
   ?:  ?=([%x ~] path)
     ``[%noun !>(~(key by repo-store))]
   ?>  ?=([%x @ta *] path)
@@ -195,11 +195,11 @@
   ==
 ++  delete
   |=  name=@ta
-  ~&  delete-repo+name
+  :: ~&  delete-repo+name
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
     ~|  "Git repository {<name>} does not exist"  !!
-  ~&  "Deleted git repository {<name>}"
+  :: ~&  "Deleted git repository {<name>}"
   :-  ~
   %=  state
     repo-store  (~(del by repo-store.state) name)
@@ -209,37 +209,37 @@
   ==
 ++  lock
   |=  name=@ta
-  ~&  lock+name
+  :: ~&  lock+name
   ^-  (quip card _state)
   ?>  (~(has by repo-store.state) name)
   ?:  (~(has in lock.state) name)
     ~|  "Repository {<name>} is already locked"  !!
-  ~&  "Locked git repository {<name>}"
+  :: ~&  "Locked git repository {<name>}"
   `state(lock (~(put in lock.state) name))
 ++  unlock
   |=  name=@ta
-  ~&  unlock+name
+  :: ~&  unlock+name
   ^-  (quip card _state)
   ?>  (~(has by repo-store.state) name)
-  ~&  "Unlocked git repository {<name>}"
+  :: ~&  "Unlocked git repository {<name>}"
   `state(lock (~(del in lock.state) name))
 ++  set-private
   |=  name=@ta
-  ~&  set-private+name
+  :: ~&  set-private+name
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
     ~|  "Git repository {<name>} does not exist"  !!
-  ~&  "Restricted Git repository {<name>}"
+  :: ~&  "Restricted Git repository {<name>}"
   `state(access (~(put by access) name ~))
 ++  allow
   |=  [name=@ta ship=@p]
-  ~&  allow-access+[name ship]
+  :: ~&  allow-access+[name ship]
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
     ~|  "Git repository {<name>} does not exist"  !!
   ?.  (~(has by access.state) name)
     ~|  "Git repository {<name>} is public"  !!
-  ~&  "Restricted Git repository {<name>}"
+  :: ~&  "Restricted Git repository {<name>}"
   ::  XX double get
   =+  allow=(~(got by access.state) name)
   =.  allow  (~(put in allow) ship)
@@ -250,7 +250,7 @@
   ^-  (quip card _state)
   ?.  (~(has by repo-store.state) name)
     ~|  "Git repository {<name>} does not exist"  !!
-  ~&  "Git repository {<name>} is now public"
+  :: ~&  "Git repository {<name>} is now public"
   `state(access (~(del by access.state) name))
 ++  sync
   |=  [name=@ta =refname dir=path desk=@tas]
@@ -264,7 +264,7 @@
     =+  des=desk:(~(got by repo-sync.state) name)
     ~|  "Git repository {<name>} already synced to {<des>}"  !!
   =+  repo=(~(got by repo-store.state) name)
-  ~&  "Syncing repository {<name>} to {<desk>}"
+  :: ~&  "Syncing repository {<name>} to {<desk>}"
   =/  [cards=(list card) =^sync]
     (run-sync name repo refname dir desk)
   :-  cards
@@ -284,7 +284,7 @@
   ?.  (~(has by repo-sync.state) name)
     `state
   =+  des=desk:(~(got by repo-sync.state) name)
-  ~&  "Git repository sync {<name>} to {<des>} cancelled"
+  :: ~&  "Git repository sync {<name>} to {<des>} cancelled"
   `state(repo-sync (~(del by repo-sync.state) name))
 ++  is-authorized
   |=  =inbound-request:eyre
@@ -451,6 +451,9 @@
     ~&  refs.repo
     =|  sea=stream:stream
     =+  ref-prefix=ref-prefix.args
+    ::  XX handle glob ref prefixes
+    ::  a/b/c should match any refs in a/b/ starting with c
+    ::
     =.  sea  %+  roll  ?~(ref-prefix `(list refname:git)`~[~] ref-prefix)
       |=  [prefix=refname:git =_sea]
       %+  rep-prefix:~(refs git repo)  prefix 
@@ -576,7 +579,9 @@
           :+  [(write-pkt-lines-txt (crip "ACK {((x-co:co 20) hash)}")) acks.acc]
             ?.  ?=(%commit -.u.obj)
               oldest-have.acc
-            =+  time=-.date.committer.commit.u.obj
+            ::  XX rename time -> date
+            ::  XX why is the cast needed?
+            =+  time=`@ud`date.commit-time.commit.u.obj
             ?:  |(=(0 oldest-have.acc) (lth time oldest-have.acc))
               time
             oldest-have.acc

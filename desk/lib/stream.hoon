@@ -26,7 +26,7 @@
   |=  =octs
   ^-  byts
   [p.octs (rev 3 octs)]
-++  as-octs  as-octt:mimes:html
+++  as-octs  as-octs:mimes:html
 ++  as-octt  as-octt:mimes:html
 ::
 ::  Concatenate octs

@@ -142,6 +142,9 @@
   ^-  [[pack (list raw-object)] stream:stream]
   =+  start=pos.sea
   =|  count=@ud
+  =/  step=@ud
+    =-  ?:((gth - 0) - 1)
+    (div count.header 4)
   =|  index=pack-index
   =|  miss=(list raw-object)
   =^  [=_index =_miss]  sea
@@ -153,7 +156,7 @@
     ?:  (is-dry:stream sea)
       ~|  "Expected {<count.header>} objects ({<count>} processed)"
         !!
-    ~?  &(=(0 (mod count 10.000)) (gth count 0))
+    ~?  >  =(0 (mod count step))
       pack-index+"{<+(count)>}/{<count.header>}"
     =+  beg=pos.sea
     =^  pob=pack-object  sea  (read-pack-object sea)

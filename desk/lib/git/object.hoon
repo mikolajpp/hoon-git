@@ -14,14 +14,20 @@
 +$  object-header  [type=object-type size=@ud]
 +$  raw-object  [type=object-type size=@ud data=stream:stream]
 ::
-+$  person  [name=tape email=tape]
-+$  signature  $%  [%gpg @t]
++$  commit-person  [name=tape email=tape]
++$  commit-time  [date=@da zone=(pair ? @dr)]
++$  commit-signature  $%  [%gpg @t]
                ==
 +$  commit-header  $:  tree=hash
                        parents=(list hash)
-                       author=[person date=[@ud ? tape]]
-                       committer=[person date=[@ud ? tape]]
-                       sign=(unit signature)
+                       ::
+                       author=commit-person
+                       author-time=commit-time
+                       ::
+                       committer=commit-person
+                       commit-time=commit-time
+                       ::
+                       sign=(unit commit-signature)
                    ==
 +$  commit  $+  commit
             $:  commit-header
@@ -183,6 +189,7 @@
     =+  len=(sub p.octs.data.rob pos.data.rob)
     =+  data=(cut 3 [pos.data.rob len] q.octs.data.rob)
     blob+[size.rob [len data]]
+::  XX conform commit parser to git
 ++  parse-commit
   ::  XX looks like another compiler bug.
   ::  Below crashes with no error 
@@ -230,7 +237,7 @@
 ++  parse
   |_  hal=hash-algo
   ++  hash
-    ::  XX does this work?
+    ::  XX does this really evaluates at compile-time?
     ^~
     ?-  hal
        %sha-1  parse-sha-1
@@ -258,19 +265,29 @@
     ;~(sfix (star ;~(less gar prn)) gar)
     ==
   ++  zone
+    %+  cook
+      |=  [s=? hor=@ud min=@ud]
+      ^-  (pair ? @dr)
+      :-  s
+      `@dr`(add (mul hor ~h1) (mul min ~m1))
     ;~  plug
-    ;~(pose (cold & lus) (cold | hep))
-    (plus nud)
+      :: sign
+      ;~(pose (cold %& lus) (cold %| hep))
+      :: hours
+      (bass 10 ;~(plug sid:ab sid:ab (easy ~)))
+      :: minutes
+      (bass 10 ;~(plug sid:ab sid:ab (easy ~)))
     ==
-  ++  time  ;~(plug ;~(sfix dip:ag ace) zone)
-  ++  author
-    ;~  pfix  (jest 'author ')
-    ;~(plug person ;~(pfix ace time))
-    ==
-  ++  committer
-    ;~  pfix  (jest 'committer ')
-    ;~(plug person ;~(pfix ace time))
-    ==
+  ++  date
+    %+  cook
+      |=  sec=@ud
+      ^-  @da
+      (add ~1970.1.1 (mul ~s1 sec))
+    dip:ag
+  ++  time  
+    :: XX This breaks parsing
+    :: ^-  $-(nail (like commit-time))
+    ;~(plug date ;~(pfix ace zone))
   ++  message  (star ;~(pose prn eol))
   ++  gpg-header-begin
     ;~  pose
@@ -300,11 +317,13 @@
       ;~  plug
         ;~(sfix tree eol)
         (star ;~(sfix parent eol))
-        ;~(sfix author eol)
-        committer
-        (punt ;~(pfix eol commit-signature))
+        ;~(pfix (jest 'author ') person)
+        ;~(pfix ace ;~(sfix time eol))
+        ;~(pfix (jest 'committer ') person)
+        ;~(pfix ace ;~(sfix time eol))
+        (punt commit-signature)
       ==
-      message
+      ;~(pfix (star gah) message)
     ==
   ::  Tree rules
   ::

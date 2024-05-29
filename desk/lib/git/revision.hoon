@@ -104,8 +104,9 @@
   |=  [=hash =commit]
   ^-  rev-walk
   ::  XX use a zipper
+  ::  XX are AD and BC dates comparable?
   ::
-  =+  time=-.date.committer.commit
+  =+  time=`@ud`date.commit-time.commit
   =/  sits=(unit (list [^hash ^commit]))
     (get:seed-on seed.state time)
   ?~  sits

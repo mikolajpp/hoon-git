@@ -22,7 +22,7 @@
                  caps=(list @t)
                  args=(list @t)
              ==
-++  default-caps  :~  (cat 3 'agent=' git-agent)
+++  default-caps  :~  ;;(@t (cat 3 'agent=' git-agent))
                   ==
 --
 ~%  %git-http  ..part  ~
@@ -50,12 +50,18 @@
   =/  sea=stream:stream  0+data.u.full-file.res
   ::  Read service string
   ::
-  =^  pil  sea  (read-pkt-lines & sea)
+  =|  red=stream:stream
+  =^  pil  red  (read-pkt-lines & sea)
   =+  lip=(flop pil)
   ?~  lip 
     ~|  "Server response empty"  !!
   ?>  ?=(%data -.i.lip)
-  ?>  =(q.octs.i.lip '# service=git-upload-pack')
+  ::  "Clients MUST verify the first pkt-line is # service=$servicename"
+  ::  Yet, as of version 2.43.0, git no longer sends this line in v2 
+  ::  protocol.
+  ::
+  =?  sea  =('# service=git-upload-pack' q.octs.i.lip)
+    red
   ::  Read capabilities
   ::
   =^  pil  sea  (read-pkt-lines & sea)
@@ -144,7 +150,7 @@
       +$  args
         $:  symrefs=_|
             peel=_|
-            ref-prefix=(list @t)
+            ref-prefix=(list refname)
         ==
       --
   |=  =args
@@ -157,14 +163,14 @@
   =|  cmd-args=(list @t)
   =.  cmd-args
     %+  turn  ref-prefix.args
-    |=  pef=@t
-    (cat 3 'ref-prefix ' pef)
+    |=  ren=refname
+    (cat 3 'ref-prefix ' (print-refname ren))
   =?  cmd-args  peel.args
     ['peel' cmd-args]
   =?  cmd-args  symrefs.args
     ['symrefs' cmd-args]
-  ~&  cmd-args
   ::
+  ~&  ls-refs+cmd-args
   ;<  ~  bind:m  (send-request %ls-refs cmd-caps cmd-args)
   ;<  res=client-response:iris  bind:m  take-client-response:strandio
   ?>  ?=(%finished -.res)
@@ -217,7 +223,7 @@
   ::  A list of triples: refname, ref,
   ::  and optional peeled hash
   ::
-  =|  rel=(list [refname:git ref:git (unit hash)])
+  =|  rel=(list [=refname:git =ref:git peel=(unit hash)])
   =.  rel
   |-
   ?~  lip
@@ -229,7 +235,9 @@
   (pure:m (flop rel))
   ::
 ::
-::  Fetch references
+::  Fetch strand
+::  XX should return a full response, not
+::  just the pack (which could be missing)
 ::
 ++  fetch
   |=  [have=(list hash) want=(list hash)]
@@ -255,14 +263,21 @@
   ?>  ?=(%finished -.res)
   ?~  full-file.res
     ~|  "No pack received"  !!
-  ~&  "Received {<p.data.u.full-file.res>} bytes"
   =/  sea=stream:stream  0+data.u.full-file.res
   ::  Handle packfile response
   ::
   =<
+  =|  red=stream:stream
   ::  Acknowledgements
   ::
   =^  ack  sea  (read-acks sea)
+  =^  pkt  red  (read-pkt-line & sea)
+  ::  Acks only
+  ::
+  ?:  &(?=(@ pkt) ?=(%flush pkt))
+    (pure:m *pack:git-pack)
+  =?  sea  &(?=(@ pkt) ?=(%delim pkt))
+    red
   =^  sal  sea  (read-shallow-info sea)
   =^  wef  sea  (read-wanted-refs sea)
   =^  pur  sea  (read-pack-uris sea)
@@ -303,35 +318,35 @@
     ::
     =.  sea  red
     =|  ack=(list hash)
-    =<
     |-
     ?:  (is-dry:stream sea)
       :_  sea
       ack
     =^  pkt  red  (read-pkt-line & sea)
     ?@  pkt
-      :_  (read-pkt-delim red)
+      :_  sea
       ack
     ?:  =('ready' q.octs.pkt)
-      :_  (read-pkt-delim red)
+      :_  red
       ack
+    ::
+    =>  |%
+        ++  parse-ack
+          :: XX seems to be another bug,
+          :: this does not work properly
+          :: |=  pkt=$>(%data pkt-line)
+          |=  pkt=pkt-line
+          ^-  hash
+          ?<  ?=(@ pkt)
+          %+  scan
+            (trip q.octs.pkt)
+          ;~(pfix (jest 'ACK ') parse-sha-1)
+        --
     %=  $
       ack  [(parse-ack pkt) ack]
       sea  red
     ==
     ::
-    |%
-    ++  parse-ack
-      :: XX seems to be another bug,
-      :: this does not work properly
-      :: |=  pkt=$>(%data pkt-line)
-      |=  pkt=pkt-line
-      ^-  hash
-      ?<  ?=(@ pkt)
-      %+  scan
-        (trip q.octs.pkt)
-      ;~(pfix (jest 'ACK ') parse-sha-1)
-    --
   ++  read-shallow-info
     |=  sea=stream:stream 
     :_  sea
@@ -353,7 +368,6 @@
     ?@  pkt
       ?:  ?=(%flush pkt)
         ~|  "Expected packfile stream"  !!
-      ~&  %read-pack-empty
       :_  sea
       *pack:git-pack
     ?>  =('packfile' q.octs.pkt)
@@ -500,7 +514,6 @@
     ?:  (gth sea-len max-len)
       max-len
     sea-len
-  ~&  write-on-band+"{<pos.sea>}/{<p.octs.sea>}"
   =^  data  sea  (read-bytes:stream len sea)
   ?~  data  !!
   ?>  =(p.u.data len)

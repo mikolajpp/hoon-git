@@ -4,9 +4,16 @@
 |%
 +$  opt-kind  ?(%f %t %ud)
 +$  opt-value  $%  [%f ~]
-                   [%t @t]
-                   [%ud @ud]
+                   [%t p=@t]
+                   [%ud p=@ud]
                ==
-+$  opt-name  @tas
++$  opt-value-list  $%  [%t p=(list @t)]
+                        [%ud p=(list @ud)]
+                    ==
++$  opt-name  @ta
 +$  option  [opt-name opt-value]
+::  XX support repeated option. 
+::  This should result in a list of opt-values under 
+::  the given key
++$  opts-map  (map opt-name opt-value)
 --
