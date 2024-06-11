@@ -10,6 +10,7 @@
 /-  spider
 /+  stream, strandio
 /+  *git, git-pack, git=git-repository
+~%  %git-http  ..part  ~
 =,  strand=strand:spider
 |%
 ++  git-agent  'hoon-git/0.1'
@@ -25,7 +26,6 @@
 ++  default-caps  :~  ;;(@t (cat 3 'agent=' git-agent))
                   ==
 --
-~%  %git-http  ..part  ~
 |_  url=@t
 ::
 ::  Greet the pack upload service to obtain capabilities
@@ -530,6 +530,8 @@
 ::  Assemble pkt-lines into a stream, filtering on band
 ::
 ++  read-pkt-lines-on-band
+:: { "read-pkt-lines-on-band", 7, _139_hex_git_http_read_pkt_lines_on_band_a, 0, no_hashes},
+  :: ~%  %read-pkt-lines-on-band  +3  ~
   ~/  %read-pkt-lines-on-band
   |=  [sea=stream:stream band=@ud]
   ^-  [stream:stream stream:stream]

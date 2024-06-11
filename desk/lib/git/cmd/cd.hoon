@@ -1,13 +1,16 @@
 ::
 ::  git cd - Navigation
 ::
-::  > cd /repository
+::  > cd /repo
 ::
 /+  *git-cmd
 |%
 +$  args  name=@ta
 ::
 ++  parse
-  %+  cmd-solo  %cd
-  ;~(pfix gap ;~(pfix fas urs))
+  %+  parse-cmd-solo  %cd
+  ;~  pose
+    ;~(pfix parse-gap ;~(pfix fas parse-urs))
+    (easy %$)
+  ==
 --

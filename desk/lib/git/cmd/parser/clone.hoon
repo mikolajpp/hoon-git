@@ -1,7 +1,7 @@
 ::
 ::  git clone - Clone a repository into %git-store
 ::
-/+  *git-cmd, *git-refs
+/+  *git-cmd-parser, *git-refs
 |%
 +$  args  [url=@t dir=(unit @ta)]
 +$  opts  $:  quiet=_|
@@ -31,8 +31,9 @@
     ::
     parse-raw-url
     ::  [dir] to store in %git-store
-    ::
-    (punt ;~(pfix parse-gap ;~(less hep parse-urs)))
+    ::  XX solve the problem of args parsing 
+    ::  empty strings - parse-txt?
+    (punt ;~(pfix parse-gap ;~(less hep ;~(simu prn parse-urs))))
   ==
 ++  get-opts
   |=  =opts-map

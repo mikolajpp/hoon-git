@@ -234,9 +234,9 @@
       (punt ;~(pose lus ket))
       ;~  pose
         pat  ::  HEAD
-        parse-raw-refname
+        parse-raw-pattern-refname 
       ==
-      (punt ;~(pfix col parse-raw-refname))
+      (punt ;~(pfix col parse-raw-pattern-refname))
     ==
   --
 --

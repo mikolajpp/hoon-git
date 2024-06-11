@@ -4,6 +4,8 @@
 /+  libmip=mip
 /+  *git, *git-refspec, git-pack, git-bundle
 |%
+::  XX order loose objects by hash
+::
 +$  object-store  $:  loose=(map hash object)
                       archive=(list pack:git-pack)
                   ==
@@ -179,13 +181,10 @@
       loose
     ::  XX use a loop, why traverse when 
     ::  obj has already been found?
+    ::  XX parametrize by hash algo
     ::
-    %+  roll  archive.object-store.repo
-      |=  [=pack:git-pack obj=(unit object)]
-      ?~  obj
-        ::  XX  (~(get-with-size git-pack pack) hash)
-        (~(get git-pack pack) hash)
-      obj
+    %+  bind  (get-raw hash)
+    (cury parse-raw %sha-1)
   ++  got
     |=  =hash
     ^-  object
@@ -251,6 +250,27 @@
         %+  lien  archive.object-store.repo
           |=(=pack:git-pack (~(has git-pack pack) hash))
     ==
+  ++  find-by-key
+    |=  a=@ta
+    ^-  (unit hash)
+    =+  kex=(to-hex:git-pack a)
+    =+  key=[(met 3 a) kex]
+    =/  match=(list hash)
+      ::  XX a way to chain operations on a door?
+      %+  skim  ~(tap in ~(key by loose.object-store.repo))
+      (cury (cury match-key:git-pack 40) key)
+    ?^  match
+      (some (head match))
+    ::  Find in packs
+    =|  match=(list hash)
+    =.  match
+      %+  roll  archive.object-store.repo
+        |=  [=pack:git-pack =_match]
+        %+  weld
+          (~(find-by-key git-pack pack) a)
+        match
+    ?~  match  ~
+    (some (head match))
   :: ::
   :: ++  put
   ::   |=  obe=object
@@ -305,7 +325,7 @@
     |=  =refname
     ^-  ?
     :: XX rename to ref-store
-    (~(has of refs.repo) refname)
+    ?=(^ (~(get of refs.repo) refname))
   ++  get
     |=  =refname
     ^-  (unit hash)
@@ -327,6 +347,7 @@
   ++  tap  (tap-prefix ~)
   ++  tap-prefix
     |=  prefix=refname
+    ^-  (list [refname hash])
     %+  turn
       ~(tap of (~(dip of refs.repo) prefix))
     |=  [=refname =ref]
@@ -335,6 +356,7 @@
     [refname (got refname)]
   ++  tap-prefix-full
     |=  prefix=refname
+    ^-  (list [refname hash])
     %+  turn
       ~(tap of (~(dip of refs.repo) prefix))
     |=  [=refname =ref]

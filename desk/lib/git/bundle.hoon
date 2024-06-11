@@ -23,6 +23,7 @@
   ^-  [bundle-header stream:stream]
   ::  Parse signature
   ::
+  ~&  `@t`(cut 3 [0 20] q.octs.sea)
   =^  line  sea  (read-line:stream sea)
   ?~  line
     ~|  "Git bundle is corrupted: signature absent"  !!

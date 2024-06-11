@@ -2,7 +2,7 @@
 ::  git fetch - Download objects and refs from another repository
 ::
 ::
-/+  *git-cmd, *git-refs, *git-refspec
+/+  *git-cmd-parser, *git-refs, *git-refspec
 |%
 +$  args  [remote=(unit @t) raw-refspecs=(list raw-refspec)]
 +$  opts  $:  all=_|
@@ -38,7 +38,6 @@
   ::  end of options with `--`. It seems in +cmd 
   ::  parser, before scanning for arguments, we should first 
   ::  extract the argument region with ending with first -.
-  ::
   ::
   ::  XX this seems unnecessary
   :-  (easy ~)

@@ -21,8 +21,9 @@
 ::  Is it possible to extract comparison 
 ::  function from pack-index?
 ::
-+$  pack-index   ((mop hash @ud) lth)
-++  pack-on  ((on hash @ud) lth)
+++  pack-cmp  gth
++$  pack-index   ((mop hash @ud) pack-cmp)
+++  pack-on  ((on hash @ud) pack-cmp)
 +$  pack  $:  =hash-algo
               count=@ud 
               index=pack-index 
@@ -157,7 +158,7 @@
       ~|  "Expected {<count.header>} objects ({<count>} processed)"
         !!
     ~?  >  =(0 (mod count step))
-      pack-index+"{<+(count)>}/{<count.header>}"
+      indexing-objects+"{<+(count)>}/{<count.header>}"
     =+  beg=pos.sea
     =^  pob=pack-object  sea  (read-pack-object sea)
     =/  [rob=raw-object miso=(unit raw-object)]
@@ -262,7 +263,6 @@
 ::
 ++  expand-delta-object
   ~/  %expand-delta-object
-  !:
   |=  [base=raw-object delta=pack-delta-object]
   ^-  raw-object
   =/  sea=stream:stream  0+octs.delta
@@ -595,19 +595,18 @@
   |=  a=@ta
   ^-  (list hash)
   =+  kex=(to-hex a)
+  ::  All sizes in half-bytes
   =+  key=[(met 3 a) kex]
   ::  The matching keys are in the range a..a+1
   ::
   =+  len=(met 3 (crip ((x-co:co 0) +(kex))))
-  =+  fen=(sub (key-size hash-algo.pak) len)
-  =+  end=(lsh [2 fen] +(kex))
   =|  hey=(list @ux)
   =<  -  
   %^  (dip:pack-on _hey)  
     index.pak
   hey
     |=  [hey=(list @ux) item=[hash @ud]]
-    ?.  (compare:pack-on -.item end)
+    ?.  (compare:pack-on -.item kex)
       [`+.item & hey]
     ?:  (match-key (key-size hash-algo.pak) key -.item)
       [`+.item & [-.item hey]]
@@ -617,16 +616,8 @@
 ::
 ++  to-hex
   |=  a=@ta
-  =+  hex=0x0
-  |-
-  ?:  =(a 0)
-    hex
-  =+  dit=(end [3 1] a)
-  =/  val=@ux
-  ?:  (gth dit '9')
-    (add (sub dit 'a') 10)
-  (sub dit '0')
-  $(a (rsh [3 1] a), hex (add (lsh [2 1] hex) val))
+  ^-  @ux
+  (scan (trip a) parse-short-sha-1)
 ++  key-size  
   |=  hat=hash-algo
   ?-  hat
@@ -634,7 +625,7 @@
     %sha-256  !!
   ==
 ++  match-key
-  |=  [kes=@ud a=octs b=@ux]
+  |=  [size=@ud a=octs b=@ux]
   ^-  ?
   ?:  =(a b)
     &
@@ -643,5 +634,5 @@
   .=  q.a
   %+  cut  2
     :_  b
-    [(sub kes p.a) p.a]
+    [0 p.a]
 --

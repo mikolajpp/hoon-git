@@ -3,7 +3,7 @@
 ::
 ::  > rm /repo
 ::
-/+  *git-cmd-parser
+/+  *git-cmd
 |%
 +$  args  name=@ta
 ::

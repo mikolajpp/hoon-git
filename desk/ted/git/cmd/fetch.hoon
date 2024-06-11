@@ -7,19 +7,20 @@
 ::  XX Handle negative refspecs
 ::
 /-  spider
-/-  *git, *git-cmd
+/-  *git, git-cmd, sole
 /+  io=strandio, stream
 /+  git=git-repository, *git-refs, *git-refspec, git-pack
 /+  git-http
-/+  *git-cmd-fetch, *git-cmd-parser-fetch
+::  XX git-cmd library is confusing with git-cmd sur
+/+  *git-cmd, *git-cmd-fetch, *git-cmd-parser-fetch
 =,  strand=strand:spider
 ^-  thread:spider
 ::
-|=  ted-arg=vase
+|=  arg=vase
 =/  m  (strand ,vase)
 ^-  form:m
-=/  [=sole-id repo=(unit repository:git) =args =opts-map]
-  !<([=sole-id (unit repository:git) args opts-map] ted-arg)
+=/  [=sole-id:sole =dir:git-cmd repo=(unit repository:git) =args =opts-map]
+  !<((ted-args:git-cmd args) arg)
 =/  opts  (get-opts opts-map)
 ?~  repo
   ~|  "fatal: not a git repository"  !!
@@ -120,7 +121,7 @@
     =+  (get:~(refs git repo) u.mef)
     ?~  -  0x0  u.-
   =/  new  ref.lir
-  ~&  "ref map: {<refname.lir>} -> {<u.mef>}"
+  :: ~&  "ref map: {<refname.lir>} -> {<u.mef>}"
   :_  ref-map
   [u.mef `hash`old `hash`new]
 ::  XX optimize: request only for changed refs
@@ -140,7 +141,9 @@
   %+  turn  ref-map
   |=  [=refname old=hash new=hash]
   new
-;<  =pack:git-pack  bind:m  (fetch:http want have)
+;<  =pack:git-pack  bind:m  (fetch:http have want)
+~&  new-pack-count+count.pack
+:: ~?  =(count.pack 0)  pack
 =?  repo  (gth count.pack 0)
   (add-pack:~(store git repo) pack)
 =.  refs.repo

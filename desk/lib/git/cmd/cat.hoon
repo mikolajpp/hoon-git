@@ -8,5 +8,5 @@
 +$  args  =path
 ::
 ++  parse
-  (cmd-solo %cat ;~(pfix gap stap))
+  (parse-cmd-solo %cat ;~(pfix gap stap))
 --

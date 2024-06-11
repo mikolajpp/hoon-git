@@ -1,6 +1,9 @@
 /-  *sole
+/-  *git-cmd
 /+  shoe, verb, default-agent, dbug, agentio
-/+  *git, *git-cmd
+::  XX clay seems not to mind non-existent libraries
+::
+/+  *git, *git-cmd-parser
 /+  git=git-repository, git-refs, git-pack
 ::  XX Find a way to import commands in bulk
 ::
@@ -14,13 +17,12 @@
 /+  cmd-cat=git-cmd-parser-cat
 ::
 /+  cmd-clone=git-cmd-parser-clone
+/+  cmd-diff=git-cmd-parser-diff
 /+  cmd-fetch=git-cmd-parser-fetch
 /+  cmd-log=git-cmd-parser-log
+/+  cmd-merge=git-cmd-parser-merge
 ::
 |%
-::  orientation
-::
-+$  dir  [repo=@ta ref=refname =path]
 +$  state-0
   $:  =dir             :: repository
       trash=(set @ta)  :: repository trash
@@ -30,9 +32,6 @@
   ==
 +$  card  card:shoe
 +$  sign  sign:agent:gall
-+$  action
-  $%  $>(%shoe card) 
-  ==
 +$  command
   $%  [%ls args:cmd-ls]
       [%cd args:cmd-cd]
@@ -41,15 +40,13 @@
       [%lock %~]
       ::
       [%clone args:cmd-clone]
-      [%diff diff-args]
+      [%diff args:cmd-diff]
       [%fetch args:cmd-fetch]
       [%log args:cmd-log]
-      [%merge merge-args]
+      [%merge args:cmd-merge]
       [%pull pull-args]
   ==
 +$  cat-file-args  ~
-+$  diff-args  ~
-+$  merge-args  ~
 +$  pull-args  ~
 --
 =|  state-0
@@ -95,22 +92,23 @@
     ::  /rm/repo
     ::
     [%rm @tas ~]
-      =+  name=i.t.wire
+      =+  repo=i.t.wire
       ?>  ?=(%poke-ack -.sign)
       ?~  p.sign
         :_  this
-        ?.  =(dir name)  ~
-        [%shoe ~ (set-prompt ' /> ')]~
-      ~_  "Failed to delete repository {<name>}"
+        ?:  !=(repo.dir repo)  ~
+        [%shoe ~ (sole-prompt dir.state)]~
+      ~|  "Failed to delete repository {<repo>}"
       (mean u.p.sign)
+    ::  XX Should this be handled by the clone thread?
     ::  /exec/clone/store/repo
     ::
     [%exec %clone %store @tas ~]
-      =+  name=i.t.t.t.wire
+      =+  repo=i.t.t.t.wire
       ?>  ?=(%poke-ack -.sign)
       ?~  p.sign
         `this
-      ~_  "Failed to store repository {<name>}"
+      ~|  "Failed to store repository {<repo>}"
       (mean u.p.sign)
   ==
 ++  on-arvo  
@@ -121,6 +119,7 @@
       =+  repo=i.t.wire
       ?+  t.t.wire  !!
         ::  XX Display 'rm aborted' message?
+        ::  XX update prompt upon deletion
         [%timeout ~]
           `this(trash (~(del in trash) repo))
       ==
@@ -136,7 +135,6 @@
       ::
       ?:  ?=(%| -.p.sign)
         ((slog p.p.sign) `this)
-      ~&  (spat wire)
       =/  =cage  p.p.sign
       =+  cmd=i.t.wire
       =+  dir=i.t.t.wire
@@ -173,7 +171,7 @@
   %+  cook
     |=  [cmd=command opts=(list option)]
     [| cmd opts]
-  ::  Handle muscle memory
+  ::  Accomodate muscle memory
   ::
   ;~  pfix  (punt ;~(plug (jest 'git') (star ace)))
     ;~  pose
@@ -183,16 +181,22 @@
       parse:cmd-cat
       ::
       parse:cmd-clone
+      parse:cmd-diff
       parse:cmd-fetch
       parse:cmd-log
+      parse:cmd-merge
     ==
   ==
 ++  tab-list
   |=  =sole-id
   :~  ['ls' leaf+"list available repositories"]
       ['cd' leaf+"change to directory"]
+      ['rm' leaf+"delete repository"]
       ['clone' leaf+"clone a repository"]
+      ['diff' leaf+"show changes between commits"]
       ['fetch' leaf+"download objects and refs"]
+      ['log' leaf+"show commit logs"]
+      ['merge' leaf+"fast-forward merge"]
   ==
 ++  on-command
   |=  [=sole-id =command opts=(list option)]
@@ -210,8 +214,10 @@
       %rm  (rm:do sole-id command opts)
       ::
       %clone  (exec:do sole-id command opts)
+      %diff   (exec:do sole-id command opts)
       %fetch  (exec:do sole-id command opts)
       %log    (exec:do sole-id command opts)
+      %merge  (exec:do sole-id command opts)
     ==
   [cards this]
 ++  can-connect
@@ -220,12 +226,12 @@
   =(our.bowl src.bowl)
 ++  on-connect
   |=  =sole-id
-  :: ~&  connected+sole-id
+  ~&  connected+sole-id
   ^-  (quip card _this)
   =;  [to=(list _sole-id) fec=shoe-effect:shoe]
     [[%shoe to fec]~ this]
   :-  ~[sole-id]
-  (set-prompt ' /> ')
+  (sole-prompt dir)
 ++  on-disconnect  on-disconnect:des
 --
 |_  =bowl:gall
@@ -238,24 +244,55 @@
   |=  [=sole-id ls=command opts=(list option)]
   ^-  (quip card _state)
   ?>  ?=(%ls -.ls)
-  =+  repos=scry-repos-set
-  ?.  (gth ~(wyt in repos) 0)
-    `state
-  =;  [to=(list _sole-id) fec=shoe-effect:shoe]
-    [[%shoe to fec]~ state]
-  :-  ~[sole-id]
-  [%sole %tan ~[rose+[[" " " " " "] ~(tap in repos)]]]
+  =;  [fec=shoe-effect:shoe =_state]
+    :_  state
+    [%shoe ~[sole-id] fec]~
+  ::  List repositories
+  ::
+  ?:  =(~. repo.dir)
+    =+  repos=scry-repos-set
+    :_  state
+    :+  %sole  %tan
+    [rose+[[" " " " " "] ~(tap in repos)]]~
+  ::  List branches
+  ::
+  =/  repo=repository:git
+    .^(repository:git %gx (scry:io /git-store/[repo.dir]/noun))
+  :_  state
+  :+  %sole  %tan
+  :~
+    :+  %rose
+      [" " " " " "]
+    %+  turn  (tap-prefix:~(refs git repo) /refs/heads)
+    |=  [=refname =hash]
+    (print-refname refname)
+  ==
 ++  cd
   |=  [=sole-id cd=command opts=(list option)]
   ^-  (quip card _state)
   ?>  ?=(%cd -.cd)
+  =+  branch=(scan (trip branch.cd) parse-refname)
   =+  repos=scry-repos-set
-  =;  [to=(list _sole-id) fec=shoe-effect:shoe]
-    [[%shoe to fec]~ state(repo.dir name.cd)]
-  :-  ~[sole-id]
-  ?.  |(=(%$ name.cd) (~(has in repos) name.cd))
-    [%sole %txt "cd: no such repository: /{(trip name.cd)}"]
-  (set-prompt (crip " /{(trip name.cd)}> "))
+  =;  [fec=shoe-effect:shoe =_state]
+    [[%shoe ~[sole-id] fec]~ state]
+  ::
+  ?.  |(=(%$ repo.cd) (~(has in repos) repo.cd))
+    :_  state
+    [%sole %txt "cd: no such repository: /{(trip repo.cd)}"]
+  =.  dir.state
+    [repo.cd branch /]
+  ?:  =(~. repo.cd)
+    :_  state
+    (sole-prompt dir.state)
+  =/  repo=repository:git
+    .^(repository:git %gx (scry:io /git-store/[repo.cd]/noun))
+  ?:  ?&  !=(/ branch)
+          !(has:~(refs git repo) (weld branches:refspace branch))
+      ==
+    :_  state
+    [%sole %txt "cd: no such branch: {(trip (print-refname branch))}"]
+  :_  state
+  (sole-prompt dir.state)
 ++  rm
   |=  [=sole-id rm=command opts=(list option)]
   ^-  (quip card _state)
@@ -296,7 +333,6 @@
   =/  repo=(unit repository:git)
     ?:  =(repo.dir %$)
       ~
-    ~&  exec-repo-peek+dir
     %-  some
     .^(repository:git %gx (scry:io /git-store/[repo.dir]/noun))
   =/  args
@@ -304,9 +340,11 @@
     ::  in wet gates (see issue 1347)
     ::
     ?+  -.cmd  !!
-      %clone  !>([sole-id repo +.cmd (malt opts)])
-      %fetch  !>([sole-id repo +.cmd (malt opts)])
-      %log    !>([sole-id repo +.cmd (malt opts)])
+      %clone  !>([sole-id dir repo +.cmd (malt opts)])
+      %diff   !>([sole-id dir repo +.cmd (malt opts)])
+      %fetch  !>([sole-id dir repo +.cmd (malt opts)])
+      %log    !>([sole-id dir repo +.cmd (malt opts)])
+      %merge  !>([sole-id dir repo +.cmd (malt opts)])
     ==
   =/  fard=(fyrd:khan cage)
     [q.byk.bowl ted %noun args]
@@ -316,8 +354,14 @@
   [%pass /exec/[-.cmd]/[repo.dir] %arvo %k %fard fard]~
 ++  scry-repos-set
   .^((set @ta) %gx (scry:io /git-store/noun))
-++  set-prompt
-  |=  pro=@t
+++  sole-prompt
+  |=  =^dir
   ^-  shoe-effect:shoe
-  [%sole %pro & %$ ~[pro]]
+  :+  %sole  %pro
+  :+  &  %$
+  :~ 
+  ' /'  repo.dir
+  ?:(=(branch.dir /) '' (^cat 3 ':' (print-refname branch.dir)))
+  '> '
+  ==
 --

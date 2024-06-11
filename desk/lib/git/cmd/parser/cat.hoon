@@ -3,7 +3,7 @@
 ::
 ::  XX cat should handle full git path syntax
 ::
-/+  *git-cmd
+/+  *git-cmd-parser
 |%
 +$  args  =path
 ::

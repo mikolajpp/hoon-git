@@ -7,5 +7,5 @@
 |%
 +$  args  %~
 ++  parse
-  (cmd-solo %ls (easy ~))
+  (parse-cmd-solo %ls (easy ~))
 --

@@ -125,17 +125,16 @@
 ++  on-peek
   |=  =path
   ^-  (unit (unit cage))
-  :: ~&  git-store-peek+path
   ?:  ?=([%x ~] path)
     ``[%noun !>(~(key by repo-store))]
   ?>  ?=([%x @ta *] path)
-  =+  name=i.t.path
-  ?>  (~(has by repo-store.state) name)
+  =+  repo=i.t.path
+  ?>  (~(has by repo-store.state) repo)
   ?:  ?=([%x @ta ~] path)
-    ``[%noun !>((~(got by repo-store.state) name))]
+    ``[%noun !>((~(got by repo-store.state) repo))]
   ?+  t.t.path  !!
     [%lock ~]
-      ``[%noun !>((~(has in lock.state) name))]
+      ``[%noun !>((~(has in lock.state) repo))]
   ==
 ++  on-agent   on-agent:def
 ++  on-arvo
@@ -160,6 +159,7 @@
 ++  put
   |=  [name=@ta repo=repository:git]
   ^-  (quip card _state)
+  ?<  =(%$ name)
   ?:  (~(has by repo-store.state) name)
     ~|  "Git repository {<name>} already exists"  !!
   `state(repo-store (~(put by repo-store.state) name repo))

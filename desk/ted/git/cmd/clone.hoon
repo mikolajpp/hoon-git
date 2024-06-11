@@ -4,18 +4,19 @@
 ::  Produces a (pair dir repository)
 ::
 /-  spider, *sole
-/-  *git, *git-cmd
+/-  *git, git-cmd
 /+  io=strandio, stream
 /+  git=git-repository, *git-refs, *git-refspec, git-pack
 /+  *git-cmd-parser-clone, git-http, git-clay
 =,  strand=strand:spider
 ^-  thread:spider
 ::
-|=  ted-arg=vase
+|=  arg=vase
 =/  m  (strand ,vase)
 ^-  form:m
-=/  [=sole-id repo=(unit repository:git) =args =opts-map]
-  !<([=sole-id repo=(unit repository:git) =args =opts-map] ted-arg)
+::  XX =, really needs to be fixed
+=/  [=sole-id =dir:git-cmd repo=(unit repository:git) =args =opts-map]
+  !<((ted-args:git-cmd args) arg)
 ::  XX again, tiscom is broken with units
 :: =,  arg
 =/  vex=(like purl:eyre)
@@ -183,13 +184,12 @@
   branch
 ::  Determine repository directory
 ::
-?^  dir.args
-  (pure:m !>([p=u.dir.args q=repo]))
-::  Find out the repository dir from URL
-::
-=+  name=(rear q.q.purl)
+=/  name=@ta
+  ?^  dir.args
+    u.dir.args
+  (rear q.q.purl)
 ?:  =(%$ name)
-  ~_  "Invalid repository name"  !!
+  ~|  "Invalid empty repository directory"  !!
 (pure:m !>([p=name q=repo]))
 :: ?~  desk.args
 ::   (pure:m !>(repo))

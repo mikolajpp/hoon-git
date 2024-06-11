@@ -25,7 +25,7 @@
                        author-time=commit-time
                        ::
                        committer=commit-person
-                       commit-time=commit-time
+                       =commit-time
                        ::
                        sign=(unit commit-signature)
                    ==
@@ -38,7 +38,7 @@
 +$  tree-entry  [[mode=@ta name=@ta] =hash]
 +$  tree  $+(git-tree (list tree-entry))
 :: ++  git-tree  tree
-::  XX refactor objects so that fields are readily accessible
+::  XX refactor objects so  fields are readily accessible
 ::  XX are sizes here really necessary?
 ::
 +$  object

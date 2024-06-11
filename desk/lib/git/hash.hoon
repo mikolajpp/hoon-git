@@ -95,5 +95,11 @@
     |=(hash=@ (rev 3 hash-bytes-sha-1 hash))
   =*  haz  hash-size-sha-1
   (bass 16 (stun [haz haz] six:ab))
+++  parse-short-sha-1
+  %+  cook  
+    ::  XX works only with even hash keys
+    |=(hash=@ (rev 3 (met 3 hash) hash))
+  =*  haz  hash-size-sha-1
+  (bass 16 (stun [4 haz] six:ab))
 ++  parse-sha-256  !!
 --

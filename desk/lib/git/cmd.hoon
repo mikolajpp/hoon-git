@@ -1,164 +1,162 @@
-/-  *git-cmd
+/+  *git, *git-refs
+/+  git=git-repository
+/+  *git
 |%
+::  Find refname
 ::
-++  parse-cmd-solo  cmd-solo:parse
-++  parse-cmd  cmd:parse
-++  parse-cmd-with-pfix  cmd-with-pfix:parse
+::  Matches against refs in /refs/heads,
+::  /refs/tags and other standard locations
 ::
-++  parse-gap  gap:parse
-++  parse-hym  hym:parse
-++  parse-urs  urs:parse
-++  parse-urp  urp:parse
+++  find-refname
+  |=  [repo=repository:git branch=refname]
+  ^-  (unit refname)
+  =/  refs=(list refname)
+    (expand-ref-prefix branch)
+  |-
+  ?~  refs  ~
+  ?:  (has:~(refs git repo) i.refs)
+    (some i.refs)
+  $(refs t.refs)
 ::
-++  parse-url  auri:de-purl:html
-++  parse-raw-url  url:parse
+::  Find matching hashes given a short key
 ::
-++  flag-opt  flag-opt:parse
-++  text-opt  text-opt:parse
-++  num-opt  num-opt:parse
-::
-++  parse
-  |%
-  :: Like sym, but includes uppercase
-  ++  hym
-    %+  cook
-      |=(a=tape (rap 3 ^-((list @) a)))
-    ;~(plug ;~(pose low hig) (star ;~(pose nud low hig hep)))
-  ::  renovated @ta
-  ++  urs  %+  cook
-             |=(a=tape ^-(@ta (rap 3 a)))
-           (star ;~(pose nud hig low hep dot sig cab))
-  ::  urs path
-  ::
-  ++  urp  %+  cook
-             |=(a=tape ^-(@ta (rap 3 a)))
-           (star ;~(pose nud hig low hep dot sig cab fas))
-  ::  XX Add valid +url to cord parser
-  ::
-  ++  url
-    %+  cook
-      |=(a=tape ^-(@t (rap 3 ^-((list @) a))))
-    (plus ;~(pose nud low hig hep dot sig cab col fas))
-  ++  gap  (plus ace)
-  ++  val-f  (easy ~)
-  ++  val-ud  dem:ag
-  ++  val-t
-    ;~  pose
-      ::  'cord'
-      (ifix [soq soq] (boss 256 (star qit)))
-      ::  unescaped cord
-      (boss 256 (star ;~(less ace qit)))
-    ==
-  ++  value
-    |=  kind=opt-kind
-    ^-  $-(nail (like opt-value))
-    ?-  kind
-      %f  (stag %f val-f)
-      %t  (stag %t val-t)
-      %ud  (stag %ud val-ud)
-    ==
-  ::  -o
-  ++  short
-    |=(o=char ;~(plug hep (just o)))
-  ::  --opt
-  ++  long
-    |=  opt=@tas
-    ;~(plug hep hep (jest opt))
-  ::  -o val, -oval
-  ++  short-value
-    |=  [o=char kind=opt-kind]
-    ?:  ?=(%f kind)
-      ;~(pfix (short o) (value kind))
-    ;~(pfix (short o) ;~(pfix (star ace) (value kind)))
-  ::  --opt val, --opt=val
-  ++  long-value
-    |=  [opt=@tas kind=opt-kind]
-    ::  XX a bug in the parser:
-    ::  ?=(kind %f) parser to something wrong
-    ::
-    ?:  ?=(%f kind)
-      ;~(pfix (long opt) (value kind))
-    ;~  pfix
-      (long opt)
-      ;~  pose
-        ;~(pfix tis (value kind))
-        ;~(pfix gap (value kind))
+++  find-by-key
+  |=  [repo=repository:git key=@ta]
+  ^-  (list hash)
+  ~
+::  Diff two trees
+::  
+::  Return a list of [path left=hash right=hash]
+:: 
+++  diff-tree
+  |=  $:  repo=repository:git
+          a=tree
+          b=tree
+          p=path
       ==
-    ==
-  ++  short-or-long-value
-    |=  [o=@t opt=@tas kind=opt-kind]
-    ;~  pose
-      (short-value o kind)
-      (long-value opt kind)
-    ==
-  ++  opt
-    |=  [opt=@tas o=@tas kind=opt-kind]
-    %+  stag  opt
-    ?:  =(%$ o)
-      (long-value opt kind)
-    (short-or-long-value o opt kind)
-  ++  flag-opt
-    |=  [opt=@tas o=@tas]
-    (^opt opt o %f)
-  ++  text-opt
-    |=  [opt=@tas o=@tas]
-    (^opt opt o %t)
-  ++  num-opt
-    |=  [opt=@tas o=@tas]
-    (^opt opt o %ud)
-  ++  cmd-solo
-    |*  [cmd=@tas args=rule]
-    %+  cook
-      |*(cmd=* [cmd ~])
-    (stag cmd ;~(pfix (jest cmd) args))
-  ++  any-short-opt
-    ;~(plug hep ;~(pose low dit))
-  ++  any-long-opt
-    ;~(plug hep hep ;~(pose low dit))
-  ++  any-opt
-    ;~(pose any-short-opt any-long-opt)
-  ++  cmd
-    |*  [cmd=@tas opt=rule args=rule]
-    (cmd-with-pfix cmd opt gap args)
-  ::  Generic command parser
+  ^-  (list (trel path hash hash))
+  =/  sa=tree
+    %+  sort  a
+    |=  [rya=tree-entry ryb=tree-entry]
+    (lth name.rya name.ryb)
+  =/  sb=tree
+    %+  sort  b
+    |=  [rya=tree-entry ryb=tree-entry]
+    (lth name.rya name.ryb)
+  :: ~&  sa+sa
+  :: ~&  sb+sb
+  =|  diff=(list (trel path hash hash))
+  |-
+  :: ~&  diff-at+p
+  ::  left exhausted - append right
+  ?~  sa
+    %-  flop
+    %+  weld
+      %+  turn  sb
+      |=(ent=tree-entry [[name.ent p] 0x0 hash.ent])
+    diff
+  ::  right exhausted - append left
+  ?~  sb
+    %-  flop
+    %+  weld
+      %+  turn  sa
+      |=(ent=tree-entry [[name.ent p] hash.ent 0x0])
+    diff
+  ::  No change
   ::
-  ::  .cmd: command name
-  ::  .opt: option
-  ::  .pix: arguments prefix
-  ::  .args: arguments
+  ?:  ?&  =(name.i.sa name.i.sb)
+          =(hash.i.sa hash.i.sb)
+      ==
+    $(sa t.sa, sb t.sb)
+  ::  a,b,c  x
+  ::  a,b,c  f
   ::
-  ++  cmd-with-pfix
-    |*  [cmd=@tas opt=rule pix=rule args=rule]
-    |=  tub=nail
-    ^-  (like [[_cmd _(wonk *args)] (list option)])
-    ::  Parse front options, command arguments
-    ::
-    ::  XX using , somehow changes output of
-    ::  compiler error.
-    ::
-    =/  vex=(like [(list option) (unit *) command=[_cmd _(wonk *args)]])
-      %.  tub
-      ;~  pfix  (jest cmd)
-        ;~  plug
-          (star ;~(pfix gap opt))
-          (punt ;~(plug gap hep hep))
-          ;~(pfix pix (stag cmd args))
-        ==
-      ==
-    :: ~&  vex
-    ?~  q.vex  vex
-    =/  [front=(list option) opt-end=(unit *) command=[_cmd _(wonk *args)]]
-      p.u.q.vex
-    ?:  ?|(?=(^ opt-end) =("" q.q.u.q.vex))
-      [p.vex `[[command front] q.u.q.vex]]
-    =/  vex=(like (list option))
-      %.  q.u.q.vex
-      ;~  sfix
-        ;~(pfix gap (more gap opt))
-        (star ace)
-      ==
-    ?~  q.vex  vex
-    =+  back=p.u.q.vex
-    [p.vex `[[command (weld front back)] q.u.q.vex]]
-  --
+  ::  Names are different, append both
+  ::
+  ?:  !=(name.i.sa name.i.sb)
+    =/  diff-a=(trel path hash hash)
+      [[name.i.sa p] hash.i.sa 0x0]
+    =/  diff-b=(trel path hash hash)
+      [[name.i.sb p] hash.i.sb 0x0]
+    %=  $
+      diff  [diff-a diff-b diff]
+      sa  t.sb
+      sb  t.sb
+    ==
+  ::  Diff
+  ::  XX use mode
+  =/  left-obj
+    (got:~(store git repo) hash.i.sa)
+  =/  right-obj
+    (got:~(store git repo) hash.i.sb)
+  ::  Advance
+  ::
+  ::  Three cases
+  ::
+  ::  blob and blob - perform txt diff
+  ::  blob and tree - show whole text file
+  ::  tree and tree - recurse
+  ::
+  ?:  &(?=(%blob -.left-obj) ?=(%blob -.right-obj))
+    :: ~&  diff-blob+p
+    %=  $
+      diff  :_  diff  [[name.i.sa p] hash.i.sa hash.i.sb]
+      sa  t.sa
+      sb  t.sb
+    ==
+  ::  XX handle commit and tag objects
+  ?:  &(?=(%tree -.left-obj) ?=(%tree -.right-obj))
+    :: ~&  diff-tree+p
+    %=  $
+      ::  XX terrible complexity, use nested lists
+      ::
+      diff  %+  weld
+              (diff-tree repo tree.left-obj tree.right-obj [name.i.sa p])
+            diff
+      sa  t.sa
+      sb  t.sb
+    ==
+  ::  Tree against the blob
+  ::  Diff blob and whole tree contents
+  ?:  |(?=(%tree -.left-obj) ?=(%tree -.right-obj))
+    :: ~&  diff-tree-blob+p
+    %=  $
+      diff
+        ?:  ?=(%tree -.left-obj)
+          :-  [[name.i.sb p] 0x0 hash.i.sb]
+          %+  weld
+            (tree-all-diff repo tree.left-obj p &)
+          diff
+        :-  [[name.i.sa p] hash.i.sa 0x0]
+        ?>  ?=(%tree -.right-obj)
+        %+  weld
+          (tree-all-diff repo tree.right-obj p |)
+        diff
+      sa  t.sa
+      sb  t.sb
+    ==
+  :: ~&  "Unhandled obj diff: {<-.left-obj>}:{<-.right-obj>}"  !!
+  ::  Submodule
+  $(sa t.sa, sb t.sb)
+    
+  ++  tree-all-diff
+    |=  [repo=repository:git =tree p=path side=?]
+    ^-  (list (trel path hash hash))
+    =|   diff=(list (trel path hash hash))
+    |-
+    ^-  _diff
+    ?~  tree  diff
+    ::  XX only get hash
+    =/  obj
+      (got:~(store git repo) hash.i.tree)
+    ?:  ?=(%blob -.obj)
+      :_  diff
+      :-  [name.i.tree p]
+      ?:  side  
+        [hash.i.tree 0x0]
+      [0x0 hash.i.tree]
+    ?.  ?=(%tree -.obj)
+      $(tree t.tree)
+    (tree-all-diff repo tree.obj [name.i.tree p] side)
 --
+

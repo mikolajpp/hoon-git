@@ -1,7 +1,7 @@
 ::
 ::  git log - Show commit logs
 ::
-/+  *git-cmd, *git-refs
+/+  *git-cmd-parser, *git-refs
 |%
 +$  args  raw-refname=@t
 +$  opts  $:  number=_1

@@ -1,31 +1,33 @@
 :: 
-::  git log
+::  git [-n <number>] [branch]
 ::
 /-  spider
-/-  *git, *git-cmd
+/-  *git, git-cmd
 /+  io=strandio, stream, *shoe
 /+  git=git-repository, *git-refs, *git-refspec, git-pack
-/+  *git-cmd-parser-log, git-http, git-clay
+/+  *git-cmd, *git-cmd-parser-log, git-http, git-clay
 ::
 =,  strand=strand:spider
 ^-  thread:spider
 ::
-|=  ted-arg=vase
+|=  arg=vase
 =/  m  (strand ,vase)
 ^-  form:m
-=/  [=sole-id repo=(unit repository:git) =args =opts-map]
-  !<([sole-id (unit repository:git) args opts-map] ted-arg)
+=/  [=sole-id =dir:git-cmd repo=(unit repository:git) =args =opts-map]
+  !<((ted-args:git-cmd args) arg)
 =+  opts=(get-opts opts-map)
 ?~  repo  (pure:m !>(~))
 =+  repo=u.repo
 =/  =refname
+  ?:  =(~. raw-refname.args)
+    branch.dir
   (scan (trip raw-refname.args) parse-refname)
 =/  refs=(list ^refname)  
   (expand-ref-prefix refname)
 =/  dir=^refname
   |-
   ?~  refs
-    ~|  "Reference{(trip (print-refname refname))} not found"  !!
+    ~|  "Reference {(trip (print-refname refname))} not found"  !!
   ?:  (has:~(refs git repo) i.refs)
     i.refs
   $(refs t.refs)

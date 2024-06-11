@@ -14,6 +14,7 @@
 ++  refspace
   |%
   ++  head  ['HEAD' ~]
+  ::  XX rename to branch and tag
   ++  branches  /refs/heads
   ++  tags  /refs/tags
   ++  remote  /refs/remotes
@@ -79,6 +80,7 @@
   ==
 ++  parse-refname  refname:parse
 ++  parse-raw-refname  raw-refname:parse
+++  parse-raw-pattern-refname  raw-pattern-refname:parse
 ++  parse-refname-ext  refname-ext:parse
 ::
 ++  parse
@@ -116,6 +118,11 @@
   ::
   ++  refname-ext  ;~(sfix refname (punt fas))
   ++  raw-refname
+    %+  cook
+      |=(a=tape ^-(@t (rap 3 a)))
+    :: @ta with '/'
+    (star ;~(pose nud hig low hep dot sig cab fas))
+  ++  raw-pattern-refname
     %+  cook
       |=(a=tape ^-(@t (rap 3 a)))
     :: @ta with '/' and '*'
