@@ -53,7 +53,7 @@
 =/  diff  (flop (diff-tree repo dst-tree src-tree /))
 ::  Display diff
 =>  |%
-    ::  XX Do not print binary files!
+    ::  XX Detect binary files and do not print them
     ::
     ++  plus-styl 
       [~ [~ `%g]]
@@ -67,7 +67,8 @@
       %+  turn  txt
       |=  line=@t
       ^-  sole-effect
-      [%klr ~[[styl ~[line]]]]
+      =+  show=(cat 3 ?:(side '+' '-') line)
+      [%klr ~[[styl ~[show]]]]
     ++  print-file
       |=  [=path =hash side=?] 
       ^-  sole-effect
@@ -78,6 +79,9 @@
       :-  %mor
       :-  [%txt "{<path>}:"]
       (print-txt wain side)
+    ::  XX print in standard formats:
+    ::  (1) unified diff format
+    ::
     ++  print-diff
       |=  [=path left=hash right=hash]
       ^-  sole-effect
@@ -87,7 +91,7 @@
       ?>  ?=(%blob -.right-obj)
       =/  lain=wain  (mime:grab:txt /text/plain octs.left-obj)
       =/  rain=wain  (mime:grab:txt /text/plain octs.right-obj)
-      =/  diff
+      =/  diff=(urge:clay cord)
         (diff:~(grad txt lain) rain)
       :-  %mor
       :-  [%txt "{<path>}:"]
@@ -98,26 +102,35 @@
       ?~  diff  (flop efes)
       ::  Advance to line
       ::
-      ?-  -.i.diff
-        %&  $(line p.i.diff, diff t.diff)
-        %|  
-          %=  $
-            efes
-              :: ^-  (list sole-effect)
-              =/  plus=sole-effect
-                [%mor (print-txt p.i.diff &)]
-              :: ~&  `wain`q.i.diff
-              ::  XX Some insane bug??
-              :: ~&  [%mor (print-txt p.i.diff &)])
-              :: =/  plus=sole-effect
-              :: =/  mine=sole-effect
-              ::   [%mor (print-txt p.i.diff &)])
-              [plus efes]
-            diff  t.diff
-          ==
-
-
+      ?:  ?=(%& -.i.diff)
+        $(line p.i.diff, diff t.diff)
+      =/  plus=sole-effect
+        [%mor (print-txt p.i.diff &)]
+      =/  minus=sole-effect
+        [%mor (print-txt q.i.diff |)]
+      %=  $
+        diff  t.diff
+        efes  [plus minus efes]
       ==
+      :: XX There is a parser bug here
+      :: ?-  -.i.diff
+      ::   %&  $(line p.i.diff, diff t.diff)
+      ::   %|  
+      ::     %=  $
+      ::       efes
+      ::         :: ^-  (list sole-effect)
+      ::         =/  plus=sole-effect
+      ::           [%mor (print-txt p.i.diff &)]
+      ::         :: ~&  `wain`q.i.diff
+      ::         ::  XX Some insane bug??
+      ::         :: ~&  [%mor (print-txt p.i.diff &)])
+      ::         :: =/  plus=sole-effect
+      ::         :: =/  mine=sole-effect
+      :: XX This seems to hang the parser
+      ::         ::   [%mor (print-txt p.i.diff &)])
+      ::         [plus efes]
+      ::       diff  t.diff
+      ::
     --
 =/  efes=(list sole-effect)
   %+  turn  diff

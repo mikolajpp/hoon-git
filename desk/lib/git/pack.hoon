@@ -20,10 +20,10 @@
 ::  do not throw error!
 ::  Is it possible to extract comparison 
 ::  function from pack-index?
-::
-++  pack-cmp  gth
-+$  pack-index   ((mop hash @ud) pack-cmp)
-++  pack-on  ((on hash @ud) pack-cmp)
+:: 
+++  hash-cmp  gth
++$  pack-index   ((mop hash @ud) hash-cmp)
+++  pack-on  ((on hash @ud) hash-cmp)
 +$  pack  $:  =hash-algo
               count=@ud 
               index=pack-index 
