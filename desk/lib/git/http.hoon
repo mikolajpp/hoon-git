@@ -10,7 +10,6 @@
 /-  spider
 /+  stream, strandio
 /+  *git, git-pack, git=git-repository
-~%  %git-http  ..part  ~
 =,  strand=strand:spider
 |%
 ++  git-agent  'hoon-git/0.1'
@@ -26,6 +25,7 @@
 ++  default-caps  :~  ;;(@t (cat 3 'agent=' git-agent))
                   ==
 --
+~%  %git-http  ..part  ~
 |_  url=@t
 ::
 ::  Greet the pack upload service to obtain capabilities
