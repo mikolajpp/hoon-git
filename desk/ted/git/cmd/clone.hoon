@@ -27,7 +27,7 @@
 =+  purl=p.u.q.vex
 ::  XX progress reporting
 ::  To match the git clone output would require:
-::  1. Change of %iris API to transfer received chunks
+::  1. Change of %iris API to transfer chunks as they are received
 ::  2. A receive-pkt-lines strand that transfers
 ::  pkt-lines to main thread as it receives them from %iris
 ::  3. A suspendable pack indexer to properly report progress, or
@@ -142,8 +142,7 @@
 =.  refs.repo  
   %+  roll  ~(tap of (~(dip of remote-refs) /refs/tags))
     |=  [[=refname =ref] =_refs.repo]
-    ?>  ?=([@ %~] refname)
-    (~(put of refs) (weld tags:refspace /[i.refname]) ref)
+    (~(put of refs) (weld tags:refspace refname) ref)
 ::  Install remote refs
 ::
 =.  refs.repo
@@ -160,7 +159,7 @@
     %+  ~(put of refs)
       :(weld remote:refspace /[origin.opts] refname)
     ref
-~&  ~(tap of refs.repo)
+:: ~&  ~(tap of refs.repo)
 ::  Setup remote
 ::
 =|  origin=^remote:git

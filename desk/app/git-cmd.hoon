@@ -322,6 +322,8 @@
 ++  cat  !!
 ::  Execute the command thread 
 ::
+::  XX commands should be executed synchronously
+::
 ++  exec
   |*  [=sole-id cmd=command opts=(list option)]
   ^-  (quip card _state)

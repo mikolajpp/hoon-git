@@ -87,7 +87,6 @@
   ?.  ?=(%noun mark)
     ~|  "Invalid request"  !!
   =+  cmd=!<(action vase)
-  ~&  git-store-poke+-.cmd
   ?-  -.cmd
     %put  (put:do +.cmd)
     %update  (update:do +.cmd)

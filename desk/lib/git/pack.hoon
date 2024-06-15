@@ -1,8 +1,10 @@
 ::
 ::::  Git pack
   ::
+/-  spider
 /+  stream, zlib
-/+  *git-hash, *git-object
+/+  *git, *git-hash, *git-object
+=,  strand=strand:spider
 |%
 +$  pack-object-type  $?  object-type
                           %ofs-delta
