@@ -4,8 +4,8 @@
 ::  Produces a (pair dir repository)
 ::
 /-  spider, *sole
-/-  *git, git-cmd
-/+  io=strandio, stream
+/-  git-cmd
+/+  io=strandio, bs=bytestream
 /+  git=git-repository, *git-refs, *git-refspec, git-pack
 /+  *git-cmd-parser-clone, git-http, git-clay
 =,  strand=strand:spider
@@ -109,7 +109,7 @@
       [ref want]
     want
 ;<  pack=pack:git-pack  bind:m  (fetch:http ~ want)
-~?  verbose.opts  "Received {<p.octs.data.pack>} bytes"
+~?  verbose.opts  "Received {<(size:bs stream.pack)>} bytes"
 ::
 ::  Repository setup after clone
 ::

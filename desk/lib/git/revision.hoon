@@ -12,7 +12,8 @@
 ::  =^  rev  walk  ~(get revision walk)
 ::  =^  rev  walk  ~(get revision walk)
 ::
-/+  *git, git=git-repository
+/+  *git-hash, *git-object
+/+  git=git-repository
 |%
 ::  XX Why does it need manual structure mode?
 ::

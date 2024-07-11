@@ -32,9 +32,14 @@
     %sha-1    hash-size-sha-1
     %sha-256  hash-size-sha-256
   ==
+++  hash-octs-sha-1
+  |=  =octs
+  ^-  @ux
+  (rev 3 20 (sha-1l:sha p.octs (rev 3 p.octs q.octs)))
+++  hash-octs-sha-256  !!
 ::    +as-hash
 ::  convert hexadecimal cord to hash
-::
+::  XX rename txt-to-hash
 ++  as-hash
   |=  a=@ta
   ^-  hash

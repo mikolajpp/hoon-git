@@ -2,8 +2,8 @@
 ::::  Git pack
   ::
 /-  spider
-/+  stream, zlib
-/+  *git, *git-hash, *git-object
+/+  bs=bytestream, zlib
+/+  *git-hash, *git-object
 =,  strand=strand:spider
 |%
 +$  pack-object-type  $?  object-type
@@ -18,31 +18,32 @@
 +$  pack-delta-object  $>(?(%ofs-delta %ref-delta) pack-object)
 
 +$  pack-header  [version=%2 count=@ud]
-::  XX different comparison functions 
-::  do not throw error!
 ::  Is it possible to extract comparison 
 ::  function from pack-index?
 :: 
 ++  hash-cmp  gth
 +$  pack-index   ((mop hash @ud) hash-cmp)
 ++  pack-on  ((on hash @ud) hash-cmp)
+::  +pack-cache: store recently resolved objects
+::
++$  pack-cache  [count=@ud store=(list (pair @ud raw-object))]
 +$  pack  $:  =hash-algo
               count=@ud 
               index=pack-index 
               ::  Checksum position
               end-pos=@ud 
-              data=stream:stream
+              stream=bays:bs
           ==
 +$  store-raw-get  $-(hash (unit raw-object))
 --
 ~%  %git-pack  ..part  ~
 |%
 ++  read
-  |=  sea=stream:stream
+  |=  sea=bays:bs
   ^-  pack
   (read-thin sea |=(* !!))
 ++  read-thin
-  |=  [sea=stream:stream get=store-raw-get]
+  |=  [sea=bays:bs get=store-raw-get]
   ^-  pack
   :: ?>  (gte p.octs.sea (met 3 q.octs.sea))
   =+  start=pos.sea
@@ -54,7 +55,7 @@
   ::
   =+  end=pos.sea
   =^  hash  sea
-    (read-bytes:stream (pack-hash-bytes header) sea)
+    (read-octs-maybe:bs (pack-hash-bytes header) sea)
   ?~  hash 
     ~|  "Pack file is corrupted: no checksum found"  !!
   ?>  =(pos.sea p.octs.sea)
@@ -65,20 +66,20 @@
   ::  of missing objects instead of thickening the pack
   ::
   :: =+  pack=(insert-objects pack miss)
-  pack(pos.data beg-pos)
+  pack(pos.stream beg-pos)
 ::
 ++  read-header
-  |=  sea=stream:stream
-  ^-  [pack-header stream:stream]
-  =^  sig  sea  (read-bytes:stream 4 sea)
+  |=  sea=bays:bs
+  ^-  [pack-header bays:bs]
+  =^  sig  sea  (read-octs-maybe:bs 4 sea)
   ?~  sig
     ~|  "Pack file is corrupted: no signature found"  !!
   ?.  =(q.u.sig 'PACK')
     ~|  "Pack file is corrupted: invalid signature {<`@t`q.u.sig>} ({<p.u.sig>} bytes)"  !!
-  =^  version  sea  (read-bytes:stream 4 sea)
+  =^  version  sea  (read-octs-maybe:bs 4 sea)
   ?~  version
     ~|  "Pack file is corrupted: no version found"  !!
-  =^  count  sea  (read-bytes:stream 4 sea)
+  =^  count  sea  (read-octs-maybe:bs 4 sea)
   ?~  count
     ~|  "Pack file is corrupted: no object count found"  !!
   =+  ver=(rev 3 4 q.u.version)
@@ -95,31 +96,29 @@
   ::
   ?~  list
     pack
-  =+  start=pos.data.pack
-  =.  pos.data.pack  end-pos.pack
+  =+  start=pos.stream.pack
+  =.  pos.stream.pack  end-pos.pack
   =.  pack
     ::  XX can the type system be improved to avoid this cast?
     ::
     %+  roll  `(^list raw-object)`list
       |=  [rob=raw-object =_pack]
       %=  pack
-        data
-          ::  XX add write-octs function to libstream
-          ::
-          %+  write-octs:stream  data.pack
-            (raw-as-octs rob)
+        stream
+          %+  write-octs:bs  stream.pack
+            (raw-to-octs rob)
         index
           =+  hash=(hash-raw %sha-1 rob)
           %^  put:pack-on  index.pack
             hash
-          pos.data.pack
+          pos.stream.pack
         count  +(count.pack)
       ==
-  =+  sea=data.pack
+  =+  sea=stream.pack
   =+  end-pos=pos.sea
   =+  hash=(hash-octs-sha-1 octs.sea)
-  =.  sea  (append-octs:stream sea [20 hash])
-  pack(data sea(pos start))
+  =.  sea  (append-octs:bs sea [20 hash])
+  pack(stream sea(pos start))
 ::
 ++  pack-hash-bytes
   |=  hed=pack-header
@@ -139,16 +138,18 @@
 ::
 ++  index
   |=  $:  header=pack-header
-          sea=stream:stream
+          sea=bays:bs
           get=store-raw-get
       ==
-  ^-  [[pack (list raw-object)] stream:stream]
+  ^-  [[pack (list raw-object)] bays:bs]
   =+  start=pos.sea
   =|  count=@ud
   =/  step=@ud
     =-  ?:((gth - 0) - 1)
-    (div count.header 4)
+    (div count.header 10)
   =|  index=pack-index
+  =+  cache-limit=10
+  =|  cache=pack-cache
   =|  miss=(list raw-object)
   =^  [=_index =_miss]  sea
     |-
@@ -156,7 +157,7 @@
       :_  sea
       :_  miss
       index
-    ?:  (is-dry:stream sea)
+    ?:  (is-empty:bs sea)
       ~|  "Expected {<count.header>} objects ({<count>} processed)"
         !!
     ~?  >  =(0 (mod count step))
@@ -164,10 +165,23 @@
     =+  beg=pos.sea
     =^  pob=pack-object  sea  (read-pack-object sea)
     =/  [rob=raw-object miso=(unit raw-object)]
-      (resolve-raw-object-thin pob index sea get)
-    :: ~?  ?=(^ miso)  "Missing object: {<(hash-raw %sha-1 u.miso)>}"
+      (resolve-raw-object-miss pob index cache sea get)
+    ::  cache resolved delta object
+    ::
+    =?  cache  ?=(pack-delta-object pob)
+      =?  cache  =(count.cache cache-limit)
+        ::  Shave off 5 latest objects
+        ::
+        =+  new=(sub count.cache 5)
+        %=  cache
+          count  new
+          store  (scag new store.cache)
+        ==
+      %=  cache
+        count  +(count.cache)
+        store  [[beg rob] store.cache]
+      ==
     =+  hash=(hash-raw (pack-hash-algo header) rob)
-    ?>  (gte p.octs.data.rob (met 3 q.octs.data.rob))
     ?:  (~(has by index) hash)
       ~|  "Object {<hash>} duplicated: indexed at {<(~(get by index) hash)>}"  !!
     %=  $
@@ -180,31 +194,30 @@
   :-  (pack-hash-algo header)
   [count.header index end-pos=pos.sea [start octs.sea]]
 ::
-::  Resolve raw object, potentially returning
+::  Resolve raw object, potentially obtaining 
 ::  a missing object base object through the get gate
 ::
-++  resolve-raw-object-thin
+++  resolve-raw-object-miss
   |=  $:  pob=pack-object 
           index=pack-index
-          sea=stream:stream 
+          cache=pack-cache
+          sea=bays:bs
           get=store-raw-get
       ==
   ^-  [raw-object (unit raw-object)]
   ?:  ?=(raw-object pob)
     [pob ~]
-  (resolve-delta-object pob index sea get)
+  (resolve-delta-object pob index cache sea get)
 ++  resolve-delta-object
   |=  $:  delta=pack-delta-object 
           index=pack-index
-          sea=stream:stream
+          cache=pack-cache
+          sea=bays:bs
           get=store-raw-get
       ==
   ^-  [raw-object (unit raw-object)]
   ::  Generate chain of delta objects terminating 
-  ::  at the first encountered non-delta object
-  ::
-  ::  XX introduce cache (map pos raw-object)
-  ::  storing certain number of recently resolved objects
+  ::  at the first resolved object
   ::
   =/  chain=(lest pack-delta-object)
     ~[delta]
@@ -215,13 +228,32 @@
       ?-  -.pob
         %ofs-delta
           =+  pos=(sub pos.pob base-offset.pob)
+          ::  cached raw object
+          ::
+          =*  store  store.cache
+          =/  cob=(unit raw-object)
+            |-  ?~  store  ~
+            ?:  =(pos p.i.store)
+              (some q.i.store)
+            $(store t.store)
+          ?^  cob
+            u.cob
           =<(- (read-pack-object pos octs.sea))
-
         %ref-delta
           =/  pos=(unit @ud)
             (get:pack-on index hash.pob)
           ?~  pos
             (need (get hash.pob))
+          ::  cached raw object
+          ::
+          =*  store  store.cache
+          =/  cob=(unit raw-object)
+            |-  ?~  store  ~
+            ?:  =(pos p.i.store)
+              (some q.i.store)
+            $(store t.store)
+          ?^  cob
+            u.cob
           =<(- (read-pack-object u.pos octs.sea))
       ==
     ?:  ?=(pack-delta-object kob)
@@ -236,18 +268,19 @@
 ++  resolve-raw-object
   |=  $:  pob=pack-object 
           index=pack-index
-          sea=stream:stream 
+          cache=pack-cache
+          sea=bays:bs 
           get=store-raw-get
       ==
   ^-  raw-object
-  -:(resolve-raw-object-thin pob index sea get)
+  -:(resolve-raw-object-miss pob index cache sea get)
 ::  Resolve a raw object from 
 ::  a base and a chain of delta objects
 ::
 ++  resolve-delta-chain
   |=  $:  base=raw-object 
           chain=(list pack-delta-object) 
-          sea=stream:stream
+          sea=bays:bs
       ==
   ^-  raw-object
   ::  resolved object data
@@ -258,16 +291,15 @@
   =+  delta=i.chain
   %=  $
     chain  t.chain
-    base   (expand-delta-object base delta)
+    base  (expand-delta-object base delta)
   ==
-::  Resolve a delta object against
+::  Resolve delta object against
 ::  a base
 ::
 ++  expand-delta-object
-  ~/  %expand-delta-object
   |=  [base=raw-object delta=pack-delta-object]
   ^-  raw-object
-  =/  sea=stream:stream  0+octs.delta
+  =/  sea=bays:bs  (from-octs:bs octs.delta)
   ::  Read base and target sizes
   ::
   =^  biz=@ud  sea  (read-object-size sea)
@@ -277,27 +309,31 @@
   ?>  =(size.base biz)
   ::  Expanded object data
   ::
-  =|  red=stream:stream
+  =|  chunks=(list octs)
   ::  Process delta instructions
   ::  to resolve the object
   ::
   =<
   |-
-  ?:  (is-dry:stream sea)
+  ?:  (is-empty:bs sea)
     ::  Verify target size
+    ~?  (gth siz 10.000)
+      expand-delta-object-chunks+(lent chunks)
+    =/  data
+      (can-octs:bs (flop chunks))
     =/  rob=raw-object
-      [type.base p.octs.red 0+octs.red]
+      [type.base p.data data]
     ?>  =(size.rob siz)
     rob
-    :: (parse-raw octs.red)
-  =^  byt  sea  (read-byte:stream sea)
-  =+  bat=(need byt)
+  ::  parse instruction: add or copy
+  ::
+  ::  XX is pinning efficient?
+  =^  bat  sea  (read-byte:bs sea)
   ::  XX why is this needed?
   ?>  (lth pos.sea p.octs.sea)
-  :: ~&  delta-op+[pos.sea p.octs.sea `@ux`bat]
   ?:  =(0x0 bat)
     ~|  "Resolve delta: hit reserved instruction 0x00"  !!
-  =^  red  sea
+  =^  data  sea
     ?:  =(0 (dis bat 0x80))
       ::  Add data
       ::
@@ -305,26 +341,27 @@
     ::  Copy data
     ::
     (copy-data bat)
-  $(red red)
+  ::  XX this seems uneccessary?
+  $(chunks [data chunks])
   ::
   |%
   ::
-  ::  Add data instruction
+  ::  Add instruction
   ::  0xxxxxxx
   ::
   ++  add-data
     |=  bat=@uxD
-    ^-  [stream:stream stream:stream]
+    ^-  [octs bays:bs]
     =+  siz=(dis bat 0x7f)
     :: ~&  add-data+siz=siz
-    (append-read-bytes:stream siz red sea)
+    (read-octs:bs siz sea)
   ::
-  ::  Copy data instruction
+  ::  Copy instruction
   ::  1xxxxxxx
   ::
   ++  copy-data
     |=  bat=@uxD
-    ^-  [stream:stream stream:stream]
+    ^-  [octs bays:bs]
     =+  ind=0
     =+  mak=0x1
     ::  Retrieve offset
@@ -344,11 +381,10 @@
         ::  fail
         :_  sea
         0x0
-      =^  tef  sea  (read-byte:stream sea)
-      ?~  tef
-        ~|  "Stream exhausted"  !!
+      =^  tef  sea  (read-byte:bs sea)
       :_  sea
-      u.tef
+      tef
+
     %=  $
       ind  +(ind)
       mak  (lsh [0 1] mak)
@@ -370,7 +406,7 @@
       ?:  =(0 (dis bat mak))
         :_  sea
         0x0
-      =^  las  sea  (read-byte:stream sea)
+      =^  las  sea  (read-byte-maybe:bs sea)
       :_  sea
       (need las)
     :: ~&  [ind mak sal size]
@@ -381,21 +417,17 @@
     ==
     :: ~&  copy-data+[size=size offset=offset]
     :_  sea
-    =<  -
-    %^  append-get-bytes:stream  
-      size
-      red
-      [offset octs.data.base]
+    [size (cut 3 [offset size] q.data.base)]
   --
 ::
 ++  read-with-index
   |=  [=pack =hash]
-  ^-  [pack-object stream:stream]
+  ^-  [pack-object bays:bs]
   =+  pin=(got:pack-on index.pack hash)
-  (read-pack-object [pin octs.data.pack])
+  (read-pack-object (seek-to:bs pin stream.pack))
 ++  read-pack-object
-  |=  sea=stream:stream
-  ^-  [pack-object stream:stream]
+  |=  sea=bays:bs
+  ^-  [pack-object bays:bs]
   =+  pos=pos.sea
   =^  [type=pack-object-type size=@ud]  sea
     (read-pack-object-header sea)
@@ -406,7 +438,7 @@
     :_  sea
     ::  XX parametrize by hash type
     ::
-    [type size 0+data]
+    [type size data]
   ::
   %ofs-delta  (read-object-ofs pos sea)
   ::
@@ -415,21 +447,21 @@
   ==
 ::
 ++  read-object-ref
-  |=  [pos=@ud sea=stream:stream]
-  ^-  [pack-delta-object stream:stream]
+  |=  [pos=@ud sea=bays:bs]
+  ^-  [pack-delta-object bays:bs]
   =^  =hash  sea  (read-hash sea)
   =^  =octs  sea  (expand:zlib sea)
   :_  sea
   [%ref-delta pos hash octs]
 ++  read-hash
-  |=  sea=stream:stream
-  ^-  [hash stream:stream]
-  =^  octs  sea  (read-bytes:stream 20 sea)
+  |=  sea=bays:bs
+  ^-  [hash bays:bs]
+  =^  octs  sea  (read-octs:bs 20 sea)
   :_  sea
-  q:(need octs)
+  q:octs
 ++  read-object-ofs
-  |=  [pos=@ud sea=stream:stream]
-  ^-  [pack-delta-object stream:stream]
+  |=  [pos=@ud sea=bays:bs]
+  ^-  [pack-delta-object bays:bs]
   =^  base-offset=@ud  sea  (read-offset sea)
   ::  XX this check could be wrong
   ::  the stream position might
@@ -442,19 +474,17 @@
   [%ofs-delta pos base-offset dat]
 ::
 ++  read-offset
-  |=  sea=stream:stream
-  ^-  [@ud stream:stream]
+  |=  sea=bays:bs
+  ^-  [@ud bays:bs]
   =+  fet=0
   ::  XX put a safety stop
   ::  to prevent infinite loop here
   ::  and at read-pack-object-header
   ::
   |-
-  ::  XX introduce unsafe read-byte?
-  =^  bat  sea  (read-byte:stream sea)
-  ?~  bat  !!
-  =+  tef=(add (lsh [0 7] fet) (dis 0x7f u.bat))
-  ?:  =(0 (dis 0x80 u.bat))
+  =^  bat  sea  (read-byte:bs sea)
+  =+  tef=(add (lsh [0 7] fet) (dis 0x7f bat))
+  ?:  =(0 (dis 0x80 bat))
     :_  sea
     tef
   ::  XX find out why we need to increase
@@ -466,18 +496,17 @@
 ::  in a single loop
 ::
 ++  read-pack-object-header
-  |=  sea=stream:stream
-  ^-  [pack-object-header stream:stream]
-  =^  bat  sea  (read-byte:stream sea)
-  ?~  bat  !!
-  =+  tap=(dis (rsh [2 1] u.bat) 0x7)
+  |=  sea=bays:bs
+  ^-  [pack-object-header bays:bs]
+  =^  bat  sea  (read-byte:bs sea)
+  =+  tap=(dis (rsh [2 1] bat) 0x7)
   =/  typ  (to-object-type tap)
   ?~  typ
     ~|  "Invalid pack object type {<tap>}"  !!
   ::  Decode object size
   ::
-  =/  siz=@ud  (dis u.bat 0xf)
-  ?:  =(0 (dis u.bat 0x80))
+  =/  siz=@ud  (dis bat 0xf)
+  ?:  =(0 (dis bat 0x80))
     :_  sea
     [u.typ siz]
   =^  tiz=@ud  sea  (read-object-size sea)
@@ -486,18 +515,17 @@
   [u.typ siz]
 ::
 ++  read-object-size
-  |=  sea=stream:stream
-  ^-  [@ud stream:stream]
+  |=  sea=bays:bs
+  ^-  [@ud bays:bs]
   =|  bits=@ud
   =|  size=@ud
   |-
-  =^  bat  sea  (read-byte:stream sea)
-  ?~  bat  !!
-  ?:  =(0 (dis u.bat 0x80))
+  =^  bat  sea  (read-byte:bs sea)
+  ?:  =(0 (dis bat 0x80))
     :_  sea
-    (add size (lsh [0 bits] u.bat))
+    (add size (lsh [0 bits] bat))
   %=  $
-    size  (add size (lsh [0 bits] (dis u.bat 0x7f)))
+    size  (add size (lsh [0 bits] (dis bat 0x7f)))
     bits  (add bits 7)
   ==
 ::
@@ -534,18 +562,18 @@
   =+  pin=(get:pack-on index.pak hax)
   ?~  pin
     ~
-  =+  sea=[u.pin octs.data.pak]
+  =+  sea=(seek-to:bs u.pin stream.pak)
   =^  pob  sea  (read-pack-object sea)
-  `(resolve-raw-object pob index.pak sea |=(* !!))
+  `(resolve-raw-object pob index.pak *pack-cache sea |=(* !!))
 ++  get-raw-thin
   |=  [hax=hash get=store-raw-get]
   ^-  (unit raw-object)
   =+  pin=(get:pack-on index.pak hax)
   ?~  pin
     ~
-  =+  sea=[u.pin octs.data.pak]
+  =+  sea=(seek-to:bs u.pin stream.pak)
   =^  pob  sea  (read-pack-object sea)
-  `(resolve-raw-object pob index.pak sea get)
+  `(resolve-raw-object pob index.pak *pack-cache sea get)
 ++  get
   |=  hax=hash
   ^-  (unit object)
@@ -561,7 +589,7 @@
     ~
   =+  offset=u.pin
   |-
-  =+  sea=[offset octs.data.pak]
+  =/  sea  (seek-to:bs offset stream.pak)
   =^  header=pack-object-header  sea
     (read-pack-object-header sea)
   ?:  ?=(object-header header)
@@ -573,9 +601,9 @@
   ^-  raw-object
   =+  pin=(get:pack-on index.pak hax)
   ?~  pin  !!
-  =+  sea=[u.pin octs.data.pak]
+  =+  sea=(seek-to:bs u.pin stream.pak)
   =^  pob=pack-object  sea  (read-pack-object sea)
-  (resolve-raw-object pob index.pak sea |=(* !!))
+  (resolve-raw-object pob index.pak *pack-cache sea |=(* !!))
 ++  got
   |=  hax=hash
   ^-  object

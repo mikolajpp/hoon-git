@@ -1,7 +1,7 @@
 /-  ted-sync=git-ted-sync
 /+  default-agent, dbug
 /+  server, io=agentio
-/+  stream, zlib
+/+  bs=bytestream, zlib
 ::
 /+  *git, *git-http
 /+  git=git-repository
@@ -383,7 +383,7 @@
       ~&  %http-gzip-encoded
       -:(expand:zlib 0+u.body.request)
     ~&  `@t`q.body
-    =/  sea=stream:stream  0+body
+    =/  sea=bays:bs  0+body
     ::  Extract command name
     ::
     =^  cmd=pkt-line  sea  (read-pkt-line & sea)
@@ -406,7 +406,7 @@
     =/  payload=simple-payload:http
       =-  :_  -
         [200 ~[['content-type' 'application/x-git-upload-pack-advertisement']]]
-      %-  some  %-  can-octs:stream
+      %-  some  %-  can-octs:bs
         :~  (write-pkt-lines-txt '# service=git-upload-pack')
             (write-pkt-len flush-pkt)
             (write-pkt-lines-txt 'version 2')
@@ -419,14 +419,14 @@
     :_  state
     (give-simple-payload:app:server eyre-id payload)
   ++  ls-refs
-    |=  sea=stream:stream
+    |=  sea=bays:bs
     ^-  (quip card _state)
     =|  args=[symrefs=_| peel=_| ref-prefix=(list path)]
     ::  Parse arguments
     ::  
     =.  args
       |-
-      ?:  (is-dry:stream sea)  !!
+      ?<  (is-empty:bs sea)
       =^  pkt  sea  (read-pkt-line & sea)
       ?@  pkt
         ?>  ?=(%flush pkt)
@@ -448,7 +448,7 @@
       ==
     ~&  args
     ~&  refs.repo
-    =|  sea=stream:stream
+    =|  sea=bays:bs
     =+  ref-prefix=ref-prefix.args
     ::  XX handle glob ref prefixes
     ::  a/b/c should match any refs in a/b/ starting with c
@@ -458,24 +458,24 @@
       %+  rep-prefix:~(refs git repo)  prefix 
         |=  [[=refname:git =ref:git] =_sea]
         ?@  ref
-          %+  append-octs:stream  sea
+          %+  append-octs:bs  sea
             %-  write-pkt-lines-txt
             (write-ref refname ref)
         =+  hash=(got:~(refs git repo) refname.ref)
-        %+  append-octs:stream  sea
+        %+  append-octs:bs  sea
           %-  write-pkt-lines-txt
           ;:  (cury cat 3)
             (write-ref refname hash)
             ' '
             (crip "symref-target:{(trip (print-refname refname.ref))}")
           ==
-    =.  sea  %+  append-octs:stream  sea
+    =.  sea  %+  append-octs:bs  sea
       (write-pkt-len flush-pkt)
     ~&  `@t`q.octs.sea
     :_  state
     (give-simple-payload:app:server eyre-id [[200 ~] `octs.sea])
   ++  fetch
-    |=  sea=stream:stream
+    |=  sea=bays:bs
     ^-  (quip card _state)
     =/  args
       $:  done=_|
@@ -492,7 +492,7 @@
     ::  
     =.  args
       |-
-      ?:  (is-dry:stream sea)  !!
+      ?<  (is-empty:bs sea)
       =^  pkt  sea  (read-pkt-line & sea)
       ?@  pkt
         ?>  ?=(%flush pkt)
@@ -541,7 +541,7 @@
     ::  Verify wants
     ::
     ?<  ?=(~ (skim want has:~(store git repo)))
-    =|  red=stream:stream  =.  red
+    =|  red=bays:bs  =.  red
       ::  The client does not want anything,
       ::  and as we don't need to wait, we simply 
       ::  return empty response.
@@ -612,13 +612,13 @@
       ::
       =?  red  !done.args
         =.  red
-          (append-octs:stream red (write-pkt-lines-txt 'acknowledgments'))
+          (append-octs:bs red (write-pkt-lines-txt 'acknowledgments'))
         ?~  acks
-          (append-octs:stream red (write-pkt-lines-txt 'NAK'))
+          (append-octs:bs red (write-pkt-lines-txt 'NAK'))
         %+  roll  `(list octs)`acks
           |=  [=octs red=_red]
-          ^-  stream:stream
-          (append-octs:stream red octs)
+          ^-  bays:bs
+          (append-octs:bs red octs)
       ::  We send the packfile if either the client says done, 
       ::  or it does not say wait-for-done, while we can reach
       ::  everything he needs.
@@ -630,7 +630,7 @@
       ::  return false
       ::
       ?.  |(done.args &(!wait-for-done.args can-reach))
-        (append-octs:stream red (write-pkt-len flush-pkt))
+        (append-octs:bs red (write-pkt-len flush-pkt))
       ::  Build and send the packfile
       ::  
       ::  Currently this only sends all the packfiles 
@@ -642,15 +642,15 @@
       ::
       =+  pack-octs=(write-packs:git-pack-objects archive.object-store.repo)
       =+  pack-pkt-lines=(write-pkt-lines-on-band [0 pack-octs] 1)
-      =.  red  (append-octs:stream red (write-pkt-lines-txt 'packfile'))
+      =.  red  (append-octs:bs red (write-pkt-lines-txt 'packfile'))
       ::  XX This should properly be done in a thread. 
       ::  The point of packet lines is not to send them all 
       ::  at once.
       ::
-      =.  red  %+  append-octs:stream  red
+      =.  red  %+  append-octs:bs  red
                   (write-pkt-lines-txt-on-band git-agent 2)
-      =.  red  (append-octs:stream red pack-pkt-lines)
-      (append-octs:stream red (write-pkt-len flush-pkt))
+      =.  red  (append-octs:bs red pack-pkt-lines)
+      (append-octs:bs red (write-pkt-len flush-pkt))
     ~&  transfer-bytes+p.octs.red
     :_  state
     %+  give-simple-payload:app:server  eyre-id
@@ -705,36 +705,38 @@
       %+  weld
         (tap-prefix-full:~(refs git repo) /refs/heads)
         (tap-prefix-full:~(refs git repo) /refs/tags)
-    =|  red=stream:stream
-    =.  red  %+  append-octs:stream  red
-      ;:  cat-octs:stream
-        (write-pkt-lines-txt '# service=git-receive-pack')
-        (write-pkt-len flush-pkt)
+    =|  red=bays:bs
+    =.  red  %+  append-octs:bs  red
+      %-  can-octs:bs
+      :~  (write-pkt-lines-txt '# service=git-receive-pack')
+          (write-pkt-len flush-pkt)
       ==
     ::  Write head reference with caps
     ::
-    =.  red  %+  append-octs:stream  red
+    =.  red  %+  append-octs:bs  red
       ?:  ?=(~ refs)
         (write-pkt-lines (write-caps |))
       %-  write-pkt-lines
-        %+  cat-octs:stream
-          (as-octs:mimes:html (write-ref (head refs)))
-        (write-caps &)
+        %-  can-octs:bs
+        :~  (as-octs:mimes:html (write-ref (head refs)))
+            (write-caps &)
+        ==
     ::  Write remaining references
     ::
     ::  XX As soon as we have the head reference, 
     ::  we should use a rep-at-prefix
     ::
-    =.  red  %+  append-octs:stream  red
+    =.  red  %+  append-octs:bs  red
       %+  roll  (tail refs)
       |=  [[=refname:git =hash] =octs]
-      %+  cat-octs:stream 
-        octs
-      (write-pkt-lines-txt (write-ref refname hash))
+      %-  can-octs:bs 
+      :~  octs
+          (write-pkt-lines-txt (write-ref refname hash))
+      ==
     ::  XX handle shallow references
     ::
     ::  Write flush packet
-    =.  red  (append-octs:stream red (write-pkt-len flush-pkt))
+    =.  red  (append-octs:bs red (write-pkt-len flush-pkt))
     ~&  `@t`q.octs.red
     :_  state
     %+  give-simple-payload:app:server  eyre-id
@@ -750,21 +752,20 @@
     ?:  have
       ::  XX implement more options
       ::  report-status-v2 delete-refs ofs-delta atomic push-options
-      ;:  cat-octs:stream
+      %-  can-octs:bs
+      :~  [1 0x0]
+          (as-octs:mimes:html caps)
+          [1 '\0a']
+      ==
+    ::  XX parametrize by hash type
+    ::
+    %-  can-octs:bs
+    :~  [20 0x0]  ::  zero hash
+        [1 ' ']
+        (as-octs:mimes:html 'capabilities^{}')
         [1 0x0]
         (as-octs:mimes:html caps)
         [1 '\0a']
-      ==
-    ;:  cat-octs:stream
-      ::  Zero-id
-      ::  XX parametrize by hash type
-      ::
-      [20 0x0]
-      [1 ' ']
-      (as-octs:mimes:html 'capabilities^{}')
-      [1 0x0]
-      (as-octs:mimes:html caps)
-      [1 '\0a']
     ==
   +$  cap  $?  %delete-refs 
                %ofs-delta 
@@ -783,12 +784,12 @@
     ::  XX verify headers
     ?>  .=  (need (get-header:http 'content-type' header-list.request))
             'application/x-git-receive-pack-request'
-    =/  sea=stream:stream  0+(need body.request)
+    =/  sea=bays:bs  0+(need body.request)
     ::  Parse head command and capabilities
     ::
     =^  pkt  sea  (read-pkt-line & sea)
     ?>  ?=(%data -.pkt)
-    =+  pin=(need (find-byte:stream 0x0 0+octs.pkt))
+    =+  pin=(need (find-byte:bs 0x0 0+octs.pkt))
     =+  cmd-txt=(cut 3 [0 pin] q.octs.pkt)
     =+  caps-txt=(cut 3 [+(pin) (sub (dec p.octs.pkt) pin)] q.octs.pkt)
     =/  caps=(set cap)  %-  silt
@@ -825,9 +826,9 @@
     ::  with --keep
     ::  2. Save file to disk
     ::
-    =|  status=stream:stream
+    =|  status=bays:bs
     =/  pack=(unit pack:git-pack)
-      ?:  (is-dry:stream sea)
+      ?:  (is-empty:bs sea)
         ~
       %-  some
         %+  read-thin:git-pack  sea
@@ -837,7 +838,7 @@
     =?  repo  ?=(^ pack)  
       (add-pack:~(store git repo) u.pack)
     =.  status
-      %+  append-octs:stream  status
+      %+  append-octs:bs  status
         (write-pkt-lines-txt 'unpack ok')
     ::  Update references
     ::
@@ -846,7 +847,7 @@
     ::  with [& 'ok'] indicating success and 
     ::  [| 'failure description'] indicating failure
     ::
-    =^  status=stream:stream  refs.repo
+    =^  status=bays:bs  refs.repo
       %+  roll  cmd-list
       ::  XX a refs zipper would be most efficient here
       ::
@@ -855,16 +856,16 @@
       ::
       ?:  =(0x0 old.cmd)
         ?:  (~(has of refs) ref-name.cmd)
-          :-  %+  append-octs:stream  status 
+          :-  %+  append-octs:bs  status 
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} reference already exists"
           refs
         ?.  (has:~(store git repo) new.cmd)
-          :-  %+  append-octs:stream  status 
+          :-  %+  append-octs:bs  status 
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} object {<new.cmd>} not found"
           refs
-        :-  %+  append-octs:stream  status
+        :-  %+  append-octs:bs  status
             %-  write-pkt-lines-txt  %-  crip
               "ok {(trip (print-refname ref-name.cmd))}"
         ~&  ref-create+cmd
@@ -873,7 +874,7 @@
       ::
       ?:  =(0x0 new.cmd)
         ?.  (~(has of refs) ref-name.cmd)
-          :-  %+  append-octs:stream  status 
+          :-  %+  append-octs:bs  status 
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} reference not found"
           refs
@@ -882,11 +883,11 @@
         ::
         ?.  .=  (need (~(get of refs) ref-name.cmd))
                 old.cmd
-          :-  %+  append-octs:stream  status 
+          :-  %+  append-octs:bs  status 
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} object id mismatch"
           refs
-        :-  %+  append-octs:stream  status
+        :-  %+  append-octs:bs  status
             %-  write-pkt-lines-txt  %-  crip
               "ok {(trip (print-refname ref-name.cmd))}"
         ~&  ref-delete+ref-name.cmd
@@ -897,18 +898,18 @@
       ::
       ?.  .=  (need (~(get of refs) ref-name.cmd))
               old.cmd
-        :-  %+  append-octs:stream  status 
+        :-  %+  append-octs:bs  status 
             %-  write-pkt-lines-txt  %-  crip
               "ng {(trip (print-refname ref-name.cmd))} object id mismatch"
         refs
       ~&  ref-update+cmd
-      :-  %+  append-octs:stream  status
+      :-  %+  append-octs:bs  status
           %-  write-pkt-lines-txt  %-  crip
             "ok {(trip (print-refname ref-name.cmd))}"
       (~(put of refs) ref-name.cmd new.cmd)
     ::  XX update repository
     ~&  `@t`q.octs.status
-    =.  status  %+  append-octs:stream  status
+    =.  status  %+  append-octs:bs  status
                   (write-pkt-len flush-pkt)
     ~&  (~(dip of refs.repo) /refs/heads)
     ::  XX We should only keep the pack if the update is successful

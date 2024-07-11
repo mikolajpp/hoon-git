@@ -1,7 +1,7 @@
 ::
 ::  Git-clay interface
 ::
-/+  *git, *git-refs, git=git-repository
+/+  *git-object, *git-refs, git=git-repository
 =,  clay
 |%
 ::  Export the tree at :refname and directory

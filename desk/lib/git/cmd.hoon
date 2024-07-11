@@ -1,6 +1,5 @@
-/+  *git, *git-refs
+/+  *git-refs, *git-object
 /+  git=git-repository
-/+  *git
 |%
 ::  Find refname
 ::
@@ -30,16 +29,16 @@
 :: 
 ++  diff-tree
   |=  $:  repo=repository:git
-          a=tree
-          b=tree
+          a=tree-dir
+          b=tree-dir
           p=path
       ==
   ^-  (list (trel path hash hash))
-  =/  sa=tree
+  =/  sa=tree-dir
     %+  sort  a
     |=  [rya=tree-entry ryb=tree-entry]
     (lth name.rya name.ryb)
-  =/  sb=tree
+  =/  sb=tree-dir
     %+  sort  b
     |=  [rya=tree-entry ryb=tree-entry]
     (lth name.rya name.ryb)
@@ -140,7 +139,7 @@
   $(sa t.sa, sb t.sb)
     
   ++  tree-all-diff
-    |=  [repo=repository:git =tree p=path side=?]
+    |=  [repo=repository:git tree=tree-dir p=path side=?]
     ^-  (list (trel path hash hash))
     =|   diff=(list (trel path hash hash))
     |-
@@ -159,4 +158,3 @@
       $(tree t.tree)
     (tree-all-diff repo tree.obj [name.i.tree p] side)
 --
-

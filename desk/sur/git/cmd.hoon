@@ -1,6 +1,7 @@
 /-  sole
 /-  *git-cmd-parser
-/+  git=git-repository, shoe
+/+  shoe
+/+  git=git-repository, *git-refs
 |%
 ::  orientation
 +$  dir  [repo=@ta branch=refname =path]

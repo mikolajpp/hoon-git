@@ -1,7 +1,7 @@
 ::
 ::::  Git objects
   ::
-/+  stream
+/+  bs=bytestream
 /+  *git-hash
 |%
 ::
@@ -12,7 +12,7 @@
       %tag
   ==
 +$  object-header  [type=object-type size=@ud]
-+$  raw-object  [type=object-type size=@ud data=stream:stream]
++$  raw-object  [type=object-type size=@ud data=octs]
 ::
 +$  commit-person  [name=tape email=tape]
 +$  commit-time  [date=@da zone=(pair ? @dr)]
@@ -36,7 +36,7 @@
 ::  XX refactor to [mode name hash]
 ::
 +$  tree-entry  [[mode=@ta name=@ta] =hash]
-+$  tree  $+(git-tree (list tree-entry))
++$  tree-dir  (list tree-entry)
 :: ++  git-tree  tree
 ::  XX refactor objects so  fields are readily accessible
 ::  XX are sizes here really necessary?
@@ -44,7 +44,7 @@
 +$  object
   $%  [%blob size=@ud =octs]
       [%commit size=@ud =commit]
-      [%tree size=@ud =tree]
+      [%tree size=@ud tree=tree-dir]
   ==
 --
 ::
@@ -60,32 +60,27 @@
     %3  `%blob
     %4  `%tag
   ==
-++  raw-as-octs
+++  raw-to-octs
   |=  rob=raw-object
   ^-  octs
-  ::  XX will not work if data is a slice
-  ?>  =(0 pos.data.rob)
-  ;:  cat-octs:stream
-    (as-octs:mimes:html type.rob)
-    [1 ' ']
-    (as-octs:mimes:html (scot %ud size.rob))
-    [1 0x0]
-    octs.data.rob
+  %-  can-octs:bs
+  :~  (as-octs:mimes:html type.rob)
+      [1 ' ']
+      (as-octs:mimes:html (scot %ud size.rob))
+      [1 0x0]
+      data.rob
   ==
 ::  Size of the data payload
 ::
 ++  raw-size
   |=  rob=raw-object
   ^-  @ud
-  (sub p.octs.data.rob pos.data.rob)
+  p.data.rob
 ::
 ++  raw-data
   |=  rob=raw-object
   ^-  octs
-  :-  (raw-size rob)
-  %^  cut  3
-    [pos.data.rob (raw-size rob)]
-  q.octs.data.rob
+  data.rob
 ::
 ::  Convert git object to raw form
 ::
@@ -106,20 +101,15 @@
 ++  hash-raw-sha-1
   |=  rob=raw-object
   ^-  @ux
-  =/  len  (crip ((d-co:co 1) p.octs.data.rob))
-  ::  There must be a pattern for this
-  =/  hed  (cat 3 (cat 3 type.rob ' ') len)
-  =/  dat  (add hed (lsh [3 +((met 3 hed))] q.octs.data.rob))
-  =/  dat  (cat 3 hed (can 3 ~[[1 0x0] octs.data.rob]))
-  ::  (can ~[type.object ' ' len 0x0 data.object])
-  =/  wid  (add +((met 3 hed)) p.octs.data.rob)
+  :: =/  len  (crip ((d-co:co 1) p.octs.data.rob))
+  :: ::  There must be a pattern for this
+  :: =/  hed  (cat 3 (cat 3 type.rob ' ') len)
+  :: =/  dat  (add hed (lsh [3 +((met 3 hed))] q.octs.data.rob))
+  :: =/  dat  (cat 3 hed (can 3 ~[[1 0x0] octs.data.rob]))
+  :: ::  (can ~[type.object ' ' len 0x0 data.object])
+  :: =/  wid  (add +((met 3 hed)) p.octs.data.rob)
   :: XX is there a way to avoid rev?
-  (hash-octs-sha-1 [wid dat])
-++  hash-octs-sha-1
-  |=  =octs
-  ^-  @ux
-  (rev 3 20 (sha-1l:sha p.octs (rev 3 p.octs q.octs)))
-++  hash-octs-sha-256  !!
+  (hash-octs-sha-1 (raw-to-octs rob))
 ::
 ::  Hash raw git object
 ::
@@ -147,12 +137,12 @@
     ::
     %sha-256  !!
   ==
-++  raw-octs
+++  raw-from-octs
   |=  =octs
   ^-  raw-object
   ::  Parse header
   ::
-  =+  pin=(find-byte:stream 0x0 0+octs)
+  =/  pin  (find-byte:bs 0x0 (from-octs:bs octs))
   ?~  pin 
     ~|  "Object is corrupted: no header terminator found"  !!
   =/  txt  (trip (cut 3 [0 u.pin] q.octs))
@@ -172,23 +162,23 @@
         %tree    %tree
         %tag  !!
     ==
-  [type size [+(u.pin) octs]]
+  =/  sea=bays:bs  (from-octs:bs octs)
+  =/  data
+    (peek-octs-end:bs (seek-to:bs +(u.pin) sea))
+  [type size data]
 ++  parse-raw
   |=  [hal=hash-algo rob=raw-object]
   ^-  object
   ?-  type.rob
-    %blob    (parse-blob rob)
+    %blob    (parse-blob hal rob)
     %commit  (parse-commit hal rob)
     %tree    (parse-tree hal rob)
     %tag     !!
   ==
 ++  parse-blob
-    |=  rob=raw-object
+    |=  [hal=hash-algo rob=raw-object]
     ^-  object
-    ?>  ?=(%blob type.rob)
-    =+  len=(sub p.octs.data.rob pos.data.rob)
-    =+  data=(cut 3 [pos.data.rob len] q.octs.data.rob)
-    blob+[size.rob [len data]]
+    (~(blob parse hal) rob)
 ::  XX conform commit parser to git
 ++  parse-commit
   ::  XX looks like another compiler bug.
@@ -212,7 +202,7 @@
   ::  XX better parsing of mode.
   ::  Is leading zero allowed in principle?
   ::
-  =/  sea=stream:stream  data.rob
+  =/  sea=bays:bs  (from-octs:bs data.rob)
   ::  XX Is there a better pattern for
   ::  building a list of results?
   ::
@@ -221,13 +211,16 @@
   |-
   ?.  (lth pos.sea p.octs.sea)
     tree+[size.rob tes]
-  =+  pin=(find-byte:stream 0x0 sea)
+  =/  pin  (find-byte:bs 0x0 sea)
   ?~  pin  !!
-  =^  tex  sea  (read-bytes:stream (sub u.pin pos.sea) sea)
+  =^  tex=(unit octs)  sea  
+    (read-octs-maybe:bs (sub u.pin pos.sea) sea)
   ?~  tex
     ~|  "Corrupted tree object: malformed tree entry"  !!
   =/  txt  (trip q.u.tex)
-  =^  hek  sea  (read-bytes:stream hash-bytes [+(pos.sea) octs.sea])
+  =.  sea  (skip-byte:bs sea)
+  =^  hek=(unit octs)  sea  
+    (read-octs-maybe:bs hash-bytes sea)
   ?~  hek
     ~|  "Corrupted tree object: malformed hash"  !!
   =+  haz=q.u.hek
@@ -247,9 +240,7 @@
     |=  rob=raw-object
     ^-  object
     ?>  ?=(%blob type.rob)
-    =+  len=(sub p.octs.data.rob pos.data.rob)
-    =+  data=(cut 3 [pos.data.rob len] q.octs.data.rob)
-    blob+[size.rob [len data]]
+    blob+[size.rob data.rob]
   ++  eol  (just '\0a')
   ::  Commit rules
   ::

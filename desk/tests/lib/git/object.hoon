@@ -1,6 +1,7 @@
 /+  *test, *git, zlib
+::
+=/  hash-algo  %sha-1
 |%
-++  hat  %sha-1
 ++  test-parse-blob
   ;:  weld
   ::

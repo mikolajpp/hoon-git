@@ -151,23 +151,6 @@
   ?:  =(fit bat)
     `pin
   $(pin +(pin))
-::
-::  Find first occurence of the fit byte
-::  searching backwards
-::
-++  seek-byte
-  |=  [fit=@D sea=stream]
-  ^-  (unit @ud)
-  =+  pin=(dec p.octs.sea)
-  |-
-  ?:  (lth pin pos.sea)
-    ~
-  =/  bat  (cut 3 [pin 1] q.octs.sea)
-  ?:  =(fit bat)
-    `pin
-  ?:  =(pin 0)
-    ~
-  $(pin (dec pin))
 ::  XX Improve naming of below arms
 ::
 ::  Append n bytes to red from sea without advancing sea

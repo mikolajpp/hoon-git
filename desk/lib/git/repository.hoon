@@ -2,7 +2,7 @@
 ::::  Git repository
   ::
 /+  libmip=mip
-/+  *git, *git-refspec, git-pack, git-bundle
+/+  *git-object, *git-refs, *git-refspec, git-pack, git-bundle
 |%
 ::  XX order loose objects by hash
 ::
@@ -17,6 +17,10 @@
 ::  XX does removing a remote in git
 ::  cause its references to disappear?
 ::
+::  Rule of thumb: any data not required by libgit, but
+::  used by external commands should be stored in
+::  the configuration
+::
 +$  remote  $:  url=@t  :: url=[@t [%local @ta]] ?
                 fetch=(list refspec)
                 push=(list refspec)
@@ -25,11 +29,6 @@
                 push-remote=@tas
                 merge=(list refname)
             ==
-:: Configuration in git confuses the actual
-:: configuration that influences behaviour of commands 
-:: with storage of state for particular objects. 
-:: hoon-git git extracts the latter and puts them 
-:: as part of the repository structure proper. 
 ::
 +$  repository
   $+  repository

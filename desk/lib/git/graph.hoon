@@ -1,7 +1,8 @@
 ::
 ::  Commit graph utilities
 ::
-/+  *git, git=git-repository
+/+  *git-hash
+/+  git=git-repository
 |_  repo=repository:git
 ::  Can every commit in @from 
 ::  reach at least one commit in @have

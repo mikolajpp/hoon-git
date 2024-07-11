@@ -8,8 +8,9 @@
 ::  protocol v0 for git-receive-pack functionality
 :: 
 /-  spider
-/+  stream, strandio
-/+  *git, git-pack, git=git-repository
+/+  bs=bytestream, strandio
+/+  git-hash, git-pack, git=git-repository
+/+  *git-refs
 =,  strand=strand:spider
 |%
 ++  git-agent  'hoon-git/0.1'
@@ -29,7 +30,8 @@
 ::  Proper behavior is restored by skipping faces
 ::  as many times as tiscom was used. 
 ::
-~%  %git-http  ..^^^^^part  ~
+:: ~%  %git-http  ..^^^^^part  ~
+~%  %git-http  ..part  ~
 |_  url=@t
 ::
 ::  Greet the pack upload service to obtain capabilities
@@ -51,10 +53,10 @@
     ~|  "Response failed {<res>}"  !!
   ?~  full-file.res  !!
   ::
-  =/  sea=stream:stream  0+data.u.full-file.res
+  =/  sea=bays:bs  0+data.u.full-file.res
   ::  Read service string
   ::
-  =|  red=stream:stream
+  =|  red=bays:bs
   =^  pil  red  (read-pkt-lines & sea)
   =+  lip=(flop pil)
   ?~  lip 
@@ -98,7 +100,7 @@
     ~|  "Response failed {<res>}"  !!
   ?~  full-file.res  !!
   ::
-  =/  sea=stream:stream  0+data.u.full-file.res
+  =/  sea=bays:bs  0+data.u.full-file.res
   =^  pil  sea  (read-pkt-lines & sea)
   =+  lip=(flop pil)
   ?~  lip 
@@ -126,12 +128,12 @@
   ::  Assemble request 
   ::
   =/  req=octs
-    %-  can-octs:stream
+    %-  can-octs:bs
     :~
       (write-pkt-lines-txt (crip "command={(trip cmd.request)}"))
-      (can-octs:stream (turn caps.request write-pkt-lines-txt))
+      (can-octs:bs (turn caps.request write-pkt-lines-txt))
       (write-pkt-len delim-pkt)
-      (can-octs:stream (turn args.request write-pkt-lines-txt))
+      (can-octs:bs (turn args.request write-pkt-lines-txt))
       (write-pkt-len flush-pkt)
     ==
   %-  send-request:strandio
@@ -181,7 +183,7 @@
   ?~  full-file.res
   ~|  "No references received"  !!
   ::
-  =/  sea=stream:stream  0+data.u.full-file.res
+  =/  sea=bays:bs  0+data.u.full-file.res
   ::  XX we don't really need to flop here
   ::
   =^  pil  sea  (read-pkt-lines & sea)
@@ -267,11 +269,11 @@
   ?>  ?=(%finished -.res)
   ?~  full-file.res
     ~|  "No pack received"  !!
-  =/  sea=stream:stream  0+data.u.full-file.res
+  =/  sea=bays:bs  0+data.u.full-file.res
   ::  Handle packfile response
   ::
   =<
-  =|  red=stream:stream
+  =|  red=bays:bs
   ::  Acknowledgements
   ::
   =^  ack  sea  (read-acks sea)
@@ -290,9 +292,9 @@
   ::
   |%
   ++  read-acks
-    |=  sea=stream:stream
-    ^-  [(list hash) stream:stream]
-    =|  red=stream:stream
+    |=  sea=bays:bs
+    ^-  [(list hash) bays:bs]
+    =|  red=bays:bs
     =^  pkt  red  (read-pkt-line & sea)
     ?@  pkt
       :_  sea
@@ -323,7 +325,7 @@
     =.  sea  red
     =|  ack=(list hash)
     |-
-    ?:  (is-dry:stream sea)
+    ?:  (is-empty:bs sea)
       :_  sea
       ack
     =^  pkt  red  (read-pkt-line & sea)
@@ -352,20 +354,20 @@
     ==
     ::
   ++  read-shallow-info
-    |=  sea=stream:stream 
+    |=  sea=bays:bs 
     :_  sea
     ~
   ++  read-wanted-refs
-    |=  sea=stream:stream
+    |=  sea=bays:bs
     :_  sea
     ~
   ++  read-pack-uris
-    |=  sea=stream:stream
+    |=  sea=bays:bs
     :_  sea
     ~
   ++  read-pack
-    |=  sea=stream:stream
-    ^-  [pack:git-pack stream:stream]
+    |=  sea=bays:bs
+    ^-  [pack:git-pack bays:bs]
     ::  Read header
     ::
     =^  pkt  sea  (read-pkt-line & sea)
@@ -377,9 +379,10 @@
     ?>  =('packfile' q.octs.pkt)
     ::  Read packfile
     ::
-    =^  red=stream:stream  sea  (read-pkt-lines-on-band sea 1)
+    =^  data  sea  (read-pkt-lines-on-band 1 sea)
+    ~&  data-sha+(hash-octs-sha-1:git-hash data)
     :_  sea
-    (read:git-pack red)
+    (read:git-pack (from-octs:bs data))
   --
 ::
 ::  Capability
@@ -405,13 +408,13 @@
     (scan txt cap)
   $(caps (~(put by caps) cap), lap t.lap)
 ++  parse-caps-stream
-  |=  sea=stream:stream
-  ^-  [caps stream:stream]
+  |=  sea=bays:bs
+  ^-  [caps bays:bs]
   =|  =caps
   |-
-  ?:  (is-dry:stream sea)
+  ?:  (is-empty:bs sea)
     [caps sea]
-  =/  [pkt=pkt-line red=stream:stream]
+  =/  [pkt=pkt-line red=bays:bs]
     (read-pkt-line & sea)
   ?@  pkt
     [caps sea]
@@ -441,7 +444,7 @@
   ::  Assemble packet line
   ::  cafe_data_LF
   ::
-  %-  can-octs:stream
+  %-  can-octs:bs
   :~
     (write-pkt-len ;:(add 5 len 1))
     [1 band]
@@ -460,7 +463,7 @@
   ::  Assemble packet line
   ::  cafe_data_LF
   ::
-  %-  can-octs:stream
+  %-  can-octs:bs
   :~
     (write-pkt-len ;:(add 4 len 1))
     [len txt]
@@ -476,7 +479,7 @@
   ::  Assemble packet line
   ::  cafe_data
   ::
-  %+  cat-octs:stream
+  %+  cat-octs:bs
     (write-pkt-len (add p.data 4))
     data
 :: XX there is an input for which q.octs.pkt crashes!
@@ -495,63 +498,65 @@
 ::  XX What's preventing us from invoking
 ::  a jet with wrong arguments directly from nock?
 ::  Do most jet verify their arguments?
+::  
+::  XX Move to the bytestream library
 ::
 ++  write-pkt-lines-on-band
   ~/  %write-pkt-lines-on-band
-  |=  [sea=stream:stream band=@ud]
+  |=  [sea=bays:bs band=@ud]
   ^-  octs
   =+  chunk-size=8.192
-  ::  chunk-size - pkt-line-len - band byte
   ::  
-  ::  XX  Alternative syntax for monadic bind
-  ::  ;<  monad
-  ::  a b
-  ::  c d
-  ::  ==
   =+  max-len=(sub chunk-size 5)
   =|  pkt-lines=octs
   |-  
-  ?:  (is-dry:stream sea)
+  ?:  (is-empty:bs sea)
     pkt-lines
   =+  sea-len=(sub p.octs.sea pos.sea)
   =/  len=@ud
     ?:  (gth sea-len max-len)
       max-len
     sea-len
-  =^  data  sea  (read-bytes:stream len sea)
-  ?~  data  !!
-  ?>  =(p.u.data len)
+  =^  data  sea  (read-octs:bs len sea)
+  ?>  =(p.data len)
   =/  new-line=octs
-    ;:  cat-octs:stream
-      (write-pkt-len (add len 5))
-      [1 band]
-      u.data
+    %-  can-octs:bs
+    :~  (write-pkt-len (add len 5))
+        [1 band]
+        data
     ==
   ?>  =(p.new-line (add len 5))
-  $(pkt-lines (cat-octs:stream pkt-lines new-line))
-::
-:: 
-::  Assemble pkt-lines into a stream, filtering on band
+  $(pkt-lines (cat-octs:bs pkt-lines new-line))
 ::
 ++  read-pkt-lines-on-band
-  ~/  %read-pkt-lines-on-band
-  |=  [sea=stream:stream band=@ud]
-  ^-  [stream:stream stream:stream]
-  =|  red=stream:stream
-  |-
-  =^  pkt=pkt-line  sea  (read-pkt-line | sea)
-  ?@  pkt
-    ?:  ?=(%flush pkt)
-      :_  sea
-      red
-    ~|  "Pack stream not terminated"  !!
-  ?.  (pkt-line-is-band band pkt)
-    $
-  $(red -:(append-get-bytes:stream (dec p.octs.pkt) red 1+octs.pkt))
-::
+  |=  [band=@ud sea=bays:bs]
+  ^-  [octs bays:bs]
+  =;  [data=octs sea=bays:bs] 
+    ~&  "Assembled {<p.data>} bytes"
+    [data sea]
+  ~&  read-pkt-lines-on-band+[b/(size:bs sea)]
+  %+  fuse-extract:bs  sea
+  |=  sea=bays:bs
+  =^  hed  sea  (read-octs:bs 4 sea)
+  =/  len
+    (scan (trip q.hed) (bass 16 (stun [4 4] six:ab)))
+  ?:  =(0 len)
+    [0 0]
+  ::  invalid according to git protocol
+  ::
+  ?<  =(4 len)
+  ::  skip special packet line 
+  ::
+  ?:  (lth len 4)
+    [4 0]
+  ::  select on band
+  ::
+  ?.  =(band (peek-byte:bs sea))
+    [len 0]
+  [5 (sub len 5)]
 ++  read-pkt-lines
-  |=  [is-txt=? sea=stream:stream]
-  ^-  [(list pkt-line) stream:stream]
+  |=  [is-txt=? sea=bays:bs]
+  ^-  [(list pkt-line) bays:bs]
   ::  Parse pkt lines
   ::
   =|  lap=(list pkt-line)
@@ -566,13 +571,13 @@
 :: XX Return unit instead of crashing?
 ::
 ++  read-pkt-line
-  |=  [is-txt=? sea=stream:stream]
-  ^-  [pkt-line stream:stream]
-  ?:  (is-dry:stream sea)  !!
-  =^  byt  sea  (read-bytes:stream 4 sea)
-  ?~  byt
+  |=  [is-txt=? sea=bays:bs]
+  ^-  [pkt-line bays:bs]
+  ?<  (is-empty:bs sea)
+  =^  octs  sea  (read-octs-maybe:bs 4 sea)
+  ?~  octs
     ~|  "Insufficient data: expected pkt-line length"  !!
-  =+  len=(scan (trip q.u.byt) (bass 16 (stun [4 4] six:ab)))
+  =+  len=(scan (trip q.u.octs) (bass 16 (stun [4 4] six:ab)))
   ?:  =(flush-pkt len)
   ::
     :_  sea
@@ -586,22 +591,22 @@
   ?:  (lte len 4)
     ~|  "Unhandled special pkt-line"  !!
   =.  len  (sub len 4)
-  =^  byt  sea  (read-bytes:stream len sea)
-  ?~  byt
+  =^  octs  sea  (read-octs-maybe:bs len sea)
+  ?~  octs 
     ~|  "Insufficient data: expected pkt-line data"  !!
   =/  pkt=pkt-line
     ::  Strip trailing newline
     ::
-    ?:  &(is-txt =('\0a' (cut 3 [(dec len) 1] q.u.byt)))
-      data+[(dec len) (cut 3 [0 (dec len)] q.u.byt)]
-    data+[p=len octs=q.u.byt]
+    ?:  &(is-txt =('\0a' (cut 3 [(dec len) 1] q.u.octs)))
+      data+[(dec len) (cut 3 [0 (dec len)] q.u.octs)]
+    data+[p=len octs=q.u.octs]
   ?>  ?=(%data -.pkt)
   :_  sea
   pkt
   ::
   ++  read-pkt-delim
-    |=  sea=stream:stream
-    ^-  stream:stream
+    |=  sea=bays:bs
+    ^-  bays:bs
     =^  pkt  sea  (read-pkt-line | sea)
     ?>  &(?=(@ pkt) ?=(%delim pkt))
     sea

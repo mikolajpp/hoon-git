@@ -1,9 +1,10 @@
 ::
 ::
-::::  Git object packing
+::::  Git object packer
   ::
+/+  bs=bytestream
+/+  *git-hash, *git-object
 /+  git=git-repository, git-revision, git-pack
-/+  *git
 |%
 ++  version  2
 ::  As we walk over objects, we need to keep 
@@ -161,7 +162,7 @@
   ==
 ++  insert-tree
   =|  name=@t
-  |=  [=hash tree=tree]
+  |=  [=hash tree=(list tree-entry)]
   ^-  ^state
   ?:  (~(has by store) hash)
     ~&  insert-tree-have+hash
@@ -221,7 +222,7 @@
   :: ::
   :: ?.  ?=(pack-delta-object:^pack pob)
   ::   =/  =octs
-  ::     %+  cat-octs:stream
+  ::     %+  cat-octs:bs
   ::       (write-type-size:^pack type.pob size.pob)
   ::       (compress:zlib octs.data.pob)
   ::   $(brick-list t.brick-list)
@@ -265,12 +266,12 @@
   =.  brick-list  (flop brick-list)
   ~&  pack-objects-brick-count+count
   =+  pack-list=(find-deltas brick-list)
-  =|  sea=stream:stream
+  =|  sea=bays:bs
   ::  Write header
   ::
-  =.  sea  (write-txt:stream sea 'PACK')
-  =.  sea  (append-octs:stream sea (as-byts:stream [4 version]))
-  =.  sea  (append-octs:stream sea (as-byts:stream [4 count]))
+  =.  sea  (write-txt:bs sea 'PACK')
+  =.  sea  (append-octs:bs sea (as-byts:bs [4 version]))
+  =.  sea  (append-octs:bs sea (as-byts:bs [4 count]))
   octs.sea
 ++  write-packs
   |=  archive=(list pack:git-pack)
@@ -281,11 +282,11 @@
       |=  [=pack:git-pack c=@ud]
       (add count.pack c)
   ~&  write-pack-objects+count
-  =|  sea=stream:stream
-  =.  sea  (write-txt:stream sea 'PACK')
-  =.  sea  (write-octs:stream sea (as-byts:stream [4 version]))
+  =|  sea=bays:bs
+  =.  sea  (write-txt:bs sea 'PACK')
+  =.  sea  (write-octs:bs sea (as-byts:bs [4 version]))
   ~&  count
-  =.  sea  (write-octs:stream sea (as-byts:stream [4 count]))
+  =.  sea  (write-octs:bs sea (as-byts:bs [4 count]))
   ~&  `@ux`q.octs.sea
   ::  XX This could have terrible memory complexity
   ::  We really want to operate on a single copy 
@@ -293,13 +294,13 @@
   ::
   =.  sea  %+  reel  archive
     |=  [=pack:git-pack =_sea]
-    %+  write-octs:stream  sea
-      ~&  pack-size+p.octs.data.pack
+    %+  write-octs:bs  sea
+      ~&  pack-size+(size:bs stream.pack)
       ::  Discard hash
-      :-  (sub end-pos.pack pos.data.pack)
+      :-  (sub end-pos.pack pos.stream.pack)
       ::  Discard header
-      (rsh [3 pos.data.pack] q.octs.data.pack)
-  =+  hash=(hash-octs-sha-1 octs.sea)
-  =.  sea  (write-octs:stream sea [20 hash])
+      (rsh [3 pos.stream.pack] (to-atom:bs stream.pack))
+  =+  hash=(hash-octs-sha-1 (to-octs:bs sea))
+  =.  sea  (write-octs:bs sea [20 hash])
   octs.sea
 --
