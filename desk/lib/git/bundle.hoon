@@ -31,12 +31,12 @@
     (cold %2 (jest '# v2 git bundle'))
   =+  sig=(rust (trip u.line) signature)
   ?~  sig
-    ~|  "Git bundle is corrupted: invalid signature"  !!
+    ~|  "Git bundle is corrupted: invalid signature {(trip u.line)}"  !!
   ::  Select hash algo and parser
   ::
-  =/  [hal=hash-algo parse-hash=_parse-sha-1]
+  =/  [hal=hash-algo parse-hash=_parse-hash-sha-1]
     ?:  =(2 u.sig)
-      [%sha-1 parse-sha-1]
+      [%sha-1 parse-hash-sha-1]
     !!
   ::  Parse prerequisites
   ::
@@ -68,7 +68,7 @@
     =/  ref=(unit [=hash =refname])
       %+  rust  (trip u.line)
       ;~  plug
-        parse-sha-1
+        parse-hash-sha-1
         ;~(pfix ace parse-refname)
       ==
     ?~  ref

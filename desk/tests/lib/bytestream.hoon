@@ -5,7 +5,7 @@
   ;:  weld
     ::
     %+  expect-eq
-    !>  [0 [4 0xcafe.babe]]
+    !>  [0 0 [4 0xcafe.babe]]
     !>  (from-octs [4 0xcafe.babe])
     ::
     %+  expect-eq
@@ -13,23 +13,42 @@
     !>  (to-octs (from-octs [4 0xcafe.babe]))
     ::
     %+  expect-eq
-    !>  [pos=2 [4 0xcafe.babe]]
+    !>  [pos=2 oft=0 [4 0xcafe.babe]]
     !>  (at-octs 2 [4 0xcafe.babe])
   ==
 ++  test-status
+  =/  sea=bays
+    (from-octs [4 0xcafe.babe])
   ;:  weld
     ::
     %+  expect-eq
     !>  &
-    !>  (is-empty 2+[2 0xcafe])
+    !>  (is-empty (at-octs 2 [2 0xcafe]))
     ::
     %+  expect-eq
     !>  |
-    !>  (is-empty 0+[2 0xcafe])
+    !>  (is-empty (from-octs [2 0xcafe]))
+    ::
+    %+  expect-eq
+    !>  4
+    !>  (in-size sea)
+    ::
+    %+  expect-eq
+    !>  0
+    !>  (out-size sea)
+    ::
+    %+  expect-eq
+    !>  1
+    !>  (in-size (skip-by 3 sea))
+    ::
+    %+  expect-eq
+    !>  3
+    !>  (out-size (skip-by 3 sea))
   ==
 ++  test-read-byte
   =/  sea=bays
     (from-octs [3 0xca.babe])
+  ~&  sea
   =^  bar  sea  (read-byte-maybe sea)
   =^  bas  sea  (read-byte sea)
   =^  bat  sea  (read-byte sea)
@@ -76,6 +95,33 @@
     %+  expect-eq
     !>  [3 0xfe.babe]
     !>  (peek-octs 3 sea)
+    ::
+    %+  expect-eq
+    !>  :_  sea(pos 3)
+        [3 0xfe.babe]
+    !>  (read-octs-until 3 sea)
+    ::
+    %+  expect-eq
+    !>  [3 0xfe.babe]
+    !>  (peek-octs-until 3 sea)
+    ::
+    %+  expect-eq
+    !>  :_  sea(pos 4)
+        [2 0xcafe]
+    !>  (read-octs-until 4 (skip-by 2 sea))
+    ::
+    %+  expect-eq
+    !>  [2 0xcafe]
+    !>  (peek-octs-until 4 (skip-by 2 sea))
+    ::
+    %+  expect-eq
+    !>  :_  sea(pos 4)
+        [3 0xca.feba]
+    !>  (read-octs-end (skip-by 1 sea))
+    ::
+    %+  expect-eq
+    !>  [3 0xca.feba]
+    !>  (peek-octs-end (skip-by 1 sea))
   ==
 ++  test-read-line
   =/  sea=bays
@@ -386,27 +432,13 @@
 ++  test-navigate-line
   =/  sea=bays
     (from-txt '\0asecond line\0athird line\0a')
-  ::
   ;:  weld
     =.  sea  (skip-line (skip-byte sea))
     %+  expect-eq
     !>  'third line'
     !>  (peek-line sea)
-    ::
-    =.  sea  (skip-by 4 sea)
-    =.  sea  (rewind-line sea)
-    %+  expect-eq
-    !>  'second line'
-    !>  (peek-line sea)
-    ::
-    =.  sea  (skip-by 4 (skip-line sea))
-    =.  sea  (back-line sea)
-    %+  expect-eq
-    !>  ''
-    !>  (peek-line sea)
-    ::
   ==
-++  test-find-and-seek-byte
+++  test-find-seek-byte
   =/  sea=bays
     (from-octs [4 0xcafe.babe])
   ;:  weld

@@ -205,7 +205,7 @@
     ;~  pose
       ::  XX use generic hash parser
       ::
-      parse-sha-1
+      parse-hash-sha-1
       (stag %ref (cold ['HEAD' ~] pat))
       (stag %ref parse-refname)
     ==

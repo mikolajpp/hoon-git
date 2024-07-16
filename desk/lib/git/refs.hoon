@@ -61,7 +61,7 @@
   ^-  tape
   ::  XX parametrize on hash algo
   ?@  ref
-    (print-sha-1 ref)
+    (print-hash-sha-1 ref)
   "symref: {<refname.ref>}"
 ++  print-refname
   |=  =refname

@@ -58,7 +58,7 @@
     (read-octs-maybe:bs (pack-hash-bytes header) sea)
   ?~  hash 
     ~|  "Pack file is corrupted: no checksum found"  !!
-  ?>  =(pos.sea p.octs.sea)
+  :: ?>  (is-empty:bs sea)
   =+  len=(sub end start)
   =+  check=(hash-octs-sha-1 len (rsh [3 start] q.octs.sea))
   ?>  =(q.u.hash check)
@@ -166,6 +166,9 @@
     =^  pob=pack-object  sea  (read-pack-object sea)
     =/  [rob=raw-object miso=(unit raw-object)]
       (resolve-raw-object-miss pob index cache sea get)
+    =+  hash=(hash-raw (pack-hash-algo header) rob)
+    ?:  (~(has by index) hash)
+      ~|  "Object {<hash>} duplicated: indexed at {<(~(get by index) hash)>}"  !!
     ::  cache resolved delta object
     ::
     =?  cache  ?=(pack-delta-object pob)
@@ -181,9 +184,6 @@
         count  +(count.cache)
         store  [[beg rob] store.cache]
       ==
-    =+  hash=(hash-raw (pack-hash-algo header) rob)
-    ?:  (~(has by index) hash)
-      ~|  "Object {<hash>} duplicated: indexed at {<(~(get by index) hash)>}"  !!
     %=  $
       index  (put:pack-on index hash beg)
       count  +(count)
@@ -192,7 +192,9 @@
   :_  sea
   :_  miss
   :-  (pack-hash-algo header)
-  [count.header index end-pos=pos.sea [start octs.sea]]
+  ::  XX use offset bytestream
+  ::
+  [count.header index end-pos=pos.sea (seek-to:bs start sea)]
 ::
 ::  Resolve raw object, potentially obtaining 
 ::  a missing object base object through the get gate
@@ -238,7 +240,7 @@
             $(store t.store)
           ?^  cob
             u.cob
-          =<(- (read-pack-object pos octs.sea))
+          -:(read-pack-object (seek-to:bs pos sea))
         %ref-delta
           =/  pos=(unit @ud)
             (get:pack-on index hash.pob)
@@ -254,7 +256,7 @@
             $(store t.store)
           ?^  cob
             u.cob
-          =<(- (read-pack-object u.pos octs.sea))
+          -:(read-pack-object (seek-to:bs u.pos sea))
       ==
     ?:  ?=(pack-delta-object kob)
       $(chain [kob chain])
@@ -293,8 +295,17 @@
     chain  t.chain
     base  (expand-delta-object base delta)
   ==
-::  Resolve delta object against
-::  a base
+::  +expand-delta-object: resolve delta object against the base
+::
+::  XX this is currently unbearably slow on certain git objects
+::  which require large number of instructions to reconstruct, 
+::  on the order of 10.000. In particular tloncorp/tlon-apps
+::  repository takes a very long time to clone. 
+::  Since we can not jet this arm, some other solution is required. 
+::
+::  Some possible improvements:
+::  instead of storing chunks, directly construct the object.
+::  Make sure all involved bytestream operations are jetted.
 ::
 ++  expand-delta-object
   |=  [base=raw-object delta=pack-delta-object]
@@ -309,7 +320,7 @@
   ?>  =(size.base biz)
   ::  Expanded object data
   ::
-  =|  chunks=(list octs)
+  =|  data=octs
   ::  Process delta instructions
   ::  to resolve the object
   ::
@@ -317,105 +328,93 @@
   |-
   ?:  (is-empty:bs sea)
     ::  Verify target size
-    ~?  (gth siz 10.000)
-      expand-delta-object-chunks+(lent chunks)
-    =/  data
-      (can-octs:bs (flop chunks))
-    =/  rob=raw-object
-      [type.base p.data data]
-    ?>  =(size.rob siz)
-    rob
+    ::
+    ?>  =(p.data siz)
+    [type.base p.data data]
   ::  parse instruction: add or copy
   ::
-  ::  XX is pinning efficient?
   =^  bat  sea  (read-byte:bs sea)
-  ::  XX why is this needed?
-  ?>  (lth pos.sea p.octs.sea)
   ?:  =(0x0 bat)
-    ~|  "Resolve delta: hit reserved instruction 0x00"  !!
-  =^  data  sea
+    ~|  "+expand-delta-object: reserved instruction 0x0"  !!
+  =^  chunk  sea
     ?:  =(0 (dis bat 0x80))
-      ::  Add data
+      ::  copy instruction
       ::
-      (add-data bat)
-    ::  Copy data
+      ::  XX do global variables influence
+      ::  performance?
+      ::
+      (add-data bat sea)
+    ::  add instruction
     ::
-    (copy-data bat)
-  ::  XX this seems uneccessary?
-  $(chunks [data chunks])
+    (copy-data bat sea)
+  $(data (cat-octs:bs data chunk))
   ::
   |%
-  ::
-  ::  Add instruction
-  ::  0xxxxxxx
+  ::  +add-data: add following bytes
+  ::  bat = 0xxxxxxx
   ::
   ++  add-data
-    |=  bat=@uxD
+    |=  [bat=@uxD sea=bays:bs]
     ^-  [octs bays:bs]
     =+  siz=(dis bat 0x7f)
-    :: ~&  add-data+siz=siz
     (read-octs:bs siz sea)
+  ::  +copy-data: copy data from base
+  ::  bat = 1xxxxxxx
   ::
-  ::  Copy instruction
-  ::  1xxxxxxx
+  ::  copy bytes from base object at the specified offset
   ::
+  ::  4 low bits of bat specify the offset
+  ::  each bit set to 1 indicates position of the following
+  ::  byte as part of the LSB offset number
+  ::
+  ::  3 higher bits of bat specify the size
+  ::
+  ::  size is encoded in the same manner as offset.
+  ::  if size computed in this way is 0, it is
+  ::  replaced by 0x1.0000
+  ::
+  ++  read-cp-param
+    |=  [var=@D [bat=@D bit=@D shift=@ud] sea=bays:bs]
+    ^-  [@D bays:bs]
+    ?:  =(0 (dis bat bit))
+      :_  sea
+      var
+    =^  byt  sea  (read-byte:bs sea)
+    :_  sea
+    (add var (lsh [3 shift] byt))
   ++  copy-data
-    |=  bat=@uxD
+    |=  [bat=@D sea=bays:bs]
     ^-  [octs bays:bs]
-    =+  ind=0
-    =+  mak=0x1
-    ::  Retrieve offset
-    ::
-    ::  XX this looks quite convoluted
-    ::  -- try to rewrite.
     =|  offset=@ud
-    =^  offset  sea
-    |-
-    ?:  (gth mak 0x8)
-      :_  sea
-      offset
-    =^  fet=@uxD  sea
-      ?:  =(0 (dis bat mak))
-        ::  XX remove sea here and
-        ::  we get failure, but not nest
-        ::  fail
-        :_  sea
-        0x0
-      =^  tef  sea  (read-byte:bs sea)
-      :_  sea
-      tef
-
-    %=  $
-      ind  +(ind)
-      mak  (lsh [0 1] mak)
-      offset  (add offset (lsh [3 ind] fet))
-    ==
-    ::  Retrieve size
-    ::
-    =+  ind=0
-    =+  mak=0x10
     =|  size=@ud
-    =^  size  sea
-    |-
-    ?:  (gth mak 0x40)
-      :_  sea
-      ?:  =(0 size)
-        `@ud`0x1.0000
-      size
-    =^  sal=@uxD  sea
-      ?:  =(0 (dis bat mak))
-        :_  sea
-        0x0
-      =^  las  sea  (read-byte-maybe:bs sea)
-      :_  sea
-      (need las)
-    :: ~&  [ind mak sal size]
-    %=  $
-      ind  +(ind)
-      mak  (lsh [0 1] mak)
-      size  (add size (lsh [3 ind] sal))
-    ==
-    :: ~&  copy-data+[size=size offset=offset]
+    ::  XX is the runtime smart enough 
+    ::  to avoid having 4 copies of offset in the
+    ::  subject?
+    ::
+    =^  oft  sea  
+      (read-cp-param offset [bat 0x1 0] sea)
+    =.  offset  oft
+    =^  oft  sea  
+      (read-cp-param offset [bat 0x2 1] sea)
+    =.  offset  oft
+    =^  oft  sea  
+      (read-cp-param offset [bat 0x4 2] sea)
+    =.  offset  oft
+    =^  oft  sea  
+      (read-cp-param offset [bat 0x8 3] sea)
+    =.  offset  oft
+    ::
+    =^  siz  sea
+      (read-cp-param size [bat 0x10 0] sea)
+    =.  size  siz
+    =^  siz  sea
+      (read-cp-param size [bat 0x20 1] sea)
+    =.  size  siz
+    =^  siz  sea
+      (read-cp-param size [bat 0x40 2] sea)
+    =.  size  siz
+    =?  size  =(0 size)
+      `@ud`0x1.0000
     :_  sea
     [size (cut 3 [offset size] q.data.base)]
   --
@@ -624,7 +623,7 @@
 ++  find-by-key
   |=  a=@ta
   ^-  (list hash)
-  =+  kex=(to-hex a)
+  =+  kex=(txt-to-hash a)
   ::  All sizes in half-bytes
   =+  key=[(met 3 a) kex]
   ::  The matching keys are in the range a..a+1
@@ -638,22 +637,9 @@
     |=  [hey=(list @ux) item=[hash @ud]]
     ?.  (compare:pack-on -.item kex)
       [`+.item & hey]
-    ?:  (match-key (key-size hash-algo.pak) key -.item)
+    ?:  (match-key (hash-size hash-algo.pak) key -.item)
       [`+.item & [-.item hey]]
     [`+.item | hey]
-::  XX remove after moving out repository to its
-::  own library
-::
-++  to-hex
-  |=  a=@ta
-  ^-  @ux
-  (scan (trip a) parse-short-sha-1)
-++  key-size  
-  |=  hat=hash-algo
-  ?-  hat
-    %sha-1    40
-    %sha-256  !!
-  ==
 ++  match-key
   |=  [size=@ud a=octs b=@ux]
   ^-  ?

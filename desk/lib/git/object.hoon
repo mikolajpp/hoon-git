@@ -133,7 +133,7 @@
   ^-  tape
   ?-  hal
     %sha-1
-      (print-sha-1 hash)
+      (print-hash-sha-1 hash)
     ::
     %sha-256  !!
   ==
@@ -233,8 +233,8 @@
     ::  XX does this really evaluates at compile-time?
     ^~
     ?-  hal
-       %sha-1  parse-sha-1
-       %sha-256  parse-sha-256
+       %sha-1  parse-hash-sha-1
+       %sha-256  parse-hash-sha-256
     ==
   ++  blob
     |=  rob=raw-object

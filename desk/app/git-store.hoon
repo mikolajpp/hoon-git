@@ -342,7 +342,7 @@
   |=  [=refname:git =hash]
   ^-  @t
   ;:  (cury cat 3)
-    (crip (print-sha-1 hash))
+    (crip (print-hash-sha-1 hash))
     ' '
     (print-refname refname)
   ==
@@ -381,9 +381,9 @@
         u.body.request
       ?>  =('gzip' u.cen)
       ~&  %http-gzip-encoded
-      -:(expand:zlib 0+u.body.request)
+      -:(expand:zlib (from-octs:bs u.body.request))
     ~&  `@t`q.body
-    =/  sea=bays:bs  0+body
+    =/  sea  (from-octs:bs body)
     ::  Extract command name
     ::
     =^  cmd=pkt-line  sea  (read-pkt-line & sea)
@@ -521,8 +521,8 @@
               (cold %ofs-delta (jest 'ofs-delta'))
               (cold %wait-for-done (jest 'wait-for-done'))
               ::  XX parametrize by hash algo
-              ;~(pfix (jest 'want ') (stag %want parse-sha-1))
-              ;~(pfix (jest 'have ') (stag %have parse-sha-1))
+              ;~(pfix (jest 'want ') (stag %want parse-hash-sha-1))
+              ;~(pfix (jest 'have ') (stag %have parse-hash-sha-1))
             ==
       ?-  arg
         %done           $(done.args &)
@@ -640,8 +640,10 @@
       ::  XX We throw away a ready made have-set, only
       ::  to rebuild it later
       ::
-      =+  pack-octs=(write-packs:git-pack-objects archive.object-store.repo)
-      =+  pack-pkt-lines=(write-pkt-lines-on-band [0 pack-octs] 1)
+      =/  pack-octs
+        (write-packs:git-pack-objects archive.object-store.repo)
+      =/  pack-pkt-lines
+        (write-pkt-lines-on-band 1 (from-octs:bs pack-octs))
       =.  red  (append-octs:bs red (write-pkt-lines-txt 'packfile'))
       ::  XX This should properly be done in a thread. 
       ::  The point of packet lines is not to send them all 
@@ -673,11 +675,10 @@
     %'GET'   advertise-refs
     %'POST'  update-refs
   ==
-  |%
-  ::  There is no push protocol 
-  ::  in version 2. Below code implements 
-  ::  version 1 of the push protocol.
+  ::  there is no git push protocol in version 2, 
+  ::  we implement version 1.
   ::
+  |%
   ++  advertise-refs
     |-
     ^-  (quip card _state)
@@ -774,8 +775,8 @@
   +$  push-cmd  [old=hash:git new=hash:git ref-name=path]
   ++  parse-push-cmd
     ;~  plug
-      parse-sha-1
-      ;~(pfix ace parse-sha-1)
+      parse-hash-sha-1
+      ;~(pfix ace parse-hash-sha-1)
       ;~(pfix ace parse-refname)
     ==
   ++  update-refs
@@ -784,12 +785,13 @@
     ::  XX verify headers
     ?>  .=  (need (get-header:http 'content-type' header-list.request))
             'application/x-git-receive-pack-request'
-    =/  sea=bays:bs  0+(need body.request)
+    =/  sea  (from-octs:bs (need body.request))
     ::  Parse head command and capabilities
     ::
+    ::  XX migrate to bytestream view
     =^  pkt  sea  (read-pkt-line & sea)
     ?>  ?=(%data -.pkt)
-    =+  pin=(need (find-byte:bs 0x0 0+octs.pkt))
+    =+  pin=(need (find-byte:bs 0x0 (from-octs:bs octs.pkt)))
     =+  cmd-txt=(cut 3 [0 pin] q.octs.pkt)
     =+  caps-txt=(cut 3 [+(pin) (sub (dec p.octs.pkt) pin)] q.octs.pkt)
     =/  caps=(set cap)  %-  silt

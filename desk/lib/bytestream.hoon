@@ -1,43 +1,60 @@
 ~%  %bytestream  ..part  ~
+::    Molds
+::
 |%
-::    bytestream
-::  .pos: cursor into .octs
++|  %arch
+::    Bytestream
+::  .pos: relative cursor into .octs
+::  .oft: offset
 ::  .octs: bytestream data
 ::
 +$  bays  $+  bays  
           $:  pos=@ud
+              oft=@ud
               =octs
           ==
 --
-::    bytestream
-::
-::  a bytestream is a pair of a cursor and octs data.
-::  the cursor points at the next byte to be read or written.
+::    
+::  A bytestream is a triple of a cursor, an offset, and octs data.
+::  The offset cursor points at the next byte to be read or written.
 ::  
-::  there are three families of functions: for reading, 
+::  There are three families of functions: for reading, 
 ::  writing and appending to a bytestream. they operate 
 ::  upon three kinds of data: a singular byte, a sequence of 
 ::  bytes (octs), or a text (cord).
 ::
-::  a combined operation of reading from a source bytestream
+::  A combined operation of reading from a source bytestream
 ::  and writing the resulting data to a target bytestream is called
 ::  a 'write-read'. 
 ::
-::  a write or append to a bytestream always succeeds. 
-::  a read can fail if the source bytestream is exhausted:
-::  reading arms either crash on failure, or return a unit.
+::  A write or append to a bytestream always succeeds. 
+::  A read can fail if the source bytestream is exhausted:
+::  reading arms either crash on failure, or return a unit (maybe).
 ::
-::  each read advances the cursor by a corresponding
+::  Each read advances the cursor by a corresponding
 ::  number of bytes read; peek functions do not advance the stream.
 ::
-::  each write advances the cursor by a corresponding
+::  Each write advances the cursor by a corresponding
 ::  number of bytes written; append functions do not advance the stream.
 ::
 |%
-::  utilities
+::    Utilities
 ::
 +|  %utilities
+++  rip-octs
+  :: ~/  %rip-octs
+  |=  a=octs
+  =|  hun=(list @)
+  =+  i=0
+  |-
+  ?:  =(i p.a)
+    (flop hun)
+  %=  $
+    i  +(i)
+    hun  :_(hun (cut 3 [i 1] q.a))
+  ==
 ++  cat-octs
+  :: ~/  %cat-octs
   |=  [a=octs b=octs]
   :-  (add p.a p.b)
   (can 3 ~[a b])
@@ -52,13 +69,13 @@
   |=  =octs
   ^-  byts
   [p.octs (rev 3 octs)]
-::    conversion
+::    Conversion
 ::
 +|  %conversion
 ++  from-octs
   |=  =octs
   ^-  bays
-  [0 octs]
+  [0 0 octs]
 ++  to-octs  
   |=  sea=bays
   ^-  octs
@@ -66,7 +83,7 @@
 ++  at-octs
   |=  [n=@ud =octs]
   ^-  bays
-  [n octs]
+  [n 0 octs]
 ++  from-txt
   |=  txt=@t
   (from-octs [(met 3 txt) txt])
@@ -78,20 +95,116 @@
   |=  sea=bays
   ^-  @
   q.octs.sea
-::    check bytestream status
+::    View into bytestream
+::
++|  %view
+::  +view: view from current position until end
+::
+++  view
+  |=  sea=bays
+  ^-  bays
+  sea(oft pos.sea)
+::  +view-octs: view on .n following bytes
+::  from the current position
+::
+++  view-octs
+  |=  [n=@ud sea=bays]
+  ^-  bays
+  %=  sea
+    oft  pos.sea
+    p.octs  ;:(add oft.sea pos.sea n)
+  ==
+::  +view-until: view until .pos 
+::
+++  view-until
+ |=  [pos=@ud sea=bays]
+ ^-  bays
+ %=  sea
+   oft  pos.sea
+   p.octs  pos
+ ==
+::  +view-range: view from .start until .end
+++  view-range
+  |=  [start=@ud end=@ud sea=bays]
+  %=  sea
+    oft  start
+    p.octs  end
+  ==
+::    Check bytestream status
+::
 +|  %status
+::
+::  +position: relative .pos to absolute
+::
+++  pos
+  |=  [pos=@ud sea=bays]
+  ^-  @ud
+  (add oft.sea pos)
+::  +here: compute absolute current position
+::
+++  here
+  |=  sea=bays
+  ^-  @ud
+  (add oft.sea pos.sea)
+::  +next-by: compute absolute advanced position
+::
+++  next-by
+  |=  [n=@ud sea=bays]
+  ^-  @ud
+  ;:(add oft.sea pos.sea n)
+++  next-byte
+  |=  sea=bays
+  ^-  @ud
+  ;:(add oft.sea pos.sea 1)
+::  +exceed: whether position is out-of-bound
+::
+++  exceed
+  |=  sea=bays
+  ^-  ?
+  (gte (add oft.sea pos.sea) p.octs.sea)
+::  +exceed-at: whether relative position .pos is out-of-bound
+::
+++  exceed-at
+  |=  [pos=@ud sea=bays]
+  ^-  ?
+  (gte (add oft.sea pos) p.octs.sea)
+::  +still-by: whether .n bytes can be read
+::
+++  still-by
+  |=  [n=@ud sea=bays]
+  ^-  ?
+  (lte (next-by n sea) p.octs.sea)
+::  +still-byte: whether a byte can be read
+::
+++  still-byte
+  |=  sea=bays
+  ^-  ?
+  (lte (next-byte sea) p.octs.sea)
+::  +is-empty: is bytestream empty?
+::
+++  is-empty
+  |=  sea=bays
+  (gte (here sea) p.octs.sea)
+::  +size: total bytes
+::
 ++  size
   |=  sea=bays
   ^-  @ud
-  p.octs.sea
+  (sub p.octs.sea oft.sea)
+::  +out-size: bytes read
+::
+++  out-size
+  |=  sea=bays
+  ^-  @ud
+  pos.sea
+::  +in-size: remaining bytes
+::
 ++  in-size
   |=  sea=bays
   ^-  @ud
-  (sub p.octs.sea pos.sea)
-++  is-empty
-  |=  sea=bays
-  (gte pos.sea p.octs.sea)
-::    navigate the bytestream
+  (sub p.octs.sea (here sea))
+::    Navigation
+::
 +|  %navigation
 ++  rewind
   |=  sea=bays
@@ -101,12 +214,16 @@
   |=  [pos=@ud sea=bays]
   ^-  bays
   sea(pos pos)
+++  seek-end
+  |=  sea=bays
+  ^-  bays
+  sea(pos (sub p.octs.sea oft.sea))
 ::    +skip-by: advance by .n bytes
 ::
 ++  skip-by
   |=  [n=@ud sea=bays]
   ^-  bays
-  ?>  (lte (add pos.sea n) p.octs.sea)
+  ?>  (lte (next-by n sea) p.octs.sea)
   sea(pos (add pos.sea n))
 ::    +skip-by: advance by one byte
 ::
@@ -120,242 +237,294 @@
   ^-  bays
   ?<  (lth pos.sea n)
   sea(pos (sub pos.sea n))
-::    +rewind-byte: retreat by one byte
+::    +back-byte: retreat by one byte
 ::
 ++  back-byte
   |=  [n=@ud sea=bays]
   ^-  bays
   (back-by 1 sea)
-::    +next-line: advance to the beginning of next line
+::    +skip-line: advance to the beginning of next line
 ::
 ++  skip-line
+  :: ~/  %skip-line
   |=  sea=bays
   ^-  bays
   =+  i=pos.sea
   |-
-  ?.  (lth i p.octs.sea)
-    sea(pos p.octs.sea)
-  ?:  =('\0a' (cut 3 [i 1] q.octs.sea))
+  ?:  (exceed-at i sea)
+    (seek-end sea)
+  ?:  =('\0a' (cut 3 [(pos i sea) 1] q.octs.sea))
     sea(pos +(i))
   $(i +(i))
-::    +rewind-line: retreat to the beginning of the current line
-::  if the stream is exhausted, position the cursor at the end
-::  of the stream
-++  rewind-line
-  |=  sea=bays
-  ^-  bays
-  ?.  (lth pos.sea p.octs.sea)
-    sea(pos p.octs.sea)
-  =+  i=pos.sea
-  |-
-  ?:  =('\0a' (cut 3 [i 1] q.octs.sea))
-    sea(pos +(i))
-  ?:  =(i 0)
-    sea(pos 0)
-  $(i (dec i))
-::    +back-line: retreat to the beginning of previous line
-::
-::  if the stream is exhausted, position the cursor
-::  at the end of the stream
-::
-++  back-line
-  |=  sea=bays
-  ^-  bays
-  ?.  (lth pos.sea p.octs.sea)
-    sea(pos p.octs.sea)
-  =.  sea  (rewind-line sea)
-  ::  current line is first
-  ::
-  ?:  =(0 pos.sea)
-    sea
-  ::  previous line is empty
-  ::
-  ?:  =(1 pos.sea)
-    sea(pos (dec pos.sea))
-  (rewind-line sea(pos (sub pos.sea 2)))
 ::    +find-byte: find the index of first occurence of byte .byt
 ::
 ++  find-byte
+  :: ~/  %find-byte
   |=  [bat=@D sea=bays]
   ^-  (unit @ud) 
   =+  i=pos.sea
   |-
-  ?.  (lth i p.octs.sea)
+  ?:  (exceed-at i sea)
     ~
-  ?:  =(bat (cut 3 [i 1] q.octs.sea))
+  ?:  =(bat (cut 3 [(pos i sea) 1] q.octs.sea))
     (some i)
   $(i +(i))
 ::    +seek-byte: seek stream to first occurence of byte .byt
 ::
 ++  seek-byte
+  :: ~/  %seek-byte
   |=  [bat=@D sea=bays]
   ^-  [(unit @ud) bays]
   =/  idx  (find-byte bat sea)
   ?~  idx
     [~ sea]
   [idx sea(pos u.idx)]
+::
 :: ++  find-octs  !!
 :: ++  seek-octs  !!
 :: ++  find-txt  !!
 :: ++  seek-txt  !!
 ::
-::    read bytes
+::    Read byte
 ::
 +|  %read-byte
+::  +read-byte: read a byte and advance the stream
+::
+++  read-byte
+  :: ~/  %read-byte
+  |=  sea=bays
+  ^-  [@D bays]
+  ?>  (still-byte sea)
+  :_  sea(pos +(pos.sea))
+  (cut 3 [(here sea) 1] q.octs.sea)
 ::    +read-byte-maybe: maybe read a byte and advance the stream
 ::
 ++  read-byte-maybe
+  :: ~/  %read-byte-maybe
   ::    return a byte unit and advanced stream
   ::
   |=  sea=bays  ::  .sea: source bytestream
   ^-  [(unit @D) bays]
-  =+  i=+(pos.sea)
-  ?:  (gth i p.octs.sea)
+  ?.  (still-byte sea)
     [~ sea]
-  :_  sea(pos i)
-  (some (cut 3 [pos.sea 1] q.octs.sea))
-::  +read-byte: read a byte and advance the stream
-::
-++  read-byte
-  |=  sea=bays
-  ^-  [@D bays]
-  =^  bam  sea  (read-byte-maybe sea)
-  :_  sea
-  (need bam)
-::  +peek-byte-maybe: maybe read a byte, do not advance
-::
-++  peek-byte-maybe
-  |=  sea=bays
-  ^-  (unit @D)
-  -:(read-byte-maybe sea)
+  :_  sea(pos +(pos.sea))
+  (some (cut 3 [(here sea) 1] q.octs.sea))
 ::  +peek-byte-maybe: read a byte, do not advance
 ::
 ++  peek-byte
+  :: ~/  %peek-byte
   |=  sea=bays
   ^-  @D
-  (need (peek-byte-maybe sea))
-::    read octs
+  ?>  (still-byte sea)
+  (cut 3 [(here sea) 1] q.octs.sea)
+::  +peek-byte-maybe: maybe read a byte, do not advance
+::
+++  peek-byte-maybe
+  :: ~/  %peek-byte-maybe
+  |=  sea=bays
+  ^-  (unit @D)
+  ?.  (still-byte sea)
+    ~
+  (some (cut 3 [(here sea) 1] q.octs.sea))
+::    Read octs
 ::
 +|  %read-octs
+++  read-octs
+  :: ~/  %read-octs
+  |=  [n=@ud sea=bays]
+  ^-  [octs bays]
+  ?>  (still-by n sea)
+  :_  (skip-by n sea)
+  [n (cut 3 [(here sea) n] q.octs.sea)]
 ++  read-octs-maybe
+  :: ~/  %read-octs-maybe
   |=  [n=@ud sea=bays]
   ^-  [(unit octs) bays]
-  =+  i=(add pos.sea n)
-  ?:  (gth i p.octs.sea)
+  ?.  (still-by n sea)
     [~ sea]
-  :_  sea(pos i)
+  :_  (skip-by n sea)
   %-  some
-  [n (cut 3 [pos.sea n] q.octs.sea)]
-++  read-octs  
-  |=  [n=@ud sea=bays]
+  [n (cut 3 [(here sea) n] q.octs.sea)]
+::  +read-octs-until: read octs until byte at position .sop
+::
+++  read-octs-until
+  :: ~/  %read-octs-until
+  |=  [sop=@ud sea=bays]
   ^-  [octs bays]
-  =^  octs  sea  (read-octs-maybe n sea)
-  :_  sea
-  (need octs)
+  ?<  (exceed-at (dec sop) sea)
+  =+  len=(sub sop pos.sea)
+  :_  sea(pos sop)
+  [len (cut 3 [(here sea) len] q.octs.sea)]
+::  +read-octs-end: read octs until end of stream
+::
 ++  read-octs-end
+  :: ~/  %read-octs-end
   |=  sea=bays
   ^-  [octs bays]
-  (read-octs (sub p.octs.sea pos.sea) sea)
+  =+  len=(in-size sea)
+  :_  (seek-end sea)
+  [len (cut 3 [(here sea) len] q.octs.sea)]
+++  peek-octs
+  :: ~/  %peek-octs
+  |=  [n=@ud sea=bays]
+  ^-  octs
+  ?>  (still-by n sea)
+  [n (cut 3 [(here sea) n] q.octs.sea)]
 ++  peek-octs-maybe
+  :: ~/  %peek-octs-maybe
   |=  [n=@ud sea=bays]
   ^-  (unit octs)
-  -:(read-octs-maybe n sea)
-++  peek-octs
-  |=  [n=@ud sea=bays]
-  ^-  octs
-  (need (peek-octs-maybe n sea))
+  ?.  (still-by n sea)
+    ~
+  %-  some
+  [n (cut 3 [(here sea) n] q.octs.sea)]
 ++  peek-octs-end
+  :: ~/  %peek-octs-end
   |=  sea=bays
   ^-  octs
-  -:(read-octs-end sea)
-::    read text
+  =+  len=(in-size sea)
+  [len (cut 3 [(here sea) len] q.octs.sea)]
+++  peek-octs-until
+  :: ~/  %peek-octs-until
+  |=  [pos=@ud sea=bays]
+  ^-  octs
+  ?<  (exceed-at (dec pos) sea)
+  =+  len=(sub pos pos.sea)
+  [len (cut 3 [(here sea) len] q.octs.sea)]
+::    Read atom
+::
++|  %read-atom
+::  +read-lsb: read atom in LSB order
+::
+++  read-lsb
+  |=  [n=@ud sea=bays]
+  ^-  [@ bays]
+  =^  num  sea  (read-octs n sea)
+  :_  sea
+  q.num
+::  +read-msb: read atom in MSB order
+::
+++  read-msb
+  |=  [n=@ud sea=bays]
+  ^-  [@ bays]
+  =^  num  sea  (read-octs n sea)
+  :_  sea
+  (rev 3 num)
+::  +read-txt: read cord
+::
+++  read-txt  read-lsb
+::    Read text
 ::
 +|  %read-txt
-::    +read-line-maybe: maybe read a line of text
 ::
-++  read-line-maybe
-  |=  sea=bays
-  ^-  [(unit @t) bays]
-  =+  i=pos.sea
-  |-
-  ::  newline not found, return whole stream
-  ::
-  ?.  (lth i p.octs.sea)
-    :_  sea(pos p.octs.sea)
-    (some (cut 3 [pos.sea (sub p.octs.sea pos.sea)] q.octs.sea))
-  ?:  =('\0a' (cut 3 [i 1] q.octs.sea))
-    :_  sea(pos +(i))
-    (some (cut 3 [pos.sea (sub i pos.sea)] q.octs.sea))
-  $(i +(i))
 ::    +read-line: read a line of text
 ::  read bytes until newline is found, or until stream
 ::  is exhausted.
 ::
 ++  read-line
+  :: ~/  %read-line
   |=  sea=bays
   ^-  [@t bays]
-  =^  line  sea  (read-line-maybe sea)
-  :_  sea
-  (need line)
-::    +peek-line-maybe: maybe peek a line of text
+  =/  pin  (find-byte 0xa sea)
+  ?~  pin
+    ::  newline not found, return whole stream
+    ::
+    =^  data  sea  (read-octs-end sea)
+    :_  sea
+    q.data
+  =^  data  sea  (read-octs-until u.pin sea)
+  :_  sea(pos +(u.pin))
+  q.data
+::    +read-line-maybe: maybe read a line of text
 ::
-++  peek-line-maybe
+++  read-line-maybe
+  :: ~/  %read-line-maybe
   |=  sea=bays
-  ^-  (unit @t)
-  -:(read-line-maybe sea)
+  ^-  [(unit @t) bays]
+  =/  pin  (find-byte 0xa sea)
+  ?~  pin
+    ::  newline not found, return whole stream
+    ::
+    =^  data  sea  (read-octs-end sea)
+    :_  sea
+    (some q.data)
+  =^  data  sea  (read-octs-until u.pin sea)
+  :_  sea(pos +(u.pin))
+  (some q.data)
 ::    +peek-line: peek a line of text
 ::  read bytes until newline is found, or until stream
 ::  is exhausted.
 ::
 ++  peek-line
+  :: ~/  %peek-line
   |=  sea=bays
   ^-  @t
-  (need (peek-line-maybe sea))
-::    write data at the cursor position
+  =/  pin  (find-byte 0xa sea)
+  ?~  pin
+    ::  newline not found, return whole stream
+    ::
+    =/  data  (peek-octs-end sea)
+    q.data
+  =/  data  (peek-octs-until u.pin sea)
+  q.data
+::    +peek-line-maybe: maybe peek a line of text
+::
+++  peek-line-maybe
+  :: ~/  %peek-line-maybe
+  |=  sea=bays
+  ^-  (unit @t)
+  =/  pin  (find-byte 0xa sea)
+  ?~  pin
+    ::  newline not found, return whole stream
+    ::
+    =/  data  (peek-octs-end sea)
+    (some q.data)
+  =/  data  (peek-octs-until u.pin sea)
+  (some q.data)
+::    Write data at the cursor position
 ::
 +|  %write
 ++  write-byte
+  :: ~/  %write-byte
   |=  [sea=bays bat=@D]
   ^-  bays
   %=  sea
     pos  +(pos.sea)
     p.octs  +(p.octs.sea)
-    q.octs  (sew 3 [pos.sea 1 bat] q.octs.sea)
+    q.octs  (sew 3 [(here sea) 1 bat] q.octs.sea)
   ==
 ++  write-octs
+  :: ~/  %write-octs
   |=  [sea=bays =octs]
   ^-  bays
   %=  sea
     pos  (add pos.sea p.octs)
     p.octs  (add p.octs p.octs.sea)
-    q.octs  (sew 3 [pos.sea p.octs q.octs] q.octs.sea)
+    q.octs  (sew 3 [(here sea) p.octs q.octs] q.octs.sea)
   ==
 ++  write-txt
+  :: ~/  %write-txt
   |=  [sea=bays txt=@t]
   (write-octs sea [(met 3 txt) txt])
-::    append data to the end of bytestream
+::    Append data
 ::
 +|  %append
-::  XX change all sew into cats
 ++  append-byte
+  :: ~/  %append-byte
   |=  [sea=bays bat=@D]
   ^-  bays
-  %=  sea
-    p.octs  +(p.octs.sea)
-    q.octs  (sew 3 [p.octs.sea 1 bat] q.octs.sea)
-  ==
+  sea(octs (cat-octs octs.sea [1 bat]))
 ++  append-octs
-  |=  [sea=bays =octs]
+  :: ~/  %append-octs
+  |=  [sea=bays data=octs]
   ^-  bays
-  %=  sea
-    p.octs  (add p.octs.sea p.octs)
-    q.octs  (sew 3 [p.octs.sea p.octs q.octs] q.octs.sea)
-  ==
+  sea(octs (cat-octs octs.sea data))
 ++  append-txt
+  :: ~/  %append-txt
   |=  [sea=bays txt=@t]
   ^-  bays
   (append-octs sea [(met 3 txt) txt])
-::    write-read operations
+::    Write-read operations
 ::
 ::  read data from a source bytestream and write it to a
 ::  target bytestream.
@@ -363,18 +532,21 @@
 +|  %write-read
 ::
 ++  write-read-byte
+  :: ~/  %write-read-byte
   |=  [red=bays sea=bays]
   ^-  [bays bays]
   =^  bat=@D  sea  (read-byte sea)
   :_  sea
   (write-byte red bat)
 ++  write-read-octs
+  :: ~/  %write-read-octs
   |=  [red=bays sea=bays n=@ud]
   ^-  [bays bays]
   =^  =octs  sea  (read-octs n sea)
   :_  sea
   (write-octs red octs)
 ++  write-read-line
+  :: ~/  %write-read-line
   |=  [red=bays sea=bays]
   ^-  [bays bays]
   =^  line=@t  sea  (read-line sea)
@@ -382,34 +554,40 @@
   (write-txt red (cat 3 line '\0a'))
 ::
 ++  write-peek-byte
+  :: ~/  %write-peek-byte
   |=  [red=bays sea=bays]
   ^-  bays
   =/  bat=@D  (peek-byte sea)
   (write-byte red bat)
 ++  write-peek-octs
+  :: ~/  %write-peek-octs
   |=  [red=bays sea=bays n=@ud]
   ^-  bays
   =/  =octs  (peek-octs n sea)
   (write-octs red octs)
 ++  write-peek-line
+  :: ~/  %write-peek-line
   |=  [red=bays sea=bays]
   ^-  bays
   =/  line=@t  (peek-line sea)
   (write-txt red (cat 3 line '\0a'))
 ::
 ++  append-read-byte
+  :: ~/  %append-read-byte
   |=  [red=bays sea=bays]
   ^-  [bays bays]
   =^  bat=@D  sea  (read-byte sea)
   :_  sea
   (append-byte red bat)
 ++  append-read-octs
+  :: ~/  %append-read-octs
   |=  [red=bays sea=bays n=@ud]
   ^-  [bays bays]
   =^  =octs  sea  (read-octs n sea)
   :_  sea
   (append-octs red octs)
 ++  append-read-line
+  :: ~/  %append-read-line
   |=  [red=bays sea=bays]
   ^-  [bays bays]
   =^  line=@t  sea  (read-line sea)
@@ -417,43 +595,50 @@
   (append-txt red (cat 3 line '\0a'))
 ::
 ++  append-peek-byte
+  :: ~/  %append-read-byte
   |=  [red=bays sea=bays]
   ^-  bays
   =/  bat=@D  (peek-byte sea)
   (append-byte red bat)
 ++  append-peek-octs
+  :: ~/  %append-peek-octs
   |=  [red=bays sea=bays n=@ud]
   ^-  bays
   =/  =octs  (peek-octs n sea)
   (append-octs red octs)
 ++  append-peek-line
+  :: ~/  %append-peek-line
   |=  [red=bays sea=bays]
   ^-  bays
   =/  line=@t  (peek-line sea)
   (append-txt red (cat 3 line '\0a'))
+::    Transformation
+::
 +|  %transformation
 ::    +chunk: split the bytestream into chunks of .siz bytes
 ::
+::  If the bytestream is not evenly divided into chunks, 
+::  the final chunk is a remainder.
+::
 ++  chunk
-  ~/  %chunk
+  :: ~/  %chunk
   |=  [sea=bays siz=@ud]
   ^-  (list octs)
   ~
 ::
-::
 ::    +extract: extract a list of octs from bytestream 
 ::  
-::  repeatedly calls the user supplied gate .rac to
+::  Repeatedly calls the user supplied gate .rac to
 ::  determine the offset and length of each octs chunk. 
 ::
 ::  .rac accepts a bytestream and returns a pair 
 ::  of an offset and chunk length to extract.
 ::
-::  the process continues until either the stream is exhausted, 
+::  The process continues until either the stream is exhausted, 
 ::  or the gate returns a pair of [0 0]
 ::
 ++  extract
-  ~/  %extract
+  :: ~/  %extract
   |=  [sea=bays rac=$-(bays [@ud @ud])]
   ^-  [(list octs) bays]
   =|  dal=(list octs)
@@ -474,7 +659,7 @@
 ::    +fuse-extract: extract and fuse the resulting octs list
 ::
 ++  fuse-extract
-  ~/  %fuse-extract
+  :: ~/  %fuse-extract
   |=  [sea=bays rac=$-(bays [@ud @ud])]
   ^-  [octs bays]
   =|  res=octs
@@ -501,6 +686,7 @@
 ::  is exhausted or the gate returns a chunk of length 0.
 ::
 ++  split
+  :: ~/  %split
   |=  [sea=bays pit=$-(bays @ud)]
   ^-  [(list octs) bays]
   %+  extract  sea
@@ -508,6 +694,7 @@
   [0 (pit sea)]
 ::
 ++  fuse-split
+  :: ~/  %fuse-split
   |=  [sea=bays pit=$-(bays @ud)]
   ^-  [octs bays]
   %+  fuse-extract  sea

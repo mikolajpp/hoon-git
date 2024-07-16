@@ -252,7 +252,7 @@
   ++  find-by-key
     |=  a=@ta
     ^-  (unit hash)
-    =+  kex=(to-hex:git-pack a)
+    =+  kex=(txt-to-hash a)
     =+  key=[(met 3 a) kex]
     =/  match=(list hash)
       ::  XX a way to chain operations on a door?
@@ -261,6 +261,7 @@
     ?^  match
       (some (head match))
     ::  Find in packs
+    ::
     =|  match=(list hash)
     =.  match
       %+  roll  archive.object-store.repo

@@ -53,7 +53,7 @@
     ~|  "Response failed {<res>}"  !!
   ?~  full-file.res  !!
   ::
-  =/  sea=bays:bs  0+data.u.full-file.res
+  =/  sea=bays:bs  (from-octs:bs data.u.full-file.res)
   ::  Read service string
   ::
   =|  red=bays:bs
@@ -100,7 +100,7 @@
     ~|  "Response failed {<res>}"  !!
   ?~  full-file.res  !!
   ::
-  =/  sea=bays:bs  0+data.u.full-file.res
+  =/  sea=bays:bs  (from-octs:bs data.u.full-file.res)
   =^  pil  sea  (read-pkt-lines & sea)
   =+  lip=(flop pil)
   ?~  lip 
@@ -183,7 +183,7 @@
   ?~  full-file.res
   ~|  "No references received"  !!
   ::
-  =/  sea=bays:bs  0+data.u.full-file.res
+  =/  sea=bays:bs  (from-octs:bs data.u.full-file.res)
   ::  XX we don't really need to flop here
   ::
   =^  pil  sea  (read-pkt-lines & sea)
@@ -199,7 +199,7 @@
         ;~  pose
           (stag %symref ;~(pfix (jest ' symref-target:') parse-refname))
           ::  XX parametrize by hash-algo
-          (stag %peeled ;~(pfix (jest ' peeled:') parse-sha-1))
+          (stag %peeled ;~(pfix (jest ' peeled:') parse-hash-sha-1))
         ==
       ++  ref-parser
         %+  cook 
@@ -221,7 +221,7 @@
           ==
           ::
           ;~  plug
-            parse-sha-1
+            parse-hash-sha-1
             ;~(pfix ace parse-refname)
             (punt (plus ref-attribute))
           ==
@@ -257,19 +257,19 @@
     %+  turn
       have
     |=  =hash
-    (crip "have {(print-sha-1 hash)}")
+    (crip "have {(print-hash-sha-1 hash)}")
     ::
     %+  turn
       want
     |=  =hash
-    (crip "want {(print-sha-1 hash)}")
+    (crip "want {(print-hash-sha-1 hash)}")
     ==
   ;<  ~  bind:m  (send-request %fetch caps args)
   ;<  res=client-response:iris  bind:m  take-client-response:strandio
   ?>  ?=(%finished -.res)
   ?~  full-file.res
     ~|  "No pack received"  !!
-  =/  sea=bays:bs  0+data.u.full-file.res
+  =/  sea=bays:bs  (from-octs:bs data.u.full-file.res)
   ::  Handle packfile response
   ::
   =<
@@ -346,7 +346,7 @@
           ?<  ?=(@ pkt)
           %+  scan
             (trip q.octs.pkt)
-          ;~(pfix (jest 'ACK ') parse-sha-1)
+          ;~(pfix (jest 'ACK ') parse-hash-sha-1)
         --
     %=  $
       ack  [(parse-ack pkt) ack]
@@ -492,49 +492,37 @@
   ^-  ?
   ?<  ?=(@ pkt)
   =(band (cut 3 [0 1] q.octs.pkt))
-:: 
-::  Split octs into pkt-lines
-::
-::  XX What's preventing us from invoking
-::  a jet with wrong arguments directly from nock?
-::  Do most jet verify their arguments?
-::  
-::  XX Move to the bytestream library
+::  +write-pkt-lines-on-band: split data into pkt-lines
 ::
 ++  write-pkt-lines-on-band
-  ~/  %write-pkt-lines-on-band
-  |=  [sea=bays:bs band=@ud]
+  |=  [band=@ud sea=bays:bs]
   ^-  octs
   =+  chunk-size=8.192
-  ::  
+  ::
   =+  max-len=(sub chunk-size 5)
-  =|  pkt-lines=octs
+  =|  data=bays:bs
   |-  
   ?:  (is-empty:bs sea)
-    pkt-lines
-  =+  sea-len=(sub p.octs.sea pos.sea)
+    (to-octs:bs data)
+  =+  rem=(in-size:bs sea)
   =/  len=@ud
-    ?:  (gth sea-len max-len)
-      max-len
-    sea-len
-  =^  data  sea  (read-octs:bs len sea)
-  ?>  =(p.data len)
-  =/  new-line=octs
-    %-  can-octs:bs
-    :~  (write-pkt-len (add len 5))
-        [1 band]
-        data
-    ==
-  ?>  =(p.new-line (add len 5))
-  $(pkt-lines (cat-octs:bs pkt-lines new-line))
+    ?:  (lth rem max-len)
+      rem
+    max-len
+  ::  pkt-len.band.data
+  ::
+  =.  data  %+  write-octs:bs  data
+            (write-pkt-len (add len 5))
+  =.  data  (write-octs:bs data [1 band])
+  =^  data  sea  (write-read-octs:bs data sea len)
+  $(data data)
+::  +read-pkt-lines-on-band: assemble pkt-lines data
 ::
 ++  read-pkt-lines-on-band
   |=  [band=@ud sea=bays:bs]
   ^-  [octs bays:bs]
   =;  [data=octs sea=bays:bs] 
-    ~&  "Assembled {<p.data>} bytes"
     [data sea]
-  ~&  read-pkt-lines-on-band+[b/(size:bs sea)]
   %+  fuse-extract:bs  sea
   |=  sea=bays:bs
   =^  hed  sea  (read-octs:bs 4 sea)

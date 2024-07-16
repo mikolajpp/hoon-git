@@ -1,6 +1,7 @@
 ::
 :: Zlib compression library
 ::
+/+  bs=bytestream
 ~%  %zlib  ..part  ~
 |%
 +$  zlib-cmf         [cm=@udD cinfo=@udD]
@@ -10,7 +11,6 @@
 ::
 +$  accumulator      [hold=@ux bits=@ud]
 +$  bit-stream       [acu=accumulator pos=@ud stream=byts]
-+$  stream           [pos=@ud =byts]
 ::
 ::  Expand Zlib stream
 ::
@@ -21,8 +21,8 @@
   [0 0x0]
 ++  expand
   ~/  %expand
-  |=  sea=stream
-  ^-  [octs stream]
+  |=  sea=bays:bs
+  ^-  [octs bays:bs]
   :_  sea
   [0 0x0]
   :: |=  sea=bit-stream
