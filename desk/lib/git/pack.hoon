@@ -431,6 +431,8 @@
   =^  [type=pack-object-type size=@ud]  sea
     (read-pack-object-header sea)
   ?+  type
+    ~&  obj-size+size
+    ~&  (en:base64:mimes:html (peek-octs:bs 120 sea))
     =^  data=octs  sea  (expand:zlib sea)
     ?.  =(p.data size)
       ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<p.data>}b)"  !!

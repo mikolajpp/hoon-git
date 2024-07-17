@@ -4,14 +4,32 @@
 |%
 +|  %arch
 ::    Bytestream
+::
 ::  .pos: relative cursor into .octs
 ::  .oft: offset
-::  .octs: bytestream data
+::  .octs: bytestream data XX rename to data=octs?
+::
+::  XX make faces verbose
 ::
 +$  bays  $+  bays  
           $:  pos=@ud
               oft=@ud
               =octs
+          ==
+::    Bitstream
+::
+::  Bitstream allows bit-by-bit access to the underlying
+::  bytestream
+::
+::  .num: acculumated bits
+::  .bit: bit accumulator
+::  .bays: bytestream
+::
+::
++$  bits  $+  bits
+          $:  num=@ud
+              bit=@ub
+              =bays
           ==
 --
 ::    
@@ -37,6 +55,8 @@
 ::  Each write advances the cursor by a corresponding
 ::  number of bytes written; append functions do not advance the stream.
 ::
+::  XX rename octs -> bytes? Would not
+::  these functions work equally well on byts?
 |%
 ::    Utilities
 ::
@@ -58,6 +78,10 @@
   |=  [a=octs b=octs]
   :-  (add p.a p.b)
   (can 3 ~[a b])
+++  cut-octs
+  |=  [pin=@ud len=@ud data=octs]
+  ^-  octs
+  [len (cut 3 [pin len] q.data)]
 ++  can-octs
   |=  a=(list octs)
   ^-  octs
@@ -402,6 +426,10 @@
   =^  num  sea  (read-octs n sea)
   :_  sea
   q.num
+++  peek-lsb
+  |=  [n=@ud sea=bays]
+  ^-  @
+  q:(peek-octs n sea)
 ::  +read-msb: read atom in MSB order
 ::
 ++  read-msb
@@ -409,6 +437,11 @@
   ^-  [@ bays]
   =^  num  sea  (read-octs n sea)
   :_  sea
+  (rev 3 num)
+++  peek-msb 
+  |=  [n=@ud sea=bays]
+  ^-  @
+  =/  num  (peek-octs n sea)
   (rev 3 num)
 ::  +read-txt: read cord
 ::
@@ -700,4 +733,98 @@
   %+  fuse-extract  sea
   |=  sea=bays
   [0 (pit sea)]
+::    Bitstream
+::
+::    XX move to a separate library?
+::
++|  %bitstream
+++  from-bays
+  |=  sea=bays
+  ^-  bits
+  [num=0 bit=0b0 sea]
+++  is-bits-empty
+  |=  pea=bits
+  ^-  ?
+  =(0 (in-bits-size pea))
+++  in-bits-size
+  |=  pea=bits
+  ^-  @ud
+  %+  add
+    num.pea
+  (mul 8 (in-size bays.pea))
+++  out-bits-size
+  |=  pea=bits
+  ^-  @ud
+  (sub (mul 8 (out-size bays.pea)) num.pea)
+::  +need-bits: require .n bits to be available
+::
+++  need-bits
+  |=  [n=@ud pea=bits]
+  ^-  bits
+  |-
+  ?:  (gte num.pea n)
+    pea
+  =^  bat  bays.pea  (read-byte bays.pea)
+  %=  $
+    num.pea  (add num.pea 8)
+    bit.pea  
+      (add bit.pea (lsh [0 num.pea] bat))
+  ==
+::  +drop-bits: drop low .n bits
+::
+++  drop-bits
+  |=  [n=@ud pea=bits]
+  ^-  bits
+  %=  pea
+    bit  (rsh [0 n] bit.pea)
+    num
+      ?.  (gth num.pea n)
+        0
+      (sub num.pea n)
+  ==
+++  skip-bits
+  |=  [n=@ud pea=bits]
+  ^-  bits
+  =.  pea  (need-bits n pea)
+  (drop-bits n pea)
+::  +peek-bits: peek low .n bits of the accumulator
+::
+++  peek-bits
+  |=  [n=@ud pea=bits]
+  ^-  @
+  ?>  (gte num.pea n)
+  %+  dis  bit.pea
+  (sub (lsh [0 n] 1) 1)
+::  +read-bits: read low .n bits of the accumulator and drop them
+::
+++  read-bits
+  |=  [n=@ud pea=bits]
+  ^-  [@ bits]
+  ?>  (gte num.pea n)
+  :_  (drop-bits n pea)
+  %+  dis  bit.pea
+  (sub (lsh [0 n] 1) 1)
+::  +read-need-bits: read low .n bits, requiring if necessary
+::
+++  read-need-bits
+  |=  [n=@ud pea=bits]
+  ^-  [@ bits]
+  =?  pea  (lth num.pea n)
+    (need-bits n pea)
+  :_  (drop-bits n pea)
+  %+  dis  bit.pea
+  (sub (lsh [0 n] 1) 1)
+::  +byte-bits: remove 0 to 7 bits to reach byte boundary
+::
+++  byte-bits
+  |=  pea=bits
+  ^-  bits
+  =+  rem=(dis num.pea 0x7)
+  %=  pea
+    num
+      ?:  (lth num.pea rem)
+        0
+      (sub num.pea rem)
+    bit  (rsh [0 rem] bit.pea)
+  ==
 --

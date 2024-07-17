@@ -1,3 +1,7 @@
+::
+::  You can't NOT test!
+::    ~winter-paches
+::
 /+  *test
 /+  *bytestream
 |%
@@ -534,5 +538,52 @@
             0
           3
     ==
+++  test-bitstream
+  =/  pea
+    (from-bays (from-octs [2 0b1101.0011.1101.1010]))
+  ;:  weld
+    ::  expect-gth, -lth, ...
+    ::
+    %+  expect-eq
+    !>  8
+    !>  num:(need-bits 8 pea)
+    ::
+    %+  expect-eq
+    !>  0b0
+    !>  (peek-bits 1 (need-bits 1 pea))
+    ::
+    %+  expect-eq
+    !>  0b10
+    !>  (peek-bits 2 (need-bits 2 pea))
+    ::
+    %+  expect-eq
+    !>  0b10
+    !>  (peek-bits 3 (need-bits 3 pea))
+    ::
+    %+  expect-eq
+    !>  0b1101.1010
+    !>  (peek-bits 8 (need-bits 8 pea))
+    ::
+    =.  pea  (need-bits 8 pea)
+    =.  pea  (drop-bits 3 pea)
+    %+  expect-eq
+    !>  0b1.1011
+    !>  (peek-bits 5 pea)
+    ::
+    =.  pea  (need-bits 8 pea)
+    =.  pea  (drop-bits 7 pea)
+    =.  pea  (need-bits 5 pea)
+    =^  bits-1  pea  (read-bits 3 pea)
+    =^  bits-2  pea  (read-bits 2 pea)
+    %+  expect-eq
+    !>  [0b111 0b0]
+    !>  [bits-1 bits-2]
+    ::
+    =.  pea  (need-bits 10 pea)
+    =.  pea  (byte-bits pea)
+    %+  expect-eq
+    !>  0b1101.1010
+    !>  (peek-bits 8 pea)
+  ==
 --
 
