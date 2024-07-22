@@ -67,7 +67,7 @@
   %+  cook
     |=  [cmd=command opts=(list option)]
     [| cmd opts]
-  ::  XX A weird bug: putting clone first results in 
+  ::  XX A weird bug: putting clone first results in
   ::  -find.p.roq error
   ::
   ;~  pose

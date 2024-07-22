@@ -10,13 +10,17 @@
 ::  .octs: bytestream data XX rename to data=octs?
 ::
 ::  XX make faces verbose
+::  XX perhaps build on top of another library: /lib/array.hoon ?
 ::
-+$  bays  $+  bays  
++$  bays  $+  bays
           $:  pos=@ud
               oft=@ud
-              =octs
+              =octs  ::  XX rename to data=octs
+              ::  data=(array @D)
           ==
 ::    Bitstream
+::
+::  XX move bitstream to a separate library
 ::
 ::  Bitstream allows bit-by-bit access to the underlying
 ::  bytestream
@@ -32,20 +36,20 @@
               =bays
           ==
 --
-::    
+::
 ::  A bytestream is a triple of a cursor, an offset, and octs data.
 ::  The offset cursor points at the next byte to be read or written.
-::  
-::  There are three families of functions: for reading, 
-::  writing and appending to a bytestream. they operate 
-::  upon three kinds of data: a singular byte, a sequence of 
+::
+::  There are three families of functions: for reading,
+::  writing and appending to a bytestream. they operate
+::  upon three kinds of data: a singular byte, a sequence of
 ::  bytes (octs), or a text (cord).
 ::
 ::  A combined operation of reading from a source bytestream
 ::  and writing the resulting data to a target bytestream is called
-::  a 'write-read'. 
+::  a 'write-read'.
 ::
-::  A write or append to a bytestream always succeeds. 
+::  A write or append to a bytestream always succeeds.
 ::  A read can fail if the source bytestream is exhausted:
 ::  reading arms either crash on failure, or return a unit (maybe).
 ::
@@ -89,6 +93,7 @@
   %+  reel  a
   |=  [=octs size=@ud]
   (add size p.octs)
+++  as-octs  as-octs:mimes:html
 ++  as-byts
   |=  =octs
   ^-  byts
@@ -100,7 +105,7 @@
   |=  =octs
   ^-  bays
   [0 0 octs]
-++  to-octs  
+++  to-octs
   |=  sea=bays
   ^-  octs
   octs.sea
@@ -138,7 +143,7 @@
     oft  pos.sea
     p.octs  ;:(add oft.sea pos.sea n)
   ==
-::  +view-until: view until .pos 
+::  +view-until: view until .pos
 ::
 ++  view-until
  |=  [pos=@ud sea=bays]
@@ -285,7 +290,7 @@
 ++  find-byte
   :: ~/  %find-byte
   |=  [bat=@D sea=bays]
-  ^-  (unit @ud) 
+  ^-  (unit @ud)
   =+  i=pos.sea
   |-
   ?:  (exceed-at i sea)
@@ -379,6 +384,15 @@
   =+  len=(sub sop pos.sea)
   :_  sea(pos sop)
   [len (cut 3 [(here sea) len] q.octs.sea)]
+++  read-octs-until-maybe
+  |=  [sop=@ud sea=bays]
+  ^-  [(unit octs) bays]
+  ?:  (exceed-at (dec sop) sea)
+    [~ sea]
+  =+  len=(sub sop pos.sea)
+  :_  sea(pos sop)
+  %-  some
+  [len (cut 3 [(here sea) len] q.octs.sea)]
 ::  +read-octs-end: read octs until end of stream
 ::
 ++  read-octs-end
@@ -438,7 +452,14 @@
   =^  num  sea  (read-octs n sea)
   :_  sea
   (rev 3 num)
-++  peek-msb 
+++  read-msb-maybe
+  |=  [n=@ud sea=bays]
+  ^-  [(unit @) bays]
+  =^  num  sea  (read-octs-maybe n sea)
+  ?~  num  [~ sea]
+  :_  sea
+  (some (rev 3 u.num))
+++  peek-msb
   |=  [n=@ud sea=bays]
   ^-  @
   =/  num  (peek-octs n sea)
@@ -650,7 +671,7 @@
 +|  %transformation
 ::    +chunk: split the bytestream into chunks of .siz bytes
 ::
-::  If the bytestream is not evenly divided into chunks, 
+::  If the bytestream is not evenly divided into chunks,
 ::  the final chunk is a remainder.
 ::
 ++  chunk
@@ -659,15 +680,15 @@
   ^-  (list octs)
   ~
 ::
-::    +extract: extract a list of octs from bytestream 
-::  
-::  Repeatedly calls the user supplied gate .rac to
-::  determine the offset and length of each octs chunk. 
+::    +extract: extract a list of octs from bytestream
 ::
-::  .rac accepts a bytestream and returns a pair 
+::  Repeatedly calls the user supplied gate .rac to
+::  determine the offset and length of each octs chunk.
+::
+::  .rac accepts a bytestream and returns a pair
 ::  of an offset and chunk length to extract.
 ::
-::  The process continues until either the stream is exhausted, 
+::  The process continues until either the stream is exhausted,
 ::  or the gate returns a pair of [0 0]
 ::
 ++  extract
@@ -711,7 +732,7 @@
   =^  data=octs  sea  (read-octs len sea)
   $(res (cat-octs res data))
 ::    +split: split bytestream into a list of octs
-::  
+::
 ::  repeatedly calls the user supplied gate .pit
 ::  to determine the current chunk length
 ::
@@ -767,7 +788,7 @@
   =^  bat  bays.pea  (read-byte bays.pea)
   %=  $
     num.pea  (add num.pea 8)
-    bit.pea  
+    bit.pea
       (add bit.pea (lsh [0 num.pea] bat))
   ==
 ::  +drop-bits: drop low .n bits

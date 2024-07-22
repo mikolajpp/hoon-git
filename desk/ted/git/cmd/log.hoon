@@ -1,4 +1,4 @@
-:: 
+::
 ::  git [-n <number>] [branch]
 ::
 /-  spider
@@ -22,7 +22,7 @@
   ?:  =(~. raw-refname.args)
     branch.dir
   (scan (trip raw-refname.args) parse-refname)
-=/  refs=(list ^refname)  
+=/  refs=(list ^refname)
   (expand-ref-prefix refname)
 =/  dir=^refname
   |-
@@ -71,11 +71,11 @@
       ^-  (list sole-effect)
       ::  XX Surely, there must be a better way
       ::  to print things to terminal...
-      ::  XX And why does %txt take a tape, while %klr takes 
+      ::  XX And why does %txt take a tape, while %klr takes
       ::  cords?
       ::
       ;:  welp
-        :~  [%klr ~[[hash-styl ~[(crip "commit {(print-sha-1 hash)}")]]]]
+        :~  [%klr ~[[hash-styl ~[(crip "commit {(print-hash-sha-1 hash)}")]]]]
             [%klr ~[(cat 3 'Author: ' (print-person author.commit))]]
             [%klr ~[(cat 3 'Date:   ' (print-time commit-time.commit))]]
         ==
@@ -99,7 +99,7 @@
     hash  i.parents.commit.obj
     fecs  :_(fecs (print-commit hash commit.obj))
   ==
-;<  ~  bind:m  
-  %+  poke-our:io   %git-cmd 
+;<  ~  bind:m
+  %+  poke-our:io   %git-cmd
   [%noun !>([%shoe ~[sole-id] %sole [%mor (flop fecs)]])]
 (pure:m !>(~))

@@ -68,21 +68,11 @@
     $(code-size +(code-size))
   :_  (skip-bits code-size input)
   u.code
-  :: [u.code (add i code-size)]
 ::
 ++  get-cl-table-components
   |=  [hclen=@ud input=bits]
   ^-  [[cl-lengths=values cl-lengths-count=values] input=bits]
   =/  code-lengths  `(list @ud)`[16 17 18 0 8 7 9 6 10 5 11 4 12 3 13 2 14 1 15 ~]
-  :: =/  code-lengths  ^-  (list @ud)
-  ::   :~  16  17  18 
-  ::        0   8   7 
-  ::        9   6  10 
-  ::        5  11   4 
-  ::       12   3  13 
-  ::        2  14   1 
-  ::        15
-  ::   ==
   =/  cl-lengths  `values`~
   =/  cl-lengths-count  `values`~
   =/  j  0
@@ -310,7 +300,6 @@
     =/  canned-blocks  (can-octs (flop blocks-output))
     :: =/  leading-zeros  (sub p.block-output (met 3 q.block-output))
     :: [(add leading-zeros (met 3 canned-blocks)) canned-blocks]
-    ~&  p-canned-blocks+p.canned-blocks
     canned-blocks
   ?:  (gth distance p.block-output)
     ~|  "invalid distance too far back: d = {<distance>}, p = {<p.block-output>}"  !!
@@ -361,7 +350,8 @@
       (get-code input distance-codes)
     =^  bits  input  (read-need-bits 5 input)
     :_  input
-    (swp 0 bits)
+    =/  code  (swp-bits [5 bits])
+    ;;(@ud data.code)
   =^  distance  input
     %+  get-distance
     distance-code
@@ -561,7 +551,7 @@
   ::
   =/  input=bits  (from-bays sea)
   =|  =blocks-output
-  =^  decompressed-data  input  
+  =^  decompressed-data  input
     |-
     ^-  [result=octs bits]
     =.  input  (need-bits 3 input)
@@ -593,7 +583,7 @@
   ::  PARSE FOOTER
   ::  ----------------------------
   ::
-  ::  
+  ::
   =.  sea  bays.input
   ::
   =/  footer-length  (in-size sea)
@@ -643,7 +633,7 @@
   ::
   =/  input=bits  (from-bays sea)
   =|  =blocks-output
-  =^  decompressed-data  input  
+  =^  decompressed-data  input
     |-
     ^-  [result=octs bits]
     =.  input  (need-bits 3 input)
@@ -675,7 +665,7 @@
   ::  PARSE FOOTER
   ::  ----------------------------
   ::
-  ::  
+  ::
   =.  sea  bays.input
   ::
   =/  footer-length  (in-size sea)

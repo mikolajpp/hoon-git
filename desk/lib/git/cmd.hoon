@@ -24,9 +24,9 @@
   ^-  (list hash)
   ~
 ::  Diff two trees
-::  
+::
 ::  Return a list of [path left=hash right=hash]
-:: 
+::
 ++  diff-tree
   |=  $:  repo=repository:git
           a=tree-dir
@@ -137,7 +137,7 @@
   :: ~&  "Unhandled obj diff: {<-.left-obj>}:{<-.right-obj>}"  !!
   ::  Submodule
   $(sa t.sa, sb t.sb)
-    
+
   ++  tree-all-diff
     |=  [repo=repository:git tree=tree-dir p=path side=?]
     ^-  (list (trel path hash hash))
@@ -151,7 +151,7 @@
     ?:  ?=(%blob -.obj)
       :_  diff
       :-  [name.i.tree p]
-      ?:  side  
+      ?:  side
         [hash.i.tree 0x0]
       [0x0 hash.i.tree]
     ?.  ?=(%tree -.obj)

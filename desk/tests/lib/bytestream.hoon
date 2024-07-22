@@ -397,7 +397,7 @@
   ::
   ;:  weld
     %+  expect-eq
-    !>  0 
+    !>  0
     !>  pos.sea
     ::
     %+  expect-eq

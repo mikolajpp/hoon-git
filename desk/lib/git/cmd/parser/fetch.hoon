@@ -32,25 +32,25 @@
     opt
   ::  XX How to handle options following
   ::  an argument?
-  ::  Currently 'fetch origin --verbose' will 
+  ::  Currently 'fetch origin --verbose' will
   ::  take --verbose to be the second argument.
-  ::  This should only be the case if we signalled 
-  ::  end of options with `--`. It seems in +cmd 
-  ::  parser, before scanning for arguments, we should first 
+  ::  This should only be the case if we signalled
+  ::  end of options with `--`. It seems in +cmd
+  ::  parser, before scanning for arguments, we should first
   ::  extract the argument region with ending with first -.
   ::
   ::  XX this seems unnecessary
   :-  (easy ~)
-  ::  
+  ::
   ::  XX This parser could be simplified if
-  ::  parse-cmd had access to the args type and 
+  ::  parse-cmd had access to the args type and
   ::  could get its bunt:
   ::  %^  parse-cmd-default %fetch opt args
-  ::  would allow args to assume their default value if 
-  ::  no arguments were supplied. 
+  ::  would allow args to assume their default value if
+  ::  no arguments were supplied.
   ::
   ;~  pose
-    ;~  pfix 
+    ;~  pfix
       parse-gap
       ;~  plug
         ::  [<remote: name or URL>]
@@ -66,7 +66,7 @@
         ==
       ==
     ==
-    (easy *args) 
+    (easy *args)
   ==
 ++  get-opts
   |=  =opts-map

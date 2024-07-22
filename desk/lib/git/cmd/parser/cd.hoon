@@ -7,12 +7,12 @@
 |%
 +$  args  [repo=@ta branch=@t]
 ::
-++  parse-repo  
+++  parse-repo
   parse-urs
 ++  parse-branch
   ;~  pose
     ;~(simu prn parse-raw-refname)
-    (easy '') 
+    (easy '')
   ==
 ++  parse
   %+  parse-cmd-solo  %cd

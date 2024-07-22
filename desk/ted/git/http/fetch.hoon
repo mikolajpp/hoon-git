@@ -1,4 +1,4 @@
-::  
+::
 ::  Git fetch
 ::
 ::  XX handle deleted reference
@@ -12,7 +12,7 @@
 |=  arg=vase
 =/  m  (strand ,vase)
 ^-  form:m
-=/  [repo=repository:git remote=@tas]  
+=/  [repo=repository:git remote=@tas]
   !<([repository:git @tas] arg)
 =/  remote=remote:git
   (~(got by remotes.repo) remote)
@@ -21,8 +21,8 @@
 ;<  refs=(list reference:git)  bind:m  (ls-refs:gitio ~)
 =+  have=~(val by refs.remote)
 =/  want=(list hash:git)
-  ::  As we all learned in the kindergarden, 
-  ::  +< is the sample. 
+  ::  As we all learned in the kindergarden,
+  ::  +< is the sample.
   ::
   (turn refs |=(reference:git +<+))
 ;<  pack=pack:git  bind:m  (fetch:gitio have want)

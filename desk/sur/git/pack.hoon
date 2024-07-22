@@ -1,6 +1,6 @@
 /+  *git, stream
 |%
-+$  pack-object-type  $?  object-type 
++$  pack-object-type  $?  object-type
                           %ofs-delta
                           %ref-delta
                       ==
@@ -12,9 +12,9 @@
 +$  pack-delta-object  $>(?(%ofs-delta %ref-delta) pack-object)
 
 +$  pack-header  [version=%2 count=@ud]
-::  XX different comparison functions 
+::  XX different comparison functions
 ::  do not throw error!
-::  Is it possible to extract comparison 
+::  Is it possible to extract comparison
 ::  function from pack-index?
 ::
 +$  pack-index   ((mop hash @ud) lth)

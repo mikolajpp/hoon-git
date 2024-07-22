@@ -10,8 +10,8 @@
                     ==
 +$  opt-name  @ta
 +$  option  [opt-name opt-value]
-::  XX support repeated option. 
-::  This should result in a list of opt-values under 
+::  XX support repeated option.
+::  This should result in a list of opt-values under
 ::  the given key
 +$  opts-map  (map opt-name opt-value)
 --

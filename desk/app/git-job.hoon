@@ -10,7 +10,7 @@
   $%  state-0
   ==
 +$  job-id  @uv
-+$  job  $:  repo=@ta  :: target repository 
++$  job  $:  repo=@ta  :: target repository
              ted=@ta   :: path to thread, relative to /ted/git/jobs/
              wait=@dr  :: recurrence time
              desc=@t   :: description
@@ -29,7 +29,7 @@
 +$  command
   $%  [%start =job]
       [%stop =job-id]
-      :: [%run =id]  :: Trigger the job 
+      :: [%run =id]  :: Trigger the job
       :: [%cancel repo=@ta] :: Cancel all jobs for repository
   ==
 --
@@ -87,7 +87,7 @@
       =^  cards  state  (run:do id)
       [cards this]
   ==
-++  on-arvo  
+++  on-arvo
   |=  [=wire sign=sign-arvo]
   ^-  (quip card _this)
   ~&  on-arvo+wire
@@ -102,7 +102,7 @@
       ::  XX improve the pipeline
       ::  1. Upon run, lock the repository
       ::  2. When poke-ack is received, either
-      ::  schedule the thread to run, or add the job 
+      ::  schedule the thread to run, or add the job
       ::  to the delayed threads
       ::
       =/  lock
@@ -151,8 +151,8 @@
     :: [%sync @tas ~]
     ::   ?>  ?=([%khan %arow *] sign)
     ::   ::  XX how to handle sync failure?
-    ::   ::  Should we just print the error, or somehow 
-    ::   ::  notify the user 
+    ::   ::  Should we just print the error, or somehow
+    ::   ::  notify the user
     ::   ::
     ::   ?:  ?=(%.n -.p.sign)
     ::     ((slog p.p.sign) `this)

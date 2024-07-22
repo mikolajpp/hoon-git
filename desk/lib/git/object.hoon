@@ -29,29 +29,23 @@
                        ::
                        sign=(unit commit-signature)
                    ==
-+$  commit  $+  commit
++$  commit  $+  git-commit
             $:  commit-header
                 message=tape
             ==
-::  XX refactor to [mode name hash]
-::
-+$  tree-entry  [[mode=@ta name=@ta] =hash]
-+$  tree-dir  (list tree-entry)
-:: ++  git-tree  tree
-::  XX refactor objects so  fields are readily accessible
-::  XX are sizes here really necessary?
-::
-+$  object
-  $%  [%blob size=@ud =octs]
-      [%commit size=@ud =commit]
-      [%tree size=@ud tree=tree-dir]
++$  tree-entry  [name=@ta mode=@ta =hash]
++$  tree-dir  $+(git-tree (list tree-entry))
++$  object  $+  git-object
+  $%  [%commit size=@ud =commit]
+      [%tree size=@ud =tree-dir]
+      [%blob size=@ud data=octs]
+      [%tag size=@ud ~]
   ==
 --
-::
 ::  Git object core
 ::
 |%
-++  as-type
+++  ud-as-type
   |=  tid=@ud
   ^-  (unit object-type)
   ?+  tid  ~
@@ -66,7 +60,7 @@
   %-  can-octs:bs
   :~  (as-octs:mimes:html type.rob)
       [1 ' ']
-      (as-octs:mimes:html (scot %ud size.rob))
+      (as-octs:mimes:html (crip ((d-co:co 1) size.rob)))
       [1 0x0]
       data.rob
   ==
@@ -81,16 +75,49 @@
   |=  rob=raw-object
   ^-  octs
   data.rob
+++  blob-to-raw
+  |=  blob=object
+  ^-  raw-object
+  ?>  ?=(%blob -.blob)
+  [%blob size.blob data.blob]
+++  tree-to-raw
+  |=  [hal=hash-algo dir=object]
+  ^-  raw-object
+  :: XX This assertion makes raw-object face
+  :: inaccessible: another compiler bug
+  :: ?>  ?=(%tree -.object)
+  ::
+  ?>  ?=(%tree -.dir)
+  =+  dir=tree-dir.dir
+  =|  data=bays:bs
+  |-
+  ?~  dir
+    [%tree size=(size:bs data) (to-octs:bs data)]
+  =.  data  %+  append-octs:bs  data
+    (as-octs:bs mode.i.dir)
+  =.  data  %+  append-octs:bs  data
+    [1 ' ']
+  =.  data  %+  append-octs:bs  data
+    (as-octs:bs name.i.dir)
+  =.  data  (append-byte:bs data 0x0)
+  =.  data  (append-hash data hal hash.i.dir)
+  $(dir t.dir)
+++  commit-to-raw
+  |=  [hal=hash-algo commit=object]
+  ^-  raw-object
+  ?>  ?=(%commit -.commit)
+  *raw-object
 ::
 ::  Convert git object to raw form
 ::
-++  as-raw 
-  |=  obe=object
+++  obj-to-raw
+  |=  [hal=hash-algo obj=object]
   ^-  raw-object
-  ?-  -.obe
-    %blob    !!
-    %tree    !!
-    %commit  !!
+  ?-  -.obj
+    %blob    (blob-to-raw obj)
+    %tree    (tree-to-raw hal obj)
+    %commit  (commit-to-raw hal obj)
+    %tag  !!
   ==
 ::
 ::  sha-1 hash a raw git object
@@ -101,14 +128,6 @@
 ++  hash-raw-sha-1
   |=  rob=raw-object
   ^-  @ux
-  :: =/  len  (crip ((d-co:co 1) p.octs.data.rob))
-  :: ::  There must be a pattern for this
-  :: =/  hed  (cat 3 (cat 3 type.rob ' ') len)
-  :: =/  dat  (add hed (lsh [3 +((met 3 hed))] q.octs.data.rob))
-  :: =/  dat  (cat 3 hed (can 3 ~[[1 0x0] octs.data.rob]))
-  :: ::  (can ~[type.object ' ' len 0x0 data.object])
-  :: =/  wid  (add +((met 3 hed)) p.octs.data.rob)
-  :: XX is there a way to avoid rev?
   (hash-octs-sha-1 (raw-to-octs rob))
 ::
 ::  Hash raw git object
@@ -124,9 +143,9 @@
 ::  Hash a git object
 ::
 ++  hash-obj
-  |=  [hal=hash-algo obe=object]
+  |=  [hal=hash-algo obj=object]
   ^-  @ux
-  (hash-raw hal (as-raw obe))
+  (hash-raw hal (obj-to-raw hal obj))
 ::
 ++  print-hash
   |=  [hal=hash-algo =hash]
@@ -143,7 +162,7 @@
   ::  Parse header
   ::
   =/  pin  (find-byte:bs 0x0 (from-octs:bs octs))
-  ?~  pin 
+  ?~  pin
     ~|  "Object is corrupted: no header terminator found"  !!
   =/  txt  (trip (cut 3 [0 u.pin] q.octs))
   :: [type len]
@@ -182,7 +201,7 @@
 ::  XX conform commit parser to git
 ++  parse-commit
   ::  XX looks like another compiler bug.
-  ::  Below crashes with no error 
+  ::  Below crashes with no error
   :: |=  rob=$>(%commit raw-object)
   |=  [hal=hash-algo rob=raw-object]
   ^-  object
@@ -199,9 +218,6 @@
   |=  [hal=hash-algo rob=raw-object]
   ^-  object
   ?>  ?=(%tree type.rob)
-  ::  XX better parsing of mode.
-  ::  Is leading zero allowed in principle?
-  ::
   =/  sea=bays:bs  (from-octs:bs data.rob)
   ::  XX Is there a better pattern for
   ::  building a list of results?
@@ -213,19 +229,19 @@
     tree+[size.rob tes]
   =/  pin  (find-byte:bs 0x0 sea)
   ?~  pin  !!
-  =^  tex=(unit octs)  sea  
-    (read-octs-maybe:bs (sub u.pin pos.sea) sea)
-  ?~  tex
-    ~|  "Corrupted tree object: malformed tree entry"  !!
-  =/  txt  (trip q.u.tex)
+  =^  tex=(unit octs)  sea
+    (read-octs-until-maybe:bs u.pin sea)
   =.  sea  (skip-byte:bs sea)
-  =^  hek=(unit octs)  sea  
-    (read-octs-maybe:bs hash-bytes sea)
-  ?~  hek
-    ~|  "Corrupted tree object: malformed hash"  !!
-  =+  haz=q.u.hek
-  =/  ren  (scan txt ;~(plug tree-mode:parse tree-node:parse))
-  =/  ent=tree-entry  [ren haz]
+  ?~  tex
+    ~|  "Corrupted tree object: invalid tree entry"  !!
+  =^  hash=(unit hash)  sea
+    (read-hash-maybe hal sea)
+  ?~  hash
+    ~|  "Corrupted tree object: hash not found"  !!
+  =+  (scan (trip q.u.tex) ;~(plug tree-mode:parse tree-node:parse))
+  ::  [name mode hash]
+  ::
+  =/  ent=tree-entry  [+.- -.- u.hash]
   $(tes [ent tes])
 ++  parse
   |_  hal=hash-algo
@@ -275,7 +291,7 @@
       ^-  @da
       (add ~1970.1.1 (mul ~s1 sec))
     dip:ag
-  ++  time  
+  ++  time
     :: XX This breaks parsing
     :: ^-  $-(nail (like commit-time))
     ;~(plug date ;~(pfix ace zone))
@@ -319,20 +335,6 @@
   ::  Tree rules
   ::
   ++  tree-mode  (cook crip ;~(sfix (plus (shim '0' '9')) ace))
-  ++  tree-node  (cook crip (star ;~(less ace prn)))
-  ::
+  ++  tree-node  (cook crip (plus prn))
   --
-::  These are useless when inspecting objects. 
-::  Could the type-checker be improved to somehow inline
-::  these?
-::
-:: ++  is-blob
-::   |=  obj=object
-::   ?=(%commit -.obj)
-:: ++  is-tree
-::   |=  obj=object
-::   ?=(%tree -.obj)
-:: ++  is-commit
-::   |=  obj=object
-::   ?=(%commit -.obj)
 --

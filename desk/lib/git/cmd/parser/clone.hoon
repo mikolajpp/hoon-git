@@ -31,7 +31,7 @@
     ::
     parse-raw-url
     ::  [dir] to store in %git-store
-    ::  XX solve the problem of args parsing 
+    ::  XX solve the problem of args parsing
     ::  empty strings - parse-txt?
     (punt ;~(pfix parse-gap ;~(less hep ;~(simu prn parse-urs))))
   ==
@@ -39,7 +39,7 @@
   |=  =opts-map
   ^-  opts
   =|  =opts
-  ::  XX This should be auto generated 
+  ::  XX This should be auto generated
   ::
   =+  opt=(~(get by opts-map) %quiet)
   =?  quiet.opts  ?=(^ opt)

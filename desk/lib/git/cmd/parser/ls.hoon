@@ -1,5 +1,5 @@
 ::
-::  git ls 
+::  git ls
 ::
 ::  Show available repositories
 ::  XX It seems there is a serious problem with clay:

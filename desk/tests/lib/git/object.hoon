@@ -1,63 +1,53 @@
-/+  *test, *git, zlib
+/+  *test, *git-object, bs=bytestream, z=zlib
 ::
-=/  hash-algo  %sha-1
+=+  hal=%sha-1
 |%
 ++  test-parse-blob
   ;:  weld
   ::
-  =/  dat  'blob 3\00oak'
-  =/  rob  (parse-raw:obj [(met 3 dat) dat])
+  =/  dat  (as-octs:bs 'blob 3\00oak')
+  =/  rob  (raw-from-octs dat)
   %+  expect-eq
-  !>  [%blob [3 'oak']]
-  !>  (parse:obj hat rob)
+  !>  :-  (txt-to-hash ~.9d880478c6219bb84e97ed6a092ce46c5ccedc60)
+      [%blob size=3 (as-octs:bs 'oak')]
+  !>  =/  obj  (parse-raw hal rob)
+      :_  obj
+      (hash-obj hal obj)
   ::
-  =/  dat  'blob 3\00fir'
-  =/  rob  (parse-raw:obj [(met 3 dat) dat])
+  =/  dat  (as-octs:bs 'blob 3\00fir')
+  =/  rob  (raw-from-octs dat)
   %+  expect-eq
-  !>  [%blob [3 'fir']]
-  !>  (parse:obj hat rob)
+  !>  :-  (txt-to-hash ~.96b0461a6d7a15b2710c23a7fb0a4b442763a193)
+      [%blob size=3 (as-octs:bs 'fir')]
+  !>  =/  obj  (parse-raw hal rob)
+      :_  obj
+      (hash-obj hal obj)
   ::
-  =/  dat  'blob 5\00maple'
-  =/  rob  (parse-raw:obj [(met 3 dat) dat])
+  =/  dat  (as-octs:bs 'blob 5\00maple')
+  =/  rob  (raw-from-octs dat)
   %+  expect-eq
-  !>  [%blob [5 'maple']]
-  !>  (parse:obj hat rob)
+  !>  :-  (txt-to-hash ~.2d8bbedc1fb46b86d8bcff50b6c491c330237bd8)
+      [%blob size=5 (as-octs:bs 'maple')]
+  !>  =/  obj  (parse-raw hal rob)
+      :_  obj
+      (hash-obj hal obj)
   ==
-++  test-parse-commit
+++  test-parse-tree
   ;:  weld
   ::
-  =/  dat
-  %-  crip:obj  %+  weld  "commit 233\00"
-  """
-  tree d928f280a489455d76396f38444512beedb05b50
-  parent 41416ff404dcf7bb0310bfd740a3c8c4490e7807
-  author Bilbo Baggins <bilbo@shire.green> 1695627855 +0800
-  committer Bilbo Baggins <bilbo@shire.green> 1695627855 +0800
-
-  Discover new trees\0a
-  """
-  =/  octs  [(met 3 dat) dat]
-  =/  rob  (parse-raw:obj octs)
+  =/  dat  %-  need
+      (de:base64:mimes:html 'dHJlZSAzNwAxMDA2NDQgUkVBRE1FLm1kAL95WRuOpepZ7+j9i+LgSvK2czrM')
+  =/  rob  (raw-from-octs dat)
   %+  expect-eq
-  !>  :-  %commit
-    :-
-    :*  tree=0xd928.f280.a489.455d.7639.6f38.4445.12be.edb0.5b50
-        parent=~[0x4141.6ff4.04dc.f7bb.0310.bfd7.40a3.c8c4.490e.7807]
-        author=[["Bilbo Baggins" "bilbo@shire.green"] [1.695.627.855 & "0800"]]
-        commiter=[["Bilbo Baggins" "bilbo@shire.green"] [1.695.627.855 & "0800"]]
-    ==
-    "Discover new trees\0a"
-  !>  (parse:obj hat rob)
-  ::
-  =/  dat  %-  need  %-  de:base64:mimes:html
-  'dHJlZSA2OQAxMDA2NDQgUkVBRE1FLm1kAG5lqUXsvk61r72SKJgR5IWM1yhsNDAwMDAgdHJlZXMAGwbNWLyXaB6s5lJb9DTUapEoXck='
-  =/  rob  (parse-raw:obj dat)
-  %+  expect-eq
-  !>  :-  %tree
-      :~
-      :-  [mode=~.40000 node=~.trees]  0x1b06.cd58.bc97.681e.ace6.525b.f434.d46a.9128.5dc9
-      :-  [mode=~.100644 node='README.md']  0x6e65.a945.ecbe.4eb5.afbd.9228.9811.e485.8cd7.286c
+  !>  :-  (txt-to-hash ~.47a237559adb6f5ca41621c8afcfcdb24ad4eadf)
+      :-  %tree  :-  size=37
+      :~  :-  name='README.md'
+          :-  mode=~.100644
+          (txt-to-hash ~.bf79591b8ea5ea59efe8fd8be2e04af2b6733acc)
       ==
-  !>  (parse:obj hat rob)
+  !>  =/  obj  (parse-raw hal rob)
+      :_  obj
+      (hash-obj hal obj)
+  ::
   ==
 --

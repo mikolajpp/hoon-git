@@ -27,7 +27,7 @@
   ::
   ::  XX Do we really need to differentiate refnames such as
   ::  /refs/heads and /refs/heads/ in pattern matching?
-  ::  Is there any practical difference in git when it comes to 
+  ::  Is there any practical difference in git when it comes to
   ::  /refs/heads* and /refs/heads/*?
   ::
   ::  With the pattern flag, /refs/heads unambigously means
@@ -84,7 +84,7 @@
       (weld /refs/heads u.base)
       (weld /refs/tags u.base)
   ==
-    
+
 ++  parse-refspec  refspec:parse
 ++  parse-raw-refspec  raw-refspec:parse
 ::  Convert .raw to $refspec
@@ -118,7 +118,7 @@
     ~|  "Invalid negative refspec"  ~
   ::  Special case ':' or '+:' for pushing matching refs
   ::
-  ?:  ?&  !fetch 
+  ?:  ?&  !fetch
           ?=([%ref %$] src)
           ?=([~ %$] dst)
       ==
@@ -172,12 +172,12 @@
         ::  Push refspecs
         ::
         ::  1. when wildcarded, src must be valid
-        ::  2. otherwise, src must be existing sha-1, 
+        ::  2. otherwise, src must be existing sha-1,
         ::  but this can't be verified
         ::  3. if dst is missing, src must be valid
         ::  4. dst must not be empty and must be valid
         ?|  &(pattern !sane-src)
-            ?~  dst  
+            ?~  dst
               !sane-src
             !(sane-refname u.dst flags)
         ==
@@ -234,7 +234,7 @@
       (punt ;~(pose lus ket))
       ;~  pose
         pat  ::  HEAD
-        parse-raw-pattern-refname 
+        parse-raw-pattern-refname
       ==
       (punt ;~(pfix col parse-raw-pattern-refname))
     ==

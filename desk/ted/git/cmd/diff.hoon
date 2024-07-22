@@ -1,4 +1,4 @@
-:: 
+::
 ::  git diff src..dst
 ::
 :: XX Is /% defunct?
@@ -42,10 +42,10 @@
 =/  dst-commit=commit
   =-  ?>(?=(%commit -.-) commit.-)
   (got:~(store git repo) dst)
-=/  src-tree=tree
+=/  src-tree=tree-dir
   =-  ?>(?=(%tree -.-) tree.-)
   (got:~(store git repo) tree.src-commit)
-=/  dst-tree=tree
+=/  dst-tree=tree-dir
   =-  ?>(?=(%tree -.-) tree.-)
   (got:~(store git repo) tree.dst-commit)
 :: ~&  src-tree
@@ -55,7 +55,7 @@
 =>  |%
     ::  XX Detect binary files and do not print them
     ::
-    ++  plus-styl 
+    ++  plus-styl
       [~ [~ `%g]]
     ++  min-styl
       [~ [~ `%r]]
@@ -70,7 +70,7 @@
       =+  show=(cat 3 ?:(side '+' '-') line)
       [%klr ~[[styl ~[show]]]]
     ++  print-file
-      |=  [=path =hash side=?] 
+      |=  [=path =hash side=?]
       ^-  sole-effect
       =/  obj
         (got:~(store git repo) hash)
@@ -115,7 +115,7 @@
       :: XX There is a parser bug here
       :: ?-  -.i.diff
       ::   %&  $(line p.i.diff, diff t.diff)
-      ::   %|  
+      ::   %|
       ::     %=  $
       ::       efes
       ::         :: ^-  (list sole-effect)
@@ -142,7 +142,7 @@
   ?:  =(0x0 r)
     (print-file p q &)
   (print-diff p q r)
-;<  ~  bind:m  
-  %+  poke-our:io   %git-cmd 
+;<  ~  bind:m
+  %+  poke-our:io   %git-cmd
   [%noun !>([%shoe ~[sole-id] %sole [%mor (flop efes)]])]
 (pure:m !>(~))

@@ -2,8 +2,8 @@
 |%
 +$  refname  $+(refname (list @t))
 +$  ref  $@(hash [%symref =refname])
-::  XX Can you use an axal with ref-path instead 
-::  of path from the aura typesystem 
+::  XX Can you use an axal with ref-path instead
+::  of path from the aura typesystem
 ::  point of view?
 ::
 +$  refs  $+(git-refs (axal ref))
@@ -143,14 +143,14 @@
   ^-  ?
   ?~  refname  |
   ::  XX Allow only single pattern
-  ::  
+  ::
   ::  Disallow trailing dot
   ::
   =+  rear=(rear refname)
   =+  last=(cut 3 [(dec (met 3 rear)) 1] rear)
   ?:  =('.' last)
     |
-  ?:  ?&  !(has-flag refname-one-level flags) 
+  ?:  ?&  !(has-flag refname-one-level flags)
           (lth (lent refname) 2)
       ==
     |

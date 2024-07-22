@@ -6,9 +6,9 @@
 +$  args  raw-refname=@t
 +$  opts  $:  number=_1
           ==
-::  XX Git supports option of the form 
-::  -@ud. Extend the command parser 
-::  to accomodate this. 
+::  XX Git supports option of the form
+::  -@ud. Extend the command parser
+::  to accomodate this.
 ++  opt
   ;~  pose
     (num-opt %number %n)
@@ -25,7 +25,7 @@
   |=  =opts-map
   ^-  opts
   =|  =opts
-  ::  XX This should be auto generated 
+  ::  XX This should be auto generated
   ::
   :: =+  opt=(~(get by opts-map) %single-branch)
   :: =?  single-branch.opts  ?=(^ opt)

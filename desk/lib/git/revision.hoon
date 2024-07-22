@@ -1,9 +1,9 @@
 ::
 ::  Revision walking
-::  Revision walker accepts a list of user supplied 
+::  Revision walker accepts a list of user supplied
 ::  commits, some of which can be marked as dull.
 ::
-::  Subsequently, the revision walker prepares its internal state 
+::  Subsequently, the revision walker prepares its internal state
 ::  for walking the revision tree.
 ::
 ::  API
@@ -19,17 +19,17 @@
 ::
 +$  seed-mop  ((mop @ud (list (pair hash commit))) gth)
 ++  seed-on  ((on @ud (list (pair hash commit))) gth)
-+$  rev-walk 
++$  rev-walk
   $:  repo=repository:git
       ::  Seed for a walk: pushes and hides
       ::  - a push is an interesting commit
       ::  - a hide is a dull commit
       ::
-      ::  For objects that were reached, 
-      ::  the store will contain the commit. 
-      ::  For objects that were added because 
-      ::  they were parents, but have not been 
-      ::  reached otherwise, the map will contain 
+      ::  For objects that were reached,
+      ::  the store will contain the commit.
+      ::  For objects that were added because
+      ::  they were parents, but have not been
+      ::  reached otherwise, the map will contain
       ::  a null. This is useful during expansion
       ::  of the dull set -- we mark grandparents dull
       ::  only if the parent was stored as a full object.
@@ -45,13 +45,13 @@
       ::  Commits already processed
       ::
       done=(set hash)
-      
+
   ==
 --
 |_  state=rev-walk
-::  Walk over revisions, growing the walk 
+::  Walk over revisions, growing the walk
 ::  from the seed list
-::  
+::
 ++  walk
   |=  [repo=repository:git want=(list hash) exclude=(list hash)]
   ^-  (list (pair hash commit))
@@ -70,9 +70,9 @@
   ^-  rev-walk
   state(store (~(put by store.state) hash commit))
 ::  Retrieve a commit from the walk
-::  store. If it does not exist, 
+::  store. If it does not exist,
 ::  reach out to the repository store, crash if not found.
-::  The null commit means the object was 
+::  The null commit means the object was
 ::  added to the store as a hash only (partially).
 ::
 ++  got-unit-by-store
@@ -86,9 +86,9 @@
   ?>  ?=(%commit -.obj)
   [`commit.obj (put-unit-by-store hash `commit.obj)]
 ::  Retrieve a commit from the walk
-::  store. If it does not exist, 
+::  store. If it does not exist,
 ::  reach out to the repository store.
-::  If the commit exists but is partial, 
+::  If the commit exists but is partial,
 ::  put the full object into the store and return it.
 ::
 ++  got-by-store
@@ -132,7 +132,7 @@
   =|  stack=(list hash)
   =+  parents=parents.commit
   =<
-  ::  Mark parents of the commit as dull, 
+  ::  Mark parents of the commit as dull,
   ::  possibly adding grandparents to the stack
   ::
   =^  stack  dull.state
@@ -142,7 +142,7 @@
     =+  hash=i.parents
     =.  dull.state
       (~(put in dull.state) hash)
-    =^  grands=(list ^hash)  state  
+    =^  grands=(list ^hash)  state
       (mark-one-parent-dull hash)
     %=  $
       parents  t.parents
@@ -182,12 +182,12 @@
   ::  (2) For dull commits that has already been parsed,
   ::      process each parent
   ::    (a) Mark the parent dull
-  ::    (b) Make it into a full object and mark 
+  ::    (b) Make it into a full object and mark
   ::        grandparents dull
   ::    (c) If the object has not yet been added to the list (!SEEN),
   ::        add it in time order.
   ::  (3) For interesting commits, process each parent
-  ::    (a) If the parent is interesting, add it to 
+  ::    (a) If the parent is interesting, add it to
   ::        the list in time order, if it=[hash commit] has not been SEEN yet.
   ::
   ::  XX use a zipper
@@ -215,16 +215,16 @@
   =.  state  (put-on-seed hash mit)
   $(parents t.parents)
 ::  XX Make (list (pair [hash commit] ?))
-::  the standard output of revision state. 
-::  The flag indicates whether to state over the commit (&) 
-::  or it is a dull object. 
+::  the standard output of revision state.
+::  The flag indicates whether to state over the commit (&)
+::  or it is a dull object.
 ::
 ++  prepare
   |=  seed=(list [hash walk=?])
   ^-  (list [hash commit])
   =.  state
     |-
-    ?~  seed 
+    ?~  seed
       state
     =+  hash=-.i.seed
     =+  dull=!+.i.seed

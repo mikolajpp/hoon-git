@@ -26,7 +26,7 @@
         ;~(pose parse-short-raw-hash (stag %ref parse-raw-refname))
       [src dst]
     ;~  plug
-      ::  XX parse-raw-refname should not 
+      ::  XX parse-raw-refname should not
       ::  parse empty strings
       ::
       (plus ;~(less dot dot prn))

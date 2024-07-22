@@ -4,10 +4,10 @@
 /+  bs=bytestream
 /+  *git-hash, *git-object, *git-refs, git-pack
 |%
-+$  bundle-header  
-  $:  version=$?(%2) 
-      hash=hash-algo 
-      need=(list hash) 
++$  bundle-header
+  $:  version=$?(%2)
+      hash=hash-algo
+      need=(list hash)
       refs=(list [p=path q=hash])
   ==
 +$  bundle  [header=bundle-header =pack:git-pack]
@@ -44,16 +44,16 @@
     =|  reqs=(list hash)
     |-
     =/  [line=(unit @t) red=bays:bs]  (read-line-maybe:bs sea)
-    ?~  line 
+    ?~  line
       ~|  "Git bundle is corrupted: invalid header"  !!
-    =/  hash=(unit hash)  
+    =/  hash=(unit hash)
       %+  rust  (trip u.line)
       %+  ifix  [hep (just '\0a')]
       ;~  sfix
         parse-hash
         (punt ;~(pfix ace (star prn)))  :: optional comment
       ==
-    ?~  hash 
+    ?~  hash
       [reqs sea]
     $(reqs [u.hash reqs], sea red)
   ::
@@ -63,7 +63,7 @@
     =|  refs=(list (pair refname hash))
     |-
     =/  [line=(unit @t) red=bays:bs]  (read-line-maybe:bs sea)
-    ?~  line 
+    ?~  line
       ~|  "Git bundle is corrupted: invalid header"  !!
     =/  ref=(unit [=hash =refname])
       %+  rust  (trip u.line)

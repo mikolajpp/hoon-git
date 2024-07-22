@@ -82,10 +82,10 @@
   ::  All on-agent and on-arvo calls
   ::  originate in response to user commands.
   ::
-  ::  The wire should begin with sole-id, 
+  ::  The wire should begin with sole-id,
   ::  /who/ses/...
   ::
-  ::  In this way, we can emit notifications and 
+  ::  In this way, we can emit notifications and
   ::  manage prompt for each sessions separately.
   ::
   ?+  wire  (on-agent:def wire sign)
@@ -111,7 +111,7 @@
       ~|  "Failed to store repository {<repo>}"
       (mean u.p.sign)
   ==
-++  on-arvo  
+++  on-arvo
   |=  [=wire sign=sign-arvo]
   ^-  (quip card _this)
   ?+  wire  (on-arvo:def wire sign)
@@ -127,7 +127,7 @@
     ::
     ::  XX  The command threads should probably
     ::  communicate directly with the git-store.
-    ::  This would free git-cmd from dependending 
+    ::  This would free git-cmd from dependending
     ::  on output type of command threads.
     ::
     [%exec @tas @ta ~]
@@ -320,7 +320,7 @@
   :: :*  [%shoe ~[sole-id] %sole %txt "rm: deleted repository /{(trip name.rm)}"]
   ::     [%shoe ~[sole-id] (set-prompt ' /> ')]
 ++  cat  !!
-::  Execute the command thread 
+::  Execute the command thread
 ::
 ::  XX commands should be executed synchronously
 ::
@@ -338,7 +338,7 @@
     %-  some
     .^(repository:git %gx (scry:io /git-store/[repo.dir]/noun))
   =/  args
-    ::  XX This is a workaround for bug with vase mode 
+    ::  XX This is a workaround for bug with vase mode
     ::  in wet gates (see issue 1347)
     ::
     ?+  -.cmd  !!
@@ -361,7 +361,7 @@
   ^-  shoe-effect:shoe
   :+  %sole  %pro
   :+  &  %$
-  :~ 
+  :~
   ' /'  repo.dir
   ?:(=(branch.dir /) '' (^cat 3 ':' (print-refname branch.dir)))
   '> '

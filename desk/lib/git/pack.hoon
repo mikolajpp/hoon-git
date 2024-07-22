@@ -18,9 +18,9 @@
 +$  pack-delta-object  $>(?(%ofs-delta %ref-delta) pack-object)
 
 +$  pack-header  [version=%2 count=@ud]
-::  Is it possible to extract comparison 
+::  Is it possible to extract comparison
 ::  function from pack-index?
-:: 
+::
 ++  hash-cmp  gth
 +$  pack-index   ((mop hash @ud) hash-cmp)
 ++  pack-on  ((on hash @ud) hash-cmp)
@@ -28,10 +28,10 @@
 ::
 +$  pack-cache  [count=@ud store=(list (pair @ud raw-object))]
 +$  pack  $:  =hash-algo
-              count=@ud 
-              index=pack-index 
+              count=@ud
+              index=pack-index
               ::  Checksum position
-              end-pos=@ud 
+              end-pos=@ud
               stream=bays:bs
           ==
 +$  store-raw-get  $-(hash (unit raw-object))
@@ -49,20 +49,19 @@
   =+  start=pos.sea
   =^  header=pack-header  sea  (read-header sea)
   =+  beg-pos=pos.sea
-  =^  [=pack miss=(list raw-object)]  
+  =^  [=pack miss=(list raw-object)]
     sea  (index header sea get)
   ::  Verify integrity
   ::
   =+  end=pos.sea
   =^  hash  sea
-    (read-octs-maybe:bs (pack-hash-bytes header) sea)
-  ?~  hash 
+    (read-hash-maybe (pack-hash-algo header) sea)
+  ?~  hash
     ~|  "Pack file is corrupted: no checksum found"  !!
-  :: ?>  (is-empty:bs sea)
   =+  len=(sub end start)
   =+  check=(hash-octs-sha-1 len (rsh [3 start] q.octs.sea))
-  ?>  =(q.u.hash check)
-  ::  XX read-thin should return the list 
+  ?>  =(u.hash check)
+  ::  XX read-thin should return the list
   ::  of missing objects instead of thickening the pack
   ::
   :: =+  pack=(insert-objects pack miss)
@@ -132,8 +131,8 @@
   ?-  version.hed
     %2  %sha-1
   ==
-:: 
-::  Index a pack, returning index together 
+::
+::  Index a pack, returning index together
 ::  with a list of objects missing from the pack.
 ::
 ++  index
@@ -155,8 +154,7 @@
     |-
     ?.  (lth count count.header)
       :_  sea
-      :_  miss
-      index
+      [index miss]
     ?:  (is-empty:bs sea)
       ~|  "Expected {<count.header>} objects ({<count>} processed)"
         !!
@@ -170,7 +168,6 @@
     ?:  (~(has by index) hash)
       ~|  "Object {<hash>} duplicated: indexed at {<(~(get by index) hash)>}"  !!
     ::  cache resolved delta object
-    ::
     =?  cache  ?=(pack-delta-object pob)
       =?  cache  =(count.cache cache-limit)
         ::  Shave off 5 latest objects
@@ -196,11 +193,11 @@
   ::
   [count.header index end-pos=pos.sea (seek-to:bs start sea)]
 ::
-::  Resolve raw object, potentially obtaining 
+::  Resolve raw object, potentially obtaining
 ::  a missing object base object through the get gate
 ::
 ++  resolve-raw-object-miss
-  |=  $:  pob=pack-object 
+  |=  $:  pob=pack-object
           index=pack-index
           cache=pack-cache
           sea=bays:bs
@@ -211,14 +208,14 @@
     [pob ~]
   (resolve-delta-object pob index cache sea get)
 ++  resolve-delta-object
-  |=  $:  delta=pack-delta-object 
+  |=  $:  delta=pack-delta-object
           index=pack-index
           cache=pack-cache
           sea=bays:bs
           get=store-raw-get
       ==
   ^-  [raw-object (unit raw-object)]
-  ::  Generate chain of delta objects terminating 
+  ::  Generate chain of delta objects terminating
   ::  at the first resolved object
   ::
   =/  chain=(lest pack-delta-object)
@@ -268,20 +265,20 @@
     [res `base]
   [res ~]
 ++  resolve-raw-object
-  |=  $:  pob=pack-object 
+  |=  $:  pob=pack-object
           index=pack-index
           cache=pack-cache
-          sea=bays:bs 
+          sea=bays:bs
           get=store-raw-get
       ==
   ^-  raw-object
   -:(resolve-raw-object-miss pob index cache sea get)
-::  Resolve a raw object from 
+::  Resolve a raw object from
 ::  a base and a chain of delta objects
 ::
 ++  resolve-delta-chain
-  |=  $:  base=raw-object 
-          chain=(list pack-delta-object) 
+  |=  $:  base=raw-object
+          chain=(list pack-delta-object)
           sea=bays:bs
       ==
   ^-  raw-object
@@ -298,10 +295,10 @@
 ::  +expand-delta-object: resolve delta object against the base
 ::
 ::  XX this is currently unbearably slow on certain git objects
-::  which require large number of instructions to reconstruct, 
+::  which require large number of instructions to reconstruct,
 ::  on the order of 10.000. In particular tloncorp/tlon-apps
-::  repository takes a very long time to clone. 
-::  Since we can not jet this arm, some other solution is required. 
+::  repository takes a very long time to clone.
+::  Since we can not jet this arm, some other solution is required.
 ::
 ::  Some possible improvements:
 ::  instead of storing chunks, directly construct the object.
@@ -387,20 +384,20 @@
     ^-  [octs bays:bs]
     =|  offset=@ud
     =|  size=@ud
-    ::  XX is the runtime smart enough 
+    ::  XX is the runtime smart enough
     ::  to avoid having 4 copies of offset in the
     ::  subject?
     ::
-    =^  oft  sea  
+    =^  oft  sea
       (read-cp-param offset [bat 0x1 0] sea)
     =.  offset  oft
-    =^  oft  sea  
+    =^  oft  sea
       (read-cp-param offset [bat 0x2 1] sea)
     =.  offset  oft
-    =^  oft  sea  
+    =^  oft  sea
       (read-cp-param offset [bat 0x4 2] sea)
     =.  offset  oft
-    =^  oft  sea  
+    =^  oft  sea
       (read-cp-param offset [bat 0x8 3] sea)
     =.  offset  oft
     ::
@@ -431,8 +428,6 @@
   =^  [type=pack-object-type size=@ud]  sea
     (read-pack-object-header sea)
   ?+  type
-    ~&  obj-size+size
-    ~&  (en:base64:mimes:html (peek-octs:bs 120 sea))
     =^  data=octs  sea  (expand:zlib sea)
     ?.  =(p.data size)
       ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<p.data>}b)"  !!
@@ -466,8 +461,8 @@
   =^  base-offset=@ud  sea  (read-offset sea)
   ::  XX this check could be wrong
   ::  the stream position might
-  ::  not be relative to the beginning of the packfile, 
-  ::  but, for instance, to a bundle file. 
+  ::  not be relative to the beginning of the packfile,
+  ::  but, for instance, to a bundle file.
   ::
   ?<  |(=(0 base-offset) (gte base-offset pos))
   =^  dat  sea  (expand:zlib sea)
@@ -553,7 +548,7 @@
   ^-  ?
   ?=(?(%ofs-delta %ref-delta) -.kob)
 --
-::  
+::
 ::  Pack interface
 ::
 |_  pak=pack
@@ -619,7 +614,7 @@
   ^-  ?
   (has:pack-on index.pak hash)
 ::
-::  Find objects whose hashes match the 
+::  Find objects whose hashes match the
 ::  key @a
 ::
 ++  find-by-key
@@ -632,8 +627,8 @@
   ::
   =+  len=(met 3 (crip ((x-co:co 0) +(kex))))
   =|  hey=(list @ux)
-  =<  -  
-  %^  (dip:pack-on _hey)  
+  =<  -
+  %^  (dip:pack-on _hey)
     index.pak
   hey
     |=  [hey=(list @ux) item=[hash @ud]]

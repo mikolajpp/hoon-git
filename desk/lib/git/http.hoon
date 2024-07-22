@@ -1,12 +1,12 @@
-::  
+::
 ::::  Git http
   ::
-::  git-http is a library of git smart HTTP protocol 
+::  git-http is a library of git smart HTTP protocol
 ::  component strands.
 ::
-::  Supports only protocol v2 for git-upload-pack and 
+::  Supports only protocol v2 for git-upload-pack and
 ::  protocol v0 for git-receive-pack functionality
-:: 
+::
 /-  spider
 /+  bs=bytestream, strandio
 /+  git-hash, git-pack, git=git-repository
@@ -28,7 +28,7 @@
 --
 ::  XX This is a bug caused by tiscom
 ::  Proper behavior is restored by skipping faces
-::  as many times as tiscom was used. 
+::  as many times as tiscom was used.
 ::
 :: ~%  %git-http  ..^^^^^part  ~
 ~%  %git-http  ..part  ~
@@ -40,7 +40,7 @@
   =/  m  (strand ,caps)
   ^-  form:m
   ;<  ~  bind:m
-  %-  send-request:strandio  
+  %-  send-request:strandio
     :^  %'GET'
         (cat 3 url '/info/refs?service=git-upload-pack')
         :~  ['Git-Protocol' 'version=2']
@@ -59,11 +59,11 @@
   =|  red=bays:bs
   =^  pil  red  (read-pkt-lines & sea)
   =+  lip=(flop pil)
-  ?~  lip 
+  ?~  lip
     ~|  "Server response empty"  !!
   ?>  ?=(%data -.i.lip)
   ::  "Clients MUST verify the first pkt-line is # service=$servicename"
-  ::  Yet, as of version 2.43.0, git no longer sends this line in v2 
+  ::  Yet, as of version 2.43.0, git no longer sends this line in v2
   ::  protocol.
   ::
   =?  sea  =('# service=git-upload-pack' q.octs.i.lip)
@@ -87,7 +87,7 @@
   =/  m  (strand ,caps)
   ^-  form:m
   ;<  ~  bind:m
-  %-  send-request:strandio  
+  %-  send-request:strandio
     :^  %'GET'
         (cat 3 url '/info/refs?service=git-receive-pack')
         :~  ['Git-Protocol' 'version=0']
@@ -103,7 +103,7 @@
   =/  sea=bays:bs  (from-octs:bs data.u.full-file.res)
   =^  pil  sea  (read-pkt-lines & sea)
   =+  lip=(flop pil)
-  ?~  lip 
+  ?~  lip
     ~|  "Server response empty"  !!
   ::  Handle non-standard behaviour
   ::  of servers advertising the service name
@@ -125,7 +125,7 @@
 ::
 ++  send-request
   |=  =request
-  ::  Assemble request 
+  ::  Assemble request
   ::
   =/  req=octs
     %-  can-octs:bs
@@ -145,7 +145,7 @@
         ==
         `req
 ::
-::  Parse ls-refs output to a triple of 
+::  Parse ls-refs output to a triple of
 ::  refname, reference, and optional peeled hash
 ::
 ++  ls-refs
@@ -160,7 +160,7 @@
         ==
       --
   |=  =args
-  ::  Return a triple of refname, reference, 
+  ::  Return a triple of refname, reference,
   ::  and optional peeled hash.
   ::
   =/  m  (strand ,(list [refname ref (unit hash)]))
@@ -202,7 +202,7 @@
           (stag %peeled ;~(pfix (jest ' peeled:') parse-hash-sha-1))
         ==
       ++  ref-parser
-        %+  cook 
+        %+  cook
           |=  [=hash =refname:git attr=(unit (list attribute))]
           ^-  [refname:git ref:git (unit ^hash)]
           ?~  attr
@@ -307,19 +307,19 @@
     ?@  pkt
       :_  sea
       ~
-    ::  No acceptable common object set 
-    ::  found. 
+    ::  No acceptable common object set
+    ::  found.
     ::
     ?:  =('NAK' q.octs.pkt)
       :_  red
       ~
-    ::  Server found a common object set and 
+    ::  Server found a common object set and
     ::  is ready for transfer.
     ::
     ?:  =('ready' q.octs.pkt)
       :_  red
       ~
-    ::  Acknowledge all 'have' objects also 
+    ::  Acknowledge all 'have' objects also
     ::  possessed by the server.
     ::
     =.  sea  red
@@ -354,7 +354,7 @@
     ==
     ::
   ++  read-shallow-info
-    |=  sea=bays:bs 
+    |=  sea=bays:bs
     :_  sea
     ~
   ++  read-wanted-refs
@@ -437,7 +437,7 @@
   |=  [txt=@t band=@udD]
   ^-  octs
   =+  len=(met 3 txt)
-  ::  XX split large requests across 
+  ::  XX split large requests across
   ::  multiple pkt lines
   ::
   ?>  (lte +(len) (sub 0xffff 5))
@@ -456,7 +456,7 @@
   |=  txt=@t
   ^-  octs
   =+  len=(met 3 txt)
-  ::  XX split large requests across 
+  ::  XX split large requests across
   ::  multiple pkt lines
   ::
   ?>  (lte +(len) (sub 0xffff 4))
@@ -472,7 +472,7 @@
 ++  write-pkt-lines
   |=  data=octs
   ^-  octs
-  ::  XX split large requests across 
+  ::  XX split large requests across
   ::  multiple pkt lines
   ::
   ?>  (lte p.data (sub 0xffff 4))
@@ -483,8 +483,8 @@
     (write-pkt-len (add p.data 4))
     data
 :: XX there is an input for which q.octs.pkt crashes!
-:: This looks like another 
-:: bug: 
+:: This looks like another
+:: bug:
 :: |=  [band=@ud pkt=$>(%data pkt-line)]
 ::
 ++  pkt-line-is-band
@@ -501,7 +501,7 @@
   ::
   =+  max-len=(sub chunk-size 5)
   =|  data=bays:bs
-  |-  
+  |-
   ?:  (is-empty:bs sea)
     (to-octs:bs data)
   =+  rem=(in-size:bs sea)
@@ -521,7 +521,7 @@
 ++  read-pkt-lines-on-band
   |=  [band=@ud sea=bays:bs]
   ^-  [octs bays:bs]
-  =;  [data=octs sea=bays:bs] 
+  =;  [data=octs sea=bays:bs]
     [data sea]
   %+  fuse-extract:bs  sea
   |=  sea=bays:bs
@@ -533,7 +533,7 @@
   ::  invalid according to git protocol
   ::
   ?<  =(4 len)
-  ::  skip special packet line 
+  ::  skip special packet line
   ::
   ?:  (lth len 4)
     [4 0]
@@ -580,7 +580,7 @@
     ~|  "Unhandled special pkt-line"  !!
   =.  len  (sub len 4)
   =^  octs  sea  (read-octs-maybe:bs len sea)
-  ?~  octs 
+  ?~  octs
     ~|  "Insufficient data: expected pkt-line data"  !!
   =/  pkt=pkt-line
     ::  Strip trailing newline

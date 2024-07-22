@@ -1,5 +1,5 @@
 ::
-:: +get-opts - convert an options vase to get opts function 
+:: +get-opts - convert an options vase to get opts function
 :: that accepts an options map and returns filled options structure
 ::
 /-  *git-cmd
@@ -22,7 +22,7 @@
     :: ~&  iter+-.typ
     ^-  (list [@tas hoon hoon])
     ?+  -.typ  ~
-      %hold  
+      %hold
         $(typ ~(repo ut typ))
       %cell
         %+  weld  $(typ p.typ)
@@ -68,9 +68,9 @@
           ~_  "Unsupported option atom type {<p.typ>}"  !!
         [face get set]~
     ==
-  ::  XX a rune to get the type of the bunt 
+  ::  XX a rune to get the type of the bunt
   ::  of the mold: !$  spec  -->  -:!>(*spec)
-  ::  
+  ::
   ::  Results in compiled nock
   ::
   =+  subject=.
@@ -82,11 +82,11 @@
   ::   :: [type .*(. nock)]
   ::  XX Types are not in scope !
   %+  ~(mint ut -:!>(subject))  %noun
-  ^-  hoon  
+  ^-  hoon
   ::  XX is there a way to mix hoon code and AST?
   ::  |=  =opts-map
-  ::  XX Idea: another version of ream, +seam, to specify incomplete 
-  ::  AST nodes, so that we could do 
+  ::  XX Idea: another version of ream, +seam, to specify incomplete
+  ::  AST nodes, so that we could do
   ::  (seam '|=  =opts-map') and have it generate
   ::  %brts  [%bcts %opts-map %like ~[%opts-map] ~]
   ::  And be used like
@@ -95,13 +95,13 @@
   ::  ...
   ::  In Hoon metaprogramming
   ::
-  ::  
+  ::
   :: !,  *hoon
   :: |=  =opts-map
   :: ^+  opts
   :: *_opts
   =;  =hoon
-    ~&  hoon 
+    ~&  hoon
     hoon
   :: |=  =opts-map
   :+  %brts  [%bcts %opts-map %like ~[%opts-map] ~]
@@ -110,7 +110,7 @@
   ^-  hoon
   |-
   ?~  lops  [%wing ~[%opts]]
-  ::  XX !, should admin one-argument form 
+  ::  XX !, should admin one-argument form
   ::  with *hoon as a default
   :: :^  %wthp  [%wing ~[%lops]]  [%wing ~[%opts]]
 

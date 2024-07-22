@@ -15,7 +15,7 @@
 +$  access  (map @ta (set @p))
 +$  sync       $:  =refname
                    dir=path
-                   desk=@tas 
+                   desk=@tas
                    =aeon:clay  :: XX is this needed?
                    =hash:git
                ==
@@ -26,8 +26,8 @@
 ::
 +$  repo-sync  (map @ta sync)
 ::
-+$  state-0  $:  %0 
-                 =repo-store 
++$  state-0  $:  %0
+                 =repo-store
                  =lock
                  =access
                  =repo-sync
@@ -143,8 +143,8 @@
     [%sync @tas ~]
       ?>  ?=([%khan %arow *] sign)
       ::  XX how to handle sync failure?
-      ::  Should we just print the error, or somehow 
-      ::  notify the user 
+      ::  Should we just print the error, or somehow
+      ::  notify the user
       ::
       ?:  ?=(%.n -.p.sign)
         ((slog p.p.sign) `this)
@@ -162,7 +162,7 @@
   ?:  (~(has by repo-store.state) name)
     ~|  "Git repository {<name>} already exists"  !!
   `state(repo-store (~(put by repo-store.state) name repo))
-++  update 
+++  update
   |=  [name=@ta repo=repository:git]
   ^-  (quip card _state)
   ::  XX why are state faces not accesible directly?
@@ -311,7 +311,7 @@
     ::
     :_  state
     %+  give-simple-payload:app:server  eyre-id
-      :-  [401 ~[['www-authenticate' 'Basic realm="access to git repo"']]] 
+      :-  [401 ~[['www-authenticate' 'Basic realm="access to git repo"']]]
       `(as-octt:mimes:html "Access denied")
   ?+  site.request-line  !!
     ::  Handshake
@@ -351,9 +351,9 @@
   ^-  @t
   (rsh [3 1] (spat path))
 ++  handle-upload-pack
-  |=  $:  repo-name=@t 
-          repo=repository:git 
-          eyre-id=@ta 
+  |=  $:  repo-name=@t
+          repo=repository:git
+          eyre-id=@ta
           request=request:http
       ==
   ^-  (quip card _state)
@@ -389,7 +389,7 @@
     =^  cmd=pkt-line  sea  (read-pkt-line & sea)
     ?@  cmd  !!
     ?>  ?=(%data -.cmd)
-    ::  Extract caps 
+    ::  Extract caps
     ::
     =^  caps  sea  (parse-caps-stream sea)
     =.  sea  (read-pkt-delim sea)
@@ -423,7 +423,7 @@
     ^-  (quip card _state)
     =|  args=[symrefs=_| peel=_| ref-prefix=(list path)]
     ::  Parse arguments
-    ::  
+    ::
     =.  args
       |-
       ?<  (is-empty:bs sea)
@@ -455,7 +455,7 @@
     ::
     =.  sea  %+  roll  ?~(ref-prefix `(list refname:git)`~[~] ref-prefix)
       |=  [prefix=refname:git =_sea]
-      %+  rep-prefix:~(refs git repo)  prefix 
+      %+  rep-prefix:~(refs git repo)  prefix
         |=  [[=refname:git =ref:git] =_sea]
         ?@  ref
           %+  append-octs:bs  sea
@@ -489,7 +489,7 @@
       ==
     =|  =args
     ::  Parse arguments
-    ::  
+    ::
     =.  args
       |-
       ?<  (is-empty:bs sea)
@@ -543,25 +543,25 @@
     ?<  ?=(~ (skim want has:~(store git repo)))
     =|  red=bays:bs  =.  red
       ::  The client does not want anything,
-      ::  and as we don't need to wait, we simply 
+      ::  and as we don't need to wait, we simply
       ::  return empty response.
-      ::  
-      ::  XX This seems to violate the specification 
-      ::  for the flush command. We always send either 
-      ::  the acknowledgments or the packfile, or both. 
-      ::  Yet, the git implementation seems not to care. 
+      ::
+      ::  XX This seems to violate the specification
+      ::  for the flush command. We always send either
+      ::  the acknowledgments or the packfile, or both.
+      ::  Yet, the git implementation seems not to care.
       ::
       ?:  ?&(?=(~ want) !wait-for-done.args)
         red
       ::  Process haves
       ::  A. Construct the common set to send acks
-      ::  B. Construct a unique haves set and set 
-      ::  the flags of object to THEY_HAVE, and if 
-      ::  the object is a commit, set its parents 
+      ::  B. Construct a unique haves set and set
+      ::  the flags of object to THEY_HAVE, and if
+      ::  the object is a commit, set its parents
       ::  to THEY_HAVE
       ::
-      ::  Walk over the list, generating a list of 
-      ::  ack packet lines and an object-store with modified 
+      ::  Walk over the list, generating a list of
+      ::  ack packet lines and an object-store with modified
       ::  flags (XX is it structural sharing friendly?)
       ::
       =/  [acks=(list octs) oldest-have=@ud have-set=(set hash)]
@@ -588,7 +588,7 @@
             (~(put in have-set.acc) hash)
           =.  have-set.acc
             (~(put in have-set.acc) hash)
-          ::  If they have a commit, they must 
+          ::  If they have a commit, they must
           ::  also have its parents. This is an assumption
           ::  made by git.
           ::
@@ -599,14 +599,14 @@
       ::
       ::  done and wait-for-done logic
       ::
-      ::  If the client says "done", we skip 
+      ::  If the client says "done", we skip
       ::  sending the acknowledgements and attempt to send the packfile.
       ::
-      ::  If the client did not say "done", we send the acknowledgements 
-      ::  first. Then, we consider two cases regarding wait-for-done. 
-      ::  (1) The client requested wait-for-done. In such case our 
+      ::  If the client did not say "done", we send the acknowledgements
+      ::  first. Then, we consider two cases regarding wait-for-done.
+      ::  (1) The client requested wait-for-done. In such case our
       ::  response shall only consist of acknowledgments.
-      ::  (2) otherwise, if the client did not request wait-for-done, 
+      ::  (2) otherwise, if the client did not request wait-for-done,
       ::  we check whether all `want` objects are reachable from the
       ::  common `have` set; if they are we send the packfile.
       ::
@@ -619,7 +619,7 @@
           |=  [=octs red=_red]
           ^-  bays:bs
           (append-octs:bs red octs)
-      ::  We send the packfile if either the client says done, 
+      ::  We send the packfile if either the client says done,
       ::  or it does not say wait-for-done, while we can reach
       ::  everything he needs.
       ::
@@ -632,10 +632,10 @@
       ?.  |(done.args &(!wait-for-done.args can-reach))
         (append-octs:bs red (write-pkt-len flush-pkt))
       ::  Build and send the packfile
-      ::  
-      ::  Currently this only sends all the packfiles 
-      ::  in the repository. For full functionality we 
-      ::  need to implement git build-pack. 
+      ::
+      ::  Currently this only sends all the packfiles
+      ::  in the repository. For full functionality we
+      ::  need to implement git build-pack.
       ::
       ::  XX We throw away a ready made have-set, only
       ::  to rebuild it later
@@ -645,8 +645,8 @@
       =/  pack-pkt-lines
         (write-pkt-lines-on-band 1 (from-octs:bs pack-octs))
       =.  red  (append-octs:bs red (write-pkt-lines-txt 'packfile'))
-      ::  XX This should properly be done in a thread. 
-      ::  The point of packet lines is not to send them all 
+      ::  XX This should properly be done in a thread.
+      ::  The point of packet lines is not to send them all
       ::  at once.
       ::
       =.  red  %+  append-octs:bs  red
@@ -659,9 +659,9 @@
     [[200 ~] ?:(=(0 p.octs.red) ~ `octs.red)]
   --
 ++  handle-receive-pack
-  |=  $:  repo-name=@t 
-          repo=repository:git 
-          eyre-id=@ta 
+  |=  $:  repo-name=@t
+          repo=repository:git
+          eyre-id=@ta
           request=request:http
       ==
   ^-  (quip card _state)
@@ -675,7 +675,7 @@
     %'GET'   advertise-refs
     %'POST'  update-refs
   ==
-  ::  there is no git push protocol in version 2, 
+  ::  there is no git push protocol in version 2,
   ::  we implement version 1.
   ::
   |%
@@ -685,8 +685,8 @@
     ::  Assemble advertised references
     ::
     =/  refs=(list [refname:git hash])
-      ::  XX These paths should be obtained 
-      ::  through repo interface and should 
+      ::  XX These paths should be obtained
+      ::  through repo interface and should
       ::  all be dereferenced to destination hash
       ::
       ::  XX Should we handle non-existent HEAD?
@@ -694,11 +694,11 @@
       ::  A fresh repository will point to an unborn branch
       ::  and thus will not have a head
       ::
-      ::  If HEAD is a valid ref, it must appear as the 
-      ::  first ref. If HEAD is not a valid ref, it must 
-      ::  not be advertised at all. However, git seems 
-      ::  to support a symref capability, that can 
-      ::  be used to advertise a symref for an unborn head. 
+      ::  If HEAD is a valid ref, it must appear as the
+      ::  first ref. If HEAD is not a valid ref, it must
+      ::  not be advertised at all. However, git seems
+      ::  to support a symref capability, that can
+      ::  be used to advertise a symref for an unborn head.
       ::
       ::  XX advertise symrefs
       ::
@@ -724,13 +724,13 @@
         ==
     ::  Write remaining references
     ::
-    ::  XX As soon as we have the head reference, 
+    ::  XX As soon as we have the head reference,
     ::  we should use a rep-at-prefix
     ::
     =.  red  %+  append-octs:bs  red
       %+  roll  (tail refs)
       |=  [[=refname:git =hash] =octs]
-      %-  can-octs:bs 
+      %-  can-octs:bs
       :~  octs
           (write-pkt-lines-txt (write-ref refname hash))
       ==
@@ -768,8 +768,8 @@
         (as-octs:mimes:html caps)
         [1 '\0a']
     ==
-  +$  cap  $?  %delete-refs 
-               %ofs-delta 
+  +$  cap  $?  %delete-refs
+               %ofs-delta
                %report-status
            ==
   +$  push-cmd  [old=hash:git new=hash:git ref-name=path]
@@ -823,8 +823,8 @@
     ::  Read packfile
     ::
     ::  The git logic for processing the packfile is the following:
-    ::  1. Index the packfile with git-index-pack, thickening it with --fix-thin, 
-    ::  and prevent git-repack from deleting the newly received packfile 
+    ::  1. Index the packfile with git-index-pack, thickening it with --fix-thin,
+    ::  and prevent git-repack from deleting the newly received packfile
     ::  with --keep
     ::  2. Save file to disk
     ::
@@ -837,7 +837,7 @@
           |=  =hash
           ~&  resolving-obj+hash
           (get-raw:~(store git repo) hash)
-    =?  repo  ?=(^ pack)  
+    =?  repo  ?=(^ pack)
       (add-pack:~(store git repo) u.pack)
     =.  status
       %+  append-octs:bs  status
@@ -846,7 +846,7 @@
     ::
     ~&  (~(dip of refs.repo) /refs/heads)
     ::  XX should return a list of (each @t @t)
-    ::  with [& 'ok'] indicating success and 
+    ::  with [& 'ok'] indicating success and
     ::  [| 'failure description'] indicating failure
     ::
     =^  status=bays:bs  refs.repo
@@ -858,12 +858,12 @@
       ::
       ?:  =(0x0 old.cmd)
         ?:  (~(has of refs) ref-name.cmd)
-          :-  %+  append-octs:bs  status 
+          :-  %+  append-octs:bs  status
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} reference already exists"
           refs
         ?.  (has:~(store git repo) new.cmd)
-          :-  %+  append-octs:bs  status 
+          :-  %+  append-octs:bs  status
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} object {<new.cmd>} not found"
           refs
@@ -876,16 +876,16 @@
       ::
       ?:  =(0x0 new.cmd)
         ?.  (~(has of refs) ref-name.cmd)
-          :-  %+  append-octs:bs  status 
+          :-  %+  append-octs:bs  status
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} reference not found"
           refs
-        ::  XX Hoon should really have typed equality 
+        ::  XX Hoon should really have typed equality
         ::  to slap .= with typechecking
         ::
         ?.  .=  (need (~(get of refs) ref-name.cmd))
                 old.cmd
-          :-  %+  append-octs:bs  status 
+          :-  %+  append-octs:bs  status
               %-  write-pkt-lines-txt  %-  crip
                 "ng {(trip (print-refname ref-name.cmd))} object id mismatch"
           refs
@@ -900,7 +900,7 @@
       ::
       ?.  .=  (need (~(get of refs) ref-name.cmd))
               old.cmd
-        :-  %+  append-octs:bs  status 
+        :-  %+  append-octs:bs  status
             %-  write-pkt-lines-txt  %-  crip
               "ng {(trip (print-refname ref-name.cmd))} object id mismatch"
         refs
@@ -915,8 +915,8 @@
                   (write-pkt-len flush-pkt)
     ~&  (~(dip of refs.repo) /refs/heads)
     ::  XX We should only keep the pack if the update is successful
-    ::  for at least one reference. What's the git logic 
-    ::  in case of failure? Does it extract objects 
+    ::  for at least one reference. What's the git logic
+    ::  in case of failure? Does it extract objects
     ::  associated with succesful update?
     ::
     ~&  no-packs+(lent archive.object-store.repo)

@@ -2,7 +2,7 @@
 /+  io=strandio, stream
 ::  XX *git-object, *git-refs
 ::  XX do we have to prefix with git?
-::  It seems so, since this is a library that's going to be put in 
+::  It seems so, since this is a library that's going to be put in
 ::  dev desks
 ::
 /+  git=git-repository, *git-refs, git-pack
@@ -17,8 +17,8 @@
 ::
 =+  args=(need !<((unit ^args) args))
 ::
-:: XX Improve performance: export the git workdir 
-:: as a clay namespace. Then compare the two maps, 
+:: XX Improve performance: export the git workdir
+:: as a clay namespace. Then compare the two maps,
 :: and insert only the files that has changed.
 :: Note: clay does not have any delta functionality
 ::

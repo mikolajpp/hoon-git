@@ -7,9 +7,9 @@
 /+  git=git-repository, git-revision, git-pack
 |%
 ++  version  2
-::  As we walk over objects, we need to keep 
-::  track if we have seen the object already, 
-::  and whether it is dull. 
+::  As we walk over objects, we need to keep
+::  track if we have seen the object already,
+::  and whether it is dull.
 ::
 +$  flag  ?(%seen %dull)
 +$  walk-store  (map hash (set flag))
@@ -65,18 +65,19 @@
   =.  walk-store  (put-flag hash %dull)
   =+  obj=(got:~(store git repo) hash)
   ?>  ?=(%tree -.obj)
-  =+  tree=tree.obj
+  =+  dir=tree-dir.obj
   ::
-  |-  ?~  tree  walk-store
+  |-  ?~  dir  walk-store
   =+  obj=(got:~(store git repo) hash)
-  %=  $  tree  t.tree
+  %=  $  dir  t.dir
     walk-store
     ?-  -.obj
-      %blob  (mark-blob-dull hash.i.tree)
-      %tree  (mark-tree-dull hash.i.tree)
+      %commit  walk-store
+      %tree  (mark-tree-dull hash.i.dir)
       ::  It is a submodule or something unknown, skip it
       ::
-      %commit  walk-store
+      %blob  (mark-blob-dull hash.i.dir)
+      %tag  !!
     ==
   ==
 ++  object-type-as-ud
@@ -116,7 +117,7 @@
   ?:  (lth ia ib)
     &
   |
-::  Create a sortable number from the last sixteen 
+::  Create a sortable number from the last sixteen
 ::  non-whitespace characters
 ::
 ++  hash-name
@@ -128,7 +129,7 @@
     0x0
   =|  hash=@ux
   =+  len=(met 3 name)
-  =+  i=0 
+  =+  i=0
   |-
   ?.  (lth i len)
     hash
@@ -162,7 +163,7 @@
   ==
 ++  insert-tree
   =|  name=@t
-  |=  [=hash tree=(list tree-entry)]
+  |=  [=hash dir=tree-dir]
   ^-  ^state
   ?:  (~(has by store) hash)
     ~&  insert-tree-have+hash
@@ -170,15 +171,16 @@
   ~&  insert-tree+hash
   =.  state  (insert-object hash '')
   ::
-  |-  ?~  tree  state
-  =+  obj=(got:~(store git repo) hash.i.tree)
-  =+  name=(cat 3 name name.i.tree)
-  %=  $  tree  t.tree
+  |-  ?~  dir  state
+  =+  obj=(got:~(store git repo) hash.i.dir)
+  =+  name=(cat 3 name name.i.dir)
+  %=  $  dir  t.dir
     state
     ?-  -.obj
-      %blob  (insert-object hash.i.tree name)
-      %tree  ^$(name name, hash hash.i.tree, tree tree.obj)
+      %blob  (insert-object hash.i.dir name)
+      %tree  ^$(name name, hash hash.i.dir, dir tree-dir.obj)
       %commit  state
+      %tag  !!
     ==
   ==
 ++  insert-commit
@@ -190,7 +192,7 @@
   =+  obj=(got:~(store git repo) tree.commit)
   ~&  tree.commit
   ?>  ?=(%tree -.obj)
-  (insert-tree tree.commit tree.obj)
+  (insert-tree tree.commit tree-dir.obj)
 ++  find-deltas
   |=  brick-list=(list [@ud brick-object])
   ^-  (list [@ud brick-object])
@@ -200,7 +202,7 @@
   ::  If the object is delta in the pack:
   ::  (1) Get the chain of delta objects
   ::  (2) Resolve the base and compress it
-  ::  (3) Uncompress each delta, compress it and write 
+  ::  (3) Uncompress each delta, compress it and write
   ::  it to the pack as REF_DELTA object
   ::
   =|  pack-list=(list [@ud brick-object])
@@ -237,7 +239,7 @@
   ::
   ::  (1)
   =.  walk-store
-    |-  ?~  exclude  walk-store 
+    |-  ?~  exclude  walk-store
     =+  hash=i.exclude
     ::  XX Use caching
     ::
@@ -289,7 +291,7 @@
   =.  sea  (write-octs:bs sea (as-byts:bs [4 count]))
   ~&  `@ux`q.octs.sea
   ::  XX This could have terrible memory complexity
-  ::  We really want to operate on a single copy 
+  ::  We really want to operate on a single copy
   ::  of sea
   ::
   =.  sea  %+  reel  archive
@@ -301,6 +303,8 @@
       ::  Discard header
       (rsh [3 pos.stream.pack] (to-atom:bs stream.pack))
   =+  hash=(hash-octs-sha-1 (to-octs:bs sea))
-  =.  sea  (write-octs:bs sea [20 hash])
+  ::  XX parametrize by hash algo
+  ::
+  =.  sea  (write-hash sea %sha-1 hash)
   octs.sea
 --

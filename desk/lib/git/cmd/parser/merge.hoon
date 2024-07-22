@@ -12,7 +12,7 @@
   |=  =opts-map
   ^-  opts
   =|  =opts
-  ::  XX This should be auto generated 
+  ::  XX This should be auto generated
   ::
   :: =+  opt=(~(get by opts-map) %single-branch)
   :: =?  single-branch.opts  ?=(^ opt)

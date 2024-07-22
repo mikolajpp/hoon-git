@@ -4,9 +4,9 @@
 /+  git-http, git-clay
 =,  strand=strand:spider
 |%
-::  XX most arguments are optional, 
-::  making manual thread very inconvenient. 
-::  Can we create a little vase utility to handle 
+::  XX most arguments are optional,
+::  making manual thread very inconvenient.
+::  Can we create a little vase utility to handle
 ::  optionals automatically?
 ::
 +$  args
@@ -27,7 +27,7 @@
 =*  http  ~(. git-http url.args)
 ::
 ;<  caps=(map @ta (unit @t))  bind:m  greet-server-upload:http
-;<  ls-refs=(list [refname:git ref:git (unit hash:git)])  bind:m  
+;<  ls-refs=(list [refname:git ref:git (unit hash:git)])  bind:m
   =/  ref-prefix=(list @t)
     :~  'HEAD'
         'refs/heads'
@@ -58,7 +58,7 @@
           =(hash u.fil.hed)
       ==
   head
-::  No HEAD found, attempt to point to 
+::  No HEAD found, attempt to point to
 ::  default branch
 ::
 ::  XX Default branch should be sourced from config
@@ -78,7 +78,7 @@
 =|  want=(list hash:git)
 =.  want
   %+  roll  ~(tap of remote-refs)
-    ::  XX The typechecker does not catch 
+    ::  XX The typechecker does not catch
     ::  invalid sample here
     |=  [[=path =ref:git] =_want]
     ?@  ref
@@ -88,7 +88,7 @@
 ::
 ::  Repository setup after clone:
 ::  1. Insert the pack
-::  2. Install references 
+::  2. Install references
 ::  3. Setup default branch
 ::  4. Setup remote refs
 ::  5. Setup tracking branches
@@ -97,7 +97,7 @@
 =.  repo  (add-pack:~(store git repo) pack)
 ::  Install default branch
 ::
-=.  refs.repo 
+=.  refs.repo
   %+  ~(put of *refs)
     default-branch
   =+  hash=(need (~(get of remote-refs) default-branch))
@@ -112,16 +112,16 @@
     [%origin /refs/heads/[branch]]
 ::  Install HEAD
 ::
-=.  refs.repo  
+=.  refs.repo
   %+  ~(put of refs.repo)  ['HEAD' ~]
     [%symref default-branch]
-::  Install tags 
+::  Install tags
 ::
 ::  XX Move ++of from /sys/arvo/hoon to
-::  /sys/hoon/hoon, extend it, and jet it, 
+::  /sys/hoon/hoon, extend it, and jet it,
 ::  also providing a type with more general path
 ::
-=.  refs.repo  
+=.  refs.repo
   %+  roll  ~(tap of (~(dip of remote-refs) /refs/tags))
     |=  [[=refname =ref] =_refs.repo]
     ?>  ?=([@ %~] refname)

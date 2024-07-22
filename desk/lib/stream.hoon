@@ -2,22 +2,22 @@
 ::
 ::  Byte-string library
 ::
-::  Reading data. There are two families of functions: 
+::  Reading data. There are two families of functions:
 ::  "get" and "read".
 ::
-::  1. "get" functions read data from a stream 
+::  1. "get" functions read data from a stream
 ::     without advancing the stream. On failure
-::     the returned position is the initial position. 
+::     the returned position is the initial position.
 ::
-::  2. "read" functions read data from a stream 
+::  2. "read" functions read data from a stream
 ::    advancing the stream. On failure
 ::    the position of the returned stream is unchanged.
 ::
-::  A bit stream is a byte stream with a bit 
-::  accumulator attached. 
+::  A bit stream is a byte stream with a bit
+::  accumulator attached.
 ::
 ::  A conventional variable name for a byte-stream is sea.
-::  
+::
 ::  A conventional name for a bit-stream is zea.
 ::
 ~%  %stream  ..part  ~
@@ -37,7 +37,7 @@
   =+  via=(end [3 p.a] q.a)
   =+  vib=(end [3 p.b] q.b)
   [(add p.a p.b) (add via (lsh [3 p.a] vib))]
-:: 
+::
 ::  Assemble octs
 ::
 ++  can-octs
@@ -69,7 +69,7 @@
   :_  i
   `(cut 3 [pos.sea 1] q.octs.sea)
 ::
-::  Read a byte. Advances the stream. 
+::  Read a byte. Advances the stream.
 ::
 ++  read-byte
   |=  sea=stream
@@ -90,7 +90,7 @@
   :_  i
   `[n (cut 3 [pos.sea n] q.octs.sea)]
 ::
-::  Read n bytes. Advances the stream. 
+::  Read n bytes. Advances the stream.
 ::
 ++  read-bytes
   |=  [n=@ud sea=stream]
@@ -100,7 +100,7 @@
   :-  data
   [pos octs.sea]
 ::
-::  Get bytes until newline, inclusive, 
+::  Get bytes until newline, inclusive,
 ::  without advancing the stream.
 ::
 ++  get-line
@@ -117,7 +117,7 @@
   :_  +(i)
   `[len (cut 3 [pos.sea len] q.octs.sea)]
 ::
-::  Read bytes until newline, inclusive, 
+::  Read bytes until newline, inclusive,
 ::  advancing the stream.
 ::
 ++  read-line
@@ -129,7 +129,7 @@
   [pos octs.sea]
 ::
 ::  Read bytes until newline, exclusive,
-::  without advancing. 
+::  without advancing.
 ::
 ++  get-until-line  !!
 ::
@@ -193,7 +193,7 @@
   ?:  =(p.data 0)
     sea
   :-  (add pos.sea p.data)
-  ::  XX review logic in hoon.hoon: are byts/octs with 
+  ::  XX review logic in hoon.hoon: are byts/octs with
   ::  atom greater than its stated length gracefully handled?
   ::
   =+  len=(add pos.sea p.data)
@@ -217,7 +217,7 @@
     sea
   :-  pos.sea
   :-  (add p.octs.sea p.data)
-  ::  XX review logic in hoon.hoon: are byts/octs with 
+  ::  XX review logic in hoon.hoon: are byts/octs with
   ::  atom greater than its stated length gracefully handled?
   ::
   %+  add

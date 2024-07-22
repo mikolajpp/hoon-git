@@ -2,7 +2,7 @@
 /+  *bytestream
 ::    Example demonstrating the use of bytestream library to
 ::    process PNG image.
-::  
+::
 |%
 ::  PNG specification
 ::
@@ -26,7 +26,7 @@
   ::  read IHDR chunk
   ::
   =^  =chunk-ihdr:png  sea  (read-chunk-ihdr:png sea)
-  ~&  chunk-ihdr
+  :: ~&  chunk-ihdr
   (expect !>(&))
 ++  png
   |%
@@ -48,7 +48,6 @@
     =^  typ  sea  (read-txt 4 sea)
     =^  dat  sea  (read-octs len sea)
     =^  crc=@ux  sea  (read-msb 4 sea)
-    ~&  crc+crc
     ::  XX verify data integrity
     :_  sea
     [len typ dat]

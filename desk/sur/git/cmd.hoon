@@ -8,7 +8,7 @@
 +$  action
   $%  $>(%shoe card:shoe)
   ==
-++  ted-args  
+++  ted-args
   |$  [args]
   $:  =sole-id:sole
       =dir

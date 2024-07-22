@@ -1,8 +1,8 @@
-:: 
+::
 ::  git fetch
 ::
 ::  XX Handle refspec pattern matching
-::  XX Handle multiple refspec for remote, in combination with 
+::  XX Handle multiple refspec for remote, in combination with
 ::  refspecs from the command line
 ::  XX Handle negative refspecs
 ::
@@ -42,9 +42,9 @@
 ::
 =*  http  ~(. git-http url)
 ~&  fetch-url+url
-::  XX git fetch origin refspec will 
+::  XX git fetch origin refspec will
 ::  use refspecs both from the remote and the command line.
-::  Verify behaviour is the same wrt remote and command line 
+::  Verify behaviour is the same wrt remote and command line
 ::  refspects
 ::
 =/  refspecs=(list refspec)
@@ -75,7 +75,7 @@
 ;<  ls-refs=(list [=refname =ref:git peel=(unit hash:git)])  bind:m
   ::  XX fix args shadowing in git-http
   =|  =^args:ls-refs:http
-  =.  ref-prefix.args  
+  =.  ref-prefix.args
     %.  %+  turn  refspecs
       (curr ref-prefixes &)
     zing
@@ -90,9 +90,9 @@
 ::  map received references according to first matching refspec
 ::  XX handle symrefs
 ::  Build a reference map to be injected into our refs
-::  [refname old-id new-id]  
+::  [refname old-id new-id]
 ::  old-id is at our side, while new-id at server side
-::  We fetch, declaring haves to be the list of old-ids, 
+::  We fetch, declaring haves to be the list of old-ids,
 ::  and wants to be the list of new-ids
 ::
 ::  For each ls-refs reference

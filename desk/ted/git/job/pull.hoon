@@ -14,12 +14,12 @@
 ::  XX Fetch according to refspec
 ::
 ::  1. Fetch from default remote %origin
-::  2. Receive references: go one by one and update 
+::  2. Receive references: go one by one and update
 ::     them
 ::  3. Return updated repository
 ::
 =/  repo
-  ::  XX Why does spider always pass arguments 
+  ::  XX Why does spider always pass arguments
   ::  as a unit? Is it to accomodate dojo?
   ::
   %-  need  !<((unit repository:git) arg)
@@ -33,7 +33,7 @@
 ;<  caps=(map @ta (unit @t))  bind:m  greet-server-upload:http
 ::  Receive references
 ::
-;<  ls-refs=(list [refname:git ref:git (unit hash:git)])  bind:m  
+;<  ls-refs=(list [refname:git ref:git (unit hash:git)])  bind:m
   =/  ref-prefix=(list @t)
     :~  'HEAD'
         'refs/heads'
@@ -51,7 +51,7 @@
 =|  want=(list hash:git)
 =.  want
   %+  roll  ~(tap of remote-refs)
-  ::  XX The typechecker does not catch 
+  ::  XX The typechecker does not catch
   ::  invalid sample here
   |=  [[=path =ref:git] =_want]
   ?@  ref
@@ -65,9 +65,9 @@
   ?@  ref
     [ref have]
   have
-;<  pack=pack:git-pack  bind:m  
+;<  pack=pack:git-pack  bind:m
   (fetch:http have want)
-::  XX Make sure the pack has got all 
+::  XX Make sure the pack has got all
 ::  references we requested
 ::
 ::  Update refs

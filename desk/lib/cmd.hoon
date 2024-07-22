@@ -16,7 +16,7 @@
   ++  val-f  (easy ~)  :: option is present
   ::  XX Allow non-Hoon integers
   ++  val-ud  dem:ag
-  ++  val-t 
+  ++  val-t
     ;~  pose
       ::  'cord'
       (ifix [soq soq] (boss 256 (star qit)))
@@ -31,11 +31,11 @@
       %ud  (stag %ud val-ud)
     ==
   ::  -o
-  ++  short  
-    |=(o=char ;~(plug hep (just o)))  
+  ++  short
+    |=(o=char ;~(plug hep (just o)))
   ::  --opt
-  ++  long   
-    |=  opt=@tas 
+  ++  long
+    |=  opt=@tas
     ;~(plug hep hep (jest opt))
   ::  -o val, -oval
   ++  short-value
@@ -60,7 +60,7 @@
     ==
   ++  short-or-long-value
     |=  [o=@t opt=@tas kind=opt-kind]
-    ;~  pose 
+    ;~  pose
       (short-value o kind)
       (long-value opt kind)
     ==
@@ -96,8 +96,8 @@
     ^-  (like [* (list option)])
     ::  Parse front options, command arguments
     ::
-    ::  XX using , somehow changes output of 
-    ::  compiler error. 
+    ::  XX using , somehow changes output of
+    ::  compiler error.
     ::
     =/  vex=(like [(list option) (unit *) *])
       %.  tub

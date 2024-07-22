@@ -10,7 +10,7 @@
 ++  as-soba
   |=  [repo=repository:git =refname dir=path]
   ^-  soba
-  =/  obj 
+  =/  obj
     %-  got:~(store git repo)
       (got:~(refs git repo) refname)
   ?>  ?=(%commit -.obj)
@@ -20,54 +20,54 @@
     ::
     (got:~(store git repo) tree.commit)
   ?>  ?=(%tree -.obj)
-  =+  tree=tree.obj
+  =+  tree-dir=tree-dir.obj
   ::  Descend to directory
   ::
-  =.  tree
+  =.  tree-dir
     |-
     ?~  dir
-      tree
+      tree-dir
     =/  idx=(unit @ud)
-      ::  XX Add +seek to list arms to return the value instead 
+      ::  XX Add +seek to list arms to return the value instead
       ::  of index
       ::
       %+  find  [i.dir]~
-      %+  turn  tree
+      %+  turn  tree-dir
         |=(=tree-entry name.tree-entry)
-    =+  entry=(snag (need idx) tree)
+    =+  entry=(snag (need idx) tree-dir)
     %=  $
       dir  t.dir
-      tree
+      tree-dir
         =+  obj=(got:~(store git repo) hash.entry)
         ?>  ?=(%tree -.obj)
-        tree.obj
+        tree-dir.obj
     ==
   =|  =path
   =|  =soba  ::  (list [path miso])
   |-
-  ?~  tree
+  ?~  tree-dir
     soba
-  =+  entry=(got:~(store git repo) hash.i.tree)
+  =+  entry=(got:~(store git repo) hash.i.tree-dir)
   ?+  -.entry  !!
-    %tree  
+    %tree
       %=  $
-        tree  t.tree
-        soba  $(tree tree.entry, path [name.i.tree path])
+        tree-dir  t.tree-dir
+        soba  $(tree-dir tree-dir.entry, path [name.i.tree-dir path])
       ==
     %blob
       =/  file=(unit [name=@ta ext=@ta])
-        %+  rust  (trip name.i.tree) 
+        %+  rust  (trip name.i.tree-dir)
           %+  cook
             |=([a=tape b=tape] [(crip a) (crip b)])
           ;~(plug (plus ;~(less dot prn)) ;~(pfix dot (plus prn)))
       ?~  file
-        $(tree t.tree)
+        $(tree-dir t.tree-dir)
       =+  path=[ext.u.file name.u.file path]
-      ::  XX make sure loose objects do not have the header 
+      ::  XX make sure loose objects do not have the header
       ::
-      =/  miso 
-        [%ins %mime !>([/text/plain octs.entry])]
-      $(tree t.tree, soba [[(flop path) miso] soba])
+      =/  miso
+        [%ins %mime !>([/text/plain data.entry])]
+      $(tree-dir t.tree-dir, soba [[(flop path) miso] soba])
   ==
   :: ~&  "Exporting {<refname>} to clay, found tree {<tree.commit>}"
   :: *soba

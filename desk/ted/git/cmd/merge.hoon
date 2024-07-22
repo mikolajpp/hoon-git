@@ -1,4 +1,4 @@
-:: 
+::
 ::  git merge branch
 ::
 /-  spider
@@ -28,7 +28,7 @@
 =/  dst=refname
   (need (find-refname repo branch.dir))
 =/  src=refname
-  %-  need  
+  %-  need
     %+  find-refname  repo
     (scan (trip raw-refname.args) parse-refname)
 =/  src-hash=hash
@@ -49,7 +49,7 @@
   =/  tip-commit=commit
     =-  ?>(?=(%commit -.-) commit.-)
     (got:~(store git repo) tip)
-  ?:  %+  lth 
+  ?:  %+  lth
       date.commit-time.tip-commit
       date.commit-time.dst-commit
     |

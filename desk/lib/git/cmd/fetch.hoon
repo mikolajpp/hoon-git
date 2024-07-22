@@ -4,7 +4,7 @@
 ::
 /+  *git-cmd, *git-refs, *git-refspec
 |%
-::  
+::
 ::  Modify refspecs to place all refs under prefetch:refspace
 ::
 ++  filter-prefetch-refspec

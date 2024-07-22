@@ -48,7 +48,7 @@
 ::  +remote -- remotes
 ::  +config -- configuration
 ::
-::  XX Switch to using id=hash argument 
+::  XX Switch to using id=hash argument
 ::  in gates
 |_  repo=repository
 +*  this  .
@@ -62,7 +62,7 @@
   %=  repo
     refs
     %+  roll  refs.header.bundle
-      ::  XX is there no way to write 
+      ::  XX is there no way to write
       ::  it compactly?
       |=  [ref=(pair path hash) =^refs]
       ?>  (has:store q.ref)
@@ -80,12 +80,12 @@
 ::  can introduce a configuration variable without the need to
 ::  alter and recompile libgit itself.
 ::
-::  XX The configuration does not belong in libgit. 
+::  XX The configuration does not belong in libgit.
 ::  Configuration should affects user tooling by altering.
 ::  Settings which actually serve as data stores (remote, branch etc.)
 ::  should be part of the repository structure proper.
 ::
-++  config 
+++  config
   |%
   ::
   ++  get
@@ -126,7 +126,7 @@
   ::   =+  remote=(got:~(phone git repo) remote-name)
   ::   ::  Update remote-tracking references
   ::   ::  XX This should only concern branches
-  ::   ::  XX What would happen if we push an update 
+  ::   ::  XX What would happen if we push an update
   ::   ::  to a tag?
   ::   ::
   ::   =.  refs.remote
@@ -178,7 +178,7 @@
     =+  loose=(~(get by loose.object-store.repo) hash)
     ?^  loose
       loose
-    ::  XX use a loop, why traverse when 
+    ::  XX use a loop, why traverse when
     ::  obj has already been found?
     ::  XX parametrize by hash algo
     ::
@@ -217,27 +217,27 @@
     ^-  (unit raw-object)
     =+  loose=(~(get by loose.object-store.repo) hash)
     ?^  loose
-      (some (as-raw u.loose))
-    ::  XX use a loop, why traverse when 
+      (some (obj-to-raw hash-algo.repo u.loose))
+    ::  XX use a loop, why traverse when
     ::  obj has already been found?
     ::
     %+  roll  archive.object-store.repo
       |=  [=pack:git-pack obj=(unit raw-object)]
       ?~  obj
-        ::  XX This is a workaround to retrieve objects 
-        ::  from thin packs. Thin packs in the archive 
+        ::  XX This is a workaround to retrieve objects
+        ::  from thin packs. Thin packs in the archive
         ::  currently arise because we lack the ability
-        ::  to create new packfiles from scratch. 
-        ::  Once git-pack-objects is implemented, 
-        ::  we can thicken received packs, at the risk 
-        ::  of duplicating the objects. It seems 
-        ::  that is how git does it. For instance, 
-        ::  git-receive-pack will thicken each received pack, 
+        ::  to create new packfiles from scratch.
+        ::  Once git-pack-objects is implemented,
+        ::  we can thicken received packs, at the risk
+        ::  of duplicating the objects. It seems
+        ::  that is how git does it. For instance,
+        ::  git-receive-pack will thicken each received pack,
         ::  and finally run git-gc, which presumably will detect
-        ::  duplicate objects. However, does not that mean 
-        ::  if a 2GB file was modified, git will temporalily 
+        ::  duplicate objects. However, does not that mean
+        ::  if a 2GB file was modified, git will temporalily
         ::  create a 2GB copy (thus using 4GB of space?)
-        ::  As we keep everything in memory, this will not 
+        ::  As we keep everything in memory, this will not
         ::  do for us -- we have to be smarter than git here.
         ::
         (~(get-raw-thin git-pack pack) hash get-raw)
@@ -298,7 +298,7 @@
   ::  XX a is not really octs
   ::  'cafe' -> [4 0xcafe], which is wrong
   ::
-  :: Find all keys matching the abbreviation. 
+  :: Find all keys matching the abbreviation.
   :: Search in the object-store
   ::
   :: ++  find-key-in-store
@@ -363,7 +363,7 @@
     ?@  ref
       [(weld prefix refname) ref]
     [(weld prefix refname) (got refname)]
-  ::  Accumulate product with a user 
+  ::  Accumulate product with a user
   ::  supplied gate
   ::
   ++  rep

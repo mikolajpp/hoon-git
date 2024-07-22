@@ -1,6 +1,6 @@
-:: 
+::
 ::  git clone
-::  
+::
 ::  Produces a (pair dir repository)
 ::
 /-  spider, *sole
@@ -40,7 +40,7 @@
 =*  http  ~(. git-http url.args)
 ::
 ;<  caps=(map @ta (unit @t))  bind:m  greet-server-upload:http
-;<  ls-refs=(list [refname:git ref:git (unit hash:git)])  bind:m  
+;<  ls-refs=(list [refname:git ref:git (unit hash:git)])  bind:m
   =/  ref-prefix=(list refname)
     %+  welp
       :~  ~['HEAD']
@@ -75,7 +75,7 @@
           =(hash u.fil.hed)
       ==
   head
-::  No HEAD found, attempt to point to 
+::  No HEAD found, attempt to point to
 ::  default branch
 ::
 ::  XX Default branch should also be sourced from config
@@ -102,7 +102,7 @@
 ::  XX handle --single-branch
 =.  want
   %+  roll  ~(tap of remote-refs)
-    ::  XX The typechecker does not catch 
+    ::  XX The typechecker does not catch
     ::  invalid sample here
     |=  [[=path =ref:git] =_want]
     ?@  ref
@@ -114,7 +114,7 @@
 ::  Repository setup after clone
 ::
 ::  1. Insert the pack
-::  2. Install references 
+::  2. Install references
 ::  3. Setup default branch
 ::  4. Setup remote refs
 ::  5. Setup tracking branch
@@ -123,23 +123,23 @@
 =.  repo  (add-pack:~(store git repo) pack)
 ::  Install default branch
 ::
-=.  refs.repo 
+=.  refs.repo
   %+  ~(put of *refs)
     default-branch
   =+  hash=(need (~(get of remote-refs) default-branch))
   ?^(hash !! hash)
 ::  Install HEAD
 ::
-=.  refs.repo  
+=.  refs.repo
   %+  ~(put of refs.repo)  head:refspace
     [%symref default-branch]
-::  Install tags 
+::  Install tags
 ::
 ::  XX Move ++of from /sys/arvo/hoon to
-::  /sys/hoon/hoon, extend it, and jet it, 
+::  /sys/hoon/hoon, extend it, and jet it,
 ::  also providing a type with more general path
 ::
-=.  refs.repo  
+=.  refs.repo
   %+  roll  ~(tap of (~(dip of remote-refs) /refs/tags))
     |=  [[=refname =ref] =_refs.repo]
     (~(put of refs) (weld tags:refspace refname) ref)
@@ -165,7 +165,7 @@
 =|  origin=^remote:git
 =.  url.origin  url.args
 =.  fetch.origin
-  :~  %+  scan  
+  :~  %+  scan
         "+refs/heads/*:refs/remotes/{(trip origin.opts)}/*"
       (parse-refspec &)
   ==

@@ -4,9 +4,9 @@
 /+  *git-hash
 /+  git=git-repository
 |_  repo=repository:git
-::  Can every commit in @from 
+::  Can every commit in @from
 ::  reach at least one commit in @have
-::  
+::
 ::  XX optimize using generation number
 ++  can-all-reach-from
   |=  [from=(list hash) have=(set hash) oldest-have=@ud]
@@ -20,16 +20,16 @@
   ?~  from
     &
   =+  hash=i.from
-  ::  Depth-first search for anything 
+  ::  Depth-first search for anything
   ::  in the set @have
   ::
   =/  reach=?
     |-
     ?:  (~(has in have) hash)
       &
-    ::  XX introduce object caching 
+    ::  XX introduce object caching
     ::  =^  obj  repo  (got:~(store git repo))
-    ::  would cache an object from the archive 
+    ::  would cache an object from the archive
     ::  in the loose map
     ::
     =+  obj=(got:~(store git repo) hash)
@@ -38,7 +38,7 @@
     ?.  ?=(%commit -.obj)
       &
     ::  XX Such accessess are too long. Move
-    ::  commit stuff into /lib/git/commit/hoon 
+    ::  commit stuff into /lib/git/commit/hoon
     ::  and provide compile-time accessors
     ::
     ?:  (lth date.commit-time.commit.obj oldest-have)

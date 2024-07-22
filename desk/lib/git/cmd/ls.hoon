@@ -1,5 +1,5 @@
 ::
-::  git ls 
+::  git ls
 ::
 ::  Show available repositories
 ::
