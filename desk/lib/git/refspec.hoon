@@ -1,4 +1,6 @@
 /+  *git-refs, stream
+::  XX use /refs/heads/$ to indicated pattern match on /refs/heads/
+::
 |%
 +$  raw-refspec
   [opt=(unit @tD) src=@t dst=(unit @t)]

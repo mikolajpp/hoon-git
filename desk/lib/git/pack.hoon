@@ -59,7 +59,7 @@
   ?~  hash
     ~|  "Pack file is corrupted: no checksum found"  !!
   =+  len=(sub end start)
-  =+  check=(hash-octs-sha-1 len (rsh [3 start] q.octs.sea))
+  =+  check=(hash-octs-sha-1 len (rsh [3 start] q.data.sea))
   ?>  =(u.hash check)
   ::  XX read-thin should return the list
   ::  of missing objects instead of thickening the pack
@@ -115,7 +115,7 @@
       ==
   =+  sea=stream.pack
   =+  end-pos=pos.sea
-  =+  hash=(hash-octs-sha-1 octs.sea)
+  =+  hash=(hash-octs-sha-1 data.sea)
   =.  sea  (append-octs:bs sea [20 hash])
   pack(stream sea(pos start))
 ::

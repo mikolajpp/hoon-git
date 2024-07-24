@@ -274,7 +274,7 @@
   =.  sea  (write-txt:bs sea 'PACK')
   =.  sea  (append-octs:bs sea (as-byts:bs [4 version]))
   =.  sea  (append-octs:bs sea (as-byts:bs [4 count]))
-  octs.sea
+  data.sea
 ++  write-packs
   |=  archive=(list pack:git-pack)
   ^-  octs
@@ -289,7 +289,7 @@
   =.  sea  (write-octs:bs sea (as-byts:bs [4 version]))
   ~&  count
   =.  sea  (write-octs:bs sea (as-byts:bs [4 count]))
-  ~&  `@ux`q.octs.sea
+  ~&  `@ux`q.data.sea
   ::  XX This could have terrible memory complexity
   ::  We really want to operate on a single copy
   ::  of sea
@@ -306,5 +306,5 @@
   ::  XX parametrize by hash algo
   ::
   =.  sea  (write-hash sea %sha-1 hash)
-  octs.sea
+  data.sea
 --

@@ -1,18 +1,20 @@
 ::
-::::  zlib library
+::::  gzip library
   ::
-::  author: Nathan Lever
-::
 /+  *bytestream
-~%  %gzip  ..part  ~
+~%  %zlib  ..part  ~
++|  arch
 |%
-++  expand  expand-zlib
 ::
 +$  input  bits
 +$  output  octs
 +$  blocks-output  (list output)
 +$  values  (map @ud @ud)
 +$  codes  (map [size=@ud code=@ub] literal=@ud)
+--
+::
+|%
++|  %utils
 ++  swp-bits
   |=  bits=[size=@ud data=@ub]
   ^-  [size=@ud data=@ub]
@@ -22,12 +24,10 @@
   =/  new-data-length  (met 0 data)
   =.  data  (lsh [0 original-leading-zeros] data)
   [size.bits data]
-::
 ++  cut-bytes
   |=  [index=@ud length=@ud bytes=octs]
   ^-  octs
   [length (cut 3 [index length] q.bytes)]
-::
 ++  cat-bytes
   |=  [target=octs literals=octs]
   ^-  octs
@@ -37,7 +37,7 @@
   =?  q.literals  (gth target-lz 0)
     (lsh [3 target-lz] q.literals)
   [(add p.target p.literals) (cat 3 q.target q.literals)]
-::
++|  %huffman-encoding
 ++  get-fixed-table
   |=  $:  litlen-codes=codes
           literal-start=@ud
@@ -53,7 +53,6 @@
   =/  code  (swp-bits [code-size `@ub`(add code-start i)])
   =/  literal  (add literal-start i)
   $(litlen-codes (~(put by litlen-codes) code literal), i +(i))
-::
 ++  get-code
   |=  [=input =codes]
   ^-  [code=@ud bits]
@@ -68,7 +67,6 @@
     $(code-size +(code-size))
   :_  (skip-bits code-size input)
   u.code
-::
 ++  get-cl-table-components
   |=  [hclen=@ud input=bits]
   ^-  [[cl-lengths=values cl-lengths-count=values] input=bits]
@@ -108,19 +106,17 @@
     [code-lengths cl-count]
   ?<  (gth j 285)
   =^  code  input  (get-code input codes)
-  :: =/  code  (get-code input codes i)
-  :: =.  i  i.code
   ?:  =(code.code 0)
     $(j +(j))
   ?:  =(code.code 16)
     ::
     =^  bits  input  (read-need-bits 2 input)
     =/  repeat  (add bits 3)
-    :: =/  repeat  (add (cut 0 [i 2] bitstream.input) 3)
     =/  previous  (~(got by code-lengths) (sub j 1))
     =/  count  (~(got by cl-count) previous)
     =/  l  0
-    =.  code-lengths  |-
+    =.  code-lengths  
+      |-
       ?:  =(l repeat)
         code-lengths
       %=  $
@@ -280,7 +276,8 @@
     result  (add result (mul (pow 2 j) 2))
     j  +(j)
   ==
-  =^  extra-bits  input  (read-need-bits extra-bits-amount input)
+  =^  extra-bits  input  
+    (read-need-bits extra-bits-amount input)
   :_  input
   ?:  =(q.divided 0)
     (add distance extra-bits)
@@ -297,9 +294,9 @@
   ::
   =?  block-output  (gth distance p.block-output)
     =.  blocks-output  [block-output blocks-output]
+    ::  XX This is really inefficient. Fix this 
+    ::  by search across blocks
     =/  canned-blocks  (can-octs (flop blocks-output))
-    :: =/  leading-zeros  (sub p.block-output (met 3 q.block-output))
-    :: [(add leading-zeros (met 3 canned-blocks)) canned-blocks]
     canned-blocks
   ?:  (gth distance p.block-output)
     ~|  "invalid distance too far back: d = {<distance>}, p = {<p.block-output>}"  !!
@@ -332,19 +329,20 @@
   =|  block-output=output
   |-
   =^  litlen-code  input  (get-code input litlen-codes)
-  ?:  (is-bits-empty input)
+  ?:  (bits-is-empty input)
     ~|  "invalid code -- missing end-of-block"  !!
-  ::  END OF BLOCK
+  ::  End of block
   ::
   ?:  =(code.litlen-code 256)
     :_  input
     block-output
-  ::  LITERAL OR BACKREFERENCE
+  ::  Literal of backreference
   ::
   ?:  (lth code.litlen-code 256)
     $(block-output (cat-octs block-output [1 code.litlen-code]))
   =^  length  input  (get-length code.litlen-code input)
-  ::  BLOCK TYPE 1 OR 2 DISTANCE CODE
+  ::  Block type 1 or 2 distance code
+  ::
   =^  distance-code=@ud  input
     ?^  distance-codes
       (get-code input distance-codes)
@@ -363,8 +361,8 @@
       code.length
     code.distance
   $(block-output (cat-octs block-output backreference))
-::
-++  decompress-block-type-0
++|  %block-expansion
+++  expand-block-type-0
   |=  input=bits
   ^-  [=output =bits]
   :: =/  product  (dvr i 8)
@@ -372,20 +370,13 @@
   :: =/  bit-padding  ?:  =((sub 8 q.product) 8)
   ::   0
   :: (sub 8 q.product)
-  :: =.  i  (add i bit-padding)
   =.  input  (byte-bits input)
   =^  len=@ud  input  (read-need-bits 16 input)
-  :: =/  len  `@ud`(cut 0 [i 16] bitstream.input)
-  :: =.  i  (add i 32)
   =.  input  (skip-bits 16 input)
   =^  data  bays.input  (read-octs len bays.input)
   :_  input
   data
-  :: =/  cut-data  `@ux`(cut 0 [i (mul len 8)] bitstream.input)
-  :: =.  i  (add i (mul len 8))
-  :: [[len cut-data] i]
-::
-++  decompress-block-type-1
+++  expand-block-type-1
   |=  [=input =blocks-output]
   ^-  [=output bits]
   =/  litlen-codes  `codes`~
@@ -395,17 +386,17 @@
   =.  litlen-codes  (get-fixed-table litlen-codes 280 8 0b1100.0000 8)
   (parse-block input blocks-output litlen-codes ~)
 ::
-++  decompress-block-type-2
+++  expand-block-type-2
   |=  [=input =blocks-output]
   ^-  [=output bits]
-  ::  HEADER
+  ::  Header
   ::
   =^  hlit  input  (read-need-bits 5 input)
   =^  bits  input  (read-need-bits 5 input)
   =/  hdist  (add 1 bits)
   =^  bits  input  (read-need-bits 4 input)
   =/  hclen  (add 4 bits)
-  ::  GET CODE LENGTH CODES
+  ::  Get code length codes
   ::
   =^  cl-components  input
     %+  get-cl-table-components
@@ -422,7 +413,7 @@
         8
       smallest-codes
     19
-  ::  GET LITERAL/LENGTH CODES
+  ::  Get literal/length codes
   ::
   =^  litlen-components  input
     %^  get-table-components
@@ -440,7 +431,8 @@
         16
       litlen-smallest-codes
     (add 257 hlit)
-  ::  GET DISTANCE CODES
+  ::  Get distance codes
+  ::
   =^  distance-components  input
     %^  get-table-components
     input
@@ -457,48 +449,78 @@
         16
       distance-smallest-codes
     hdist
-  ::  PARSE COMPRESSED DATA
+  ::  Parse compressed data
+  ::
   (parse-block input blocks-output litlen-codes distance-codes)
 ::
-++  expand-gzip
+++  expand-blocks
+  |=  sea=bays
+  ^-  [blocks-output bays]
+  =/  input=bits  (bits-from-bays sea)
+  =|  =blocks-output
+  ::
+  |-
+  ^-  [result=octs bits]
+  =.  input  (need-bits 3 input)
+  =^  last-block  input  (read-bits 1 input)
+  =/  is-last-block  =(1 last-block)
+  =^  block-type  input  (read-bits 2 input)
+  ::
+  =^  expanded-block=octs  input
+    ?:  =(block-type 0)
+      (expand-block-type-0 input)
+    ?:  =(block-type 1)
+      (expand-block-type-1 input blocks-output)
+    ?:  =(block-type 2)
+      (expand-block-type-2 input blocks-output)
+    ~|  "Invalid block type {<block-type>} at {<pos.bays.input>}"  !!
+  ?:  is-last-block
+    =.  blocks-output  [expanded-block blocks-output]
+    =/  result=octs  (can-octs (flop blocks-output))
+    :_  (bays-from-bits input)
+    ?:  =(p.result 0)
+      expanded-block
+    result
+  %=  $
+    blocks-output  [expanded-block blocks-output]
+  ==
++|  %expansion
+++  expand-gzip 
   |=  sea=bays
   ^-  [octs bays]
   =+  beg=pos.sea
-  ::  ----------------------------
-  ::  PARSE HEADER
-  ::  ----------------------------
+  ::  Parse header
   ::
   ::  ID1
-  ::
   =^  id1=@udD  sea  (read-byte sea)
   ?>  =(31 id1)
-  ::  ID2
   ::
+  ::  ID2
   =^  id2=@udD  sea  (read-byte sea)
   ?>  =(139 id2)
-  ::  CM
   ::
+  ::  CM
   =^  cm=@udD  sea  (read-byte sea)
   ?>  =(8 cm)
+  ::
   ::  FLG
-  ::
   =^  flg=@udD  sea  (read-byte sea)
+  ::
   ::  MTIME
-  ::
   =^  mtime=@udF  sea  (read-lsb 4 sea)
+  ::
   ::  XFL
-  ::
   =^  xfl=@udD  sea  (read-byte sea)
-  ::  OS
   ::
+  ::  OS
   =^  os=@udD  sea  (read-byte sea)
-  ::  FLG FLAGS
+  ::  FLG flags
   ::
   =/  fhcrc  (cut 0 [1 1] flg)
   =/  fextra  (cut 0 [2 1] flg)
   =/  fname  (cut 0 [3 1] flg)
   =/  fcomment  (cut 0 [4 1] flg)
-  ::  IF FEXTRA SET
+  ::  If .fextra set
   ::
   =^  xlen=(unit @udE)  sea
     ?:  =(fextra 0)
@@ -508,7 +530,7 @@
     (some num)
   =?  sea  ?=(^ xlen)
     (skip-by u.xlen sea)
-  ::  IF FNAME SET
+  ::  If .fname set
   ::
   =^  file-name=(unit @t)  sea
     ?:  =(fname 0)
@@ -518,7 +540,7 @@
     =^  octs  sea  (read-octs-until u.pin sea)
     :_  (skip-byte sea)
     (some q.octs)
-  ::  IF FCOMMENT SET
+  ::  If .fcomment set
   ::
   =^  comment=(unit @t)  sea
     ?:  =(fcomment 0)
@@ -528,7 +550,7 @@
     =^  octs  sea  (read-octs-until u.pin sea)
     :_  (skip-byte sea)
     (some q.octs)
-  ::  IF FHCRC SET
+  ::  If .fhcrc set
   ::
   =^  crc16=(unit @ud)  sea
     ?:  =(fhcrc 0)
@@ -536,8 +558,6 @@
     =^  num  sea  (read-lsb 2 sea)
     :_  sea
     (some num)
-  ::  XX why are we checking crc16 instead of crc32?
-  ::
   =/  mycrc16
     %^  cut  3  [0 2]
     (crc32:crc (peek-octs-until (sub pos.sea 2) sea(pos beg)))
@@ -545,71 +565,35 @@
           !=(u.crc16 mycrc16)
       ==
     ~|  "CRC mismatch: wanted {<u.crc16>}, computed {<mycrc16>}"  !!
-  ::  ----------------------------
-  :: DECOMPRESS COMPRESSED BLOCKS
-  ::  ----------------------------
   ::
-  =/  input=bits  (from-bays sea)
-  =|  =blocks-output
-  =^  decompressed-data  input
-    |-
-    ^-  [result=octs bits]
-    =.  input  (need-bits 3 input)
-    =^  last-block  input  (read-bits 1 input)
-    =/  is-last-block  =(1 last-block)
-    =^  block-type  input  (read-bits 2 input)
-    ::
-    =^  decompressed-block=octs  input
-      ?:  =(block-type 0)
-        (decompress-block-type-0 input)
-      ?:  =(block-type 1)
-        (decompress-block-type-1 input blocks-output)
-      ?:  =(block-type 2)
-        (decompress-block-type-2 input blocks-output)
-      ~|  "Invalid block type {<block-type>} at {<pos.bays.input>}"  !!
-    ?:  is-last-block
-      =.  blocks-output  [decompressed-block blocks-output]
-      =/  result=octs  (can-octs (flop blocks-output))
-      ?:  =(p.result 0)
-        :_  input
-        decompressed-block
-      :_  input
-      result
-    %=  $
-      blocks-output  [decompressed-block blocks-output]
-    ==
-  ::
-  ::  ----------------------------
-  ::  PARSE FOOTER
-  ::  ----------------------------
-  ::
+  ::  Expand data
+  =^  data  sea  (expand-blocks sea)
+  ::  Parse footer
   ::
   =.  sea  bays.input
   ::
   =/  footer-length  (in-size sea)
   ?:  (lth footer-length 8)
     ~|  "incorrect data check"  !!
+  ::
   ::  CRC32
-  ::
   =^  crc32  sea  (read-octs 4 sea)
-  ::  ISIZE
   ::
+  ::  ISIZE
   =^  isize  sea  (read-lsb 4 sea)
   ::
-  ?:  =(q.crc32 (crc32:crc decompressed-data))
+  ?:  =(q.crc32 (crc32:crc expanded-data))
     :_  sea
-    decompressed-data
+    data
   ~|  "incorrect CRC32 data check"  !!
 ++  expand-zlib
+  ~/  %expand
   |=  sea=bays
   ^-  [octs bays]
   =+  beg=pos.sea
-  ::  ----------------------------
-  ::  PARSE HEADER
-  ::  ----------------------------
+  ::  Parse header
   ::
   ::  CMF
-  ::
   =^  cmf=@ubD  sea  (read-byte sea)
   =/  cm  (cut 0 [0 4] cmf)
   ?>  =(cm 8)
@@ -628,12 +612,12 @@
       (some dict)
     :_(sea ~)
   ::  ----------------------------
-  :: DECOMPRESS COMPRESSED BLOCKS
+  :: expand COMPRESSED BLOCKS
   ::  ----------------------------
   ::
-  =/  input=bits  (from-bays sea)
+  =/  input=bits  (bits-from-bays sea)
   =|  =blocks-output
-  =^  decompressed-data  input
+  =^  expanded-data  input
     |-
     ^-  [result=octs bits]
     =.  input  (need-bits 3 input)
@@ -641,24 +625,24 @@
     =/  is-last-block  =(1 last-block)
     =^  block-type  input  (read-bits 2 input)
     ::
-    =^  decompressed-block=octs  input
+    =^  expanded-block=octs  input
       ?:  =(block-type 0)
-        (decompress-block-type-0 input)
+        (expand-block-type-0 input)
       ?:  =(block-type 1)
-        (decompress-block-type-1 input blocks-output)
+        (expand-block-type-1 input blocks-output)
       ?:  =(block-type 2)
-        (decompress-block-type-2 input blocks-output)
+        (expand-block-type-2 input blocks-output)
       ~|  "Invalid block type {<block-type>} at {<pos.bays.input>}"  !!
     ?:  is-last-block
-      =.  blocks-output  [decompressed-block blocks-output]
+      =.  blocks-output  [expanded-block blocks-output]
       =/  result=octs  (can-octs (flop blocks-output))
       ?:  =(p.result 0)
         :_  input
-        decompressed-block
+        expanded-block
       :_  input
       result
     %=  $
-      blocks-output  [decompressed-block blocks-output]
+      blocks-output  [expanded-block blocks-output]
     ==
   ::
   ::  ----------------------------
@@ -676,7 +660,7 @@
   =^  adler32  sea  (read-octs 4 sea)
   ::  XX verify checksum
   :_  sea
-  decompressed-data
+  expanded-data
 ++  crc
   :: ~%  %crc  ..part  ~
   |%

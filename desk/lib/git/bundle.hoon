@@ -23,7 +23,6 @@
   ^-  [bundle-header bays:bs]
   ::  Parse signature
   ::
-  ~&  `@t`(cut 3 [0 20] q.octs.sea)
   =^  line  sea  (read-line-maybe:bs sea)
   ?~  line
     ~|  "Git bundle is corrupted: signature absent"  !!
@@ -34,9 +33,8 @@
     ~|  "Git bundle is corrupted: invalid signature {(trip u.line)}"  !!
   ::  Select hash algo and parser
   ::
-  =/  [hal=hash-algo parse-hash=_parse-hash-sha-1]
-    ?:  =(2 u.sig)
-      [%sha-1 parse-hash-sha-1]
+  =/  hal=hash-algo
+    ?:  =(2 u.sig)  %sha-1
     !!
   ::  Parse prerequisites
   ::
@@ -50,7 +48,7 @@
       %+  rust  (trip u.line)
       %+  ifix  [hep (just '\0a')]
       ;~  sfix
-        parse-hash
+        ^~  (parse-hash hal)
         (punt ;~(pfix ace (star prn)))  :: optional comment
       ==
     ?~  hash
@@ -68,7 +66,7 @@
     =/  ref=(unit [=hash =refname])
       %+  rust  (trip u.line)
       ;~  plug
-        parse-hash-sha-1
+        ^~  (parse-hash hal)
         ;~(pfix ace parse-refname)
       ==
     ?~  ref

@@ -225,7 +225,7 @@
   =+  hash-bytes=(hash-bytes hal)
   =/  tes=(list tree-entry)  ~
   |-
-  ?.  (lth pos.sea p.octs.sea)
+  ?.  (is-empty:bs sea)
     tree+[size.rob tes]
   =/  pin  (find-byte:bs 0x0 sea)
   ?~  pin  !!

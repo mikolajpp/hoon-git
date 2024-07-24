@@ -82,6 +82,12 @@
   |=  [len=@ud =hash]
   ^-  @t
   (cut 3 [0 len] (crip ((x-co:co 0) hash)))
+++  parse-hash
+  |=  hal=hash-algo
+  ?-  hal
+    %sha-1  parse-hash-sha-1
+    %sha-256  parse-hash-sha-256
+  ==
 ++  parse-hash-sha-1
   %+  cook
     |=(hax=@ ;;(@ux hax))

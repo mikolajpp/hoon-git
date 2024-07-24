@@ -6,6 +6,9 @@
 /+  *git, *git-http
 /+  git=git-repository
 /+  git-revision, git-pack, git-pack-objects, git-graph
+/=  webui  /app/git-store/webui
+:: XX this syntax is broken /=  webui=/app/git-store-webui
+::
 =,  html
 |%
 +$  versioned-state
@@ -120,6 +123,7 @@
 ::  /x/repo/blob/[hash]     -- retrieve a blob
 ::  /x/repo/commit/[hash]   -- retrieve a commit
 ::  /x/repo/tree/[hash]     -- retrieve a tree
+::  /x/repo/tag/[hash]      -- retrieve a tag
 ::
 ++  on-peek
   |=  =path
@@ -313,8 +317,12 @@
     %+  give-simple-payload:app:server  eyre-id
       :-  [401 ~[['www-authenticate' 'Basic realm="access to git repo"']]]
       `(as-octt:mimes:html "Access denied")
-  ?+  site.request-line  !!
-    ::  Handshake
+  ?+  site.request-line
+    ::  Default to web view
+    ::
+    :_  state
+    (~(view webui bowl eyre-id) u.repo request-line)
+    ::  Git server: handshake
     ::
     [%git @t %info %refs ~]
       ?>  ?=([[%service @t] ~] args.request-line)
@@ -324,8 +332,12 @@
         %git-receive-pack
           (handle-receive-pack repo-name u.repo eyre-id request.inbound-request)
       ==
+    ::  Git server: upload-pack
+    ::
     [%git @t %git-upload-pack ~]
       (handle-upload-pack repo-name u.repo eyre-id request.inbound-request)
+    ::  Git server: receive-pack
+    ::
     [%git @t %git-receive-pack ~]
       (handle-receive-pack repo-name u.repo eyre-id request.inbound-request)
   ==
@@ -359,12 +371,7 @@
   ^-  (quip card _state)
   =+  ver=(get-header:http 'git-protocol' header-list.request)
   ?~  ver  !!
-  ~&  header-list.request
-  :: ~?  ?!(?=(~ body.request))
-  ::   ::  XX why does q.body.request not work here?
-  ::   `@t`q:(need body.request)
-  ::  Only support git-upload-pack in
-  ::  v2
+  ::  Only support git-upload-pack in version 2
   ::
   ?>  =('version=2' u.ver)
   =<
@@ -471,9 +478,9 @@
           ==
     =.  sea  %+  append-octs:bs  sea
       (write-pkt-len flush-pkt)
-    ~&  `@t`q.octs.sea
+    :: ~&  `@t`q.octs.sea
     :_  state
-    (give-simple-payload:app:server eyre-id [[200 ~] `octs.sea])
+    (give-simple-payload:app:server eyre-id [[200 ~] `(to-octs:bs sea)])
   ++  fetch
     |=  sea=bays:bs
     ^-  (quip card _state)
@@ -653,10 +660,10 @@
                   (write-pkt-lines-txt-on-band git-agent 2)
       =.  red  (append-octs:bs red pack-pkt-lines)
       (append-octs:bs red (write-pkt-len flush-pkt))
-    ~&  transfer-bytes+p.octs.red
+    ~&  transfer-bytes+(size:bs red)
     :_  state
     %+  give-simple-payload:app:server  eyre-id
-    [[200 ~] ?:(=(0 p.octs.red) ~ `octs.red)]
+    [[200 ~] ?:(=(0 (size:bs red)) ~ `(to-octs:bs red))]
   --
 ++  handle-receive-pack
   |=  $:  repo-name=@t
@@ -738,14 +745,14 @@
     ::
     ::  Write flush packet
     =.  red  (append-octs:bs red (write-pkt-len flush-pkt))
-    ~&  `@t`q.octs.red
+    ~&  `@t`q.data.red
     :_  state
     %+  give-simple-payload:app:server  eyre-id
     :-  :-  200
       :~
         ['content-type' 'application/x-git-receive-pack-advertisement']
       ==
-    `octs.red
+    `data.red
   ++  write-caps
     |=  have=?
     ^-  octs
@@ -910,7 +917,6 @@
             "ok {(trip (print-refname ref-name.cmd))}"
       (~(put of refs) ref-name.cmd new.cmd)
     ::  XX update repository
-    ~&  `@t`q.octs.status
     =.  status  %+  append-octs:bs  status
                   (write-pkt-len flush-pkt)
     ~&  (~(dip of refs.repo) /refs/heads)
@@ -927,6 +933,6 @@
     %+  weld
       cards
     %+  give-simple-payload:app:server  eyre-id
-    [[200 ~] `octs.status]
+    [[200 ~] `(to-octs:bs status)]
   --
 --
