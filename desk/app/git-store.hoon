@@ -5,7 +5,7 @@
 ::
 /+  *git, *git-http
 /+  git=git-repository
-/+  git-revision, git-pack, git-pack-objects, git-graph
+/+  git-rev-walk, git-pack, git-pack-objects, git-graph
 /=  webui  /app/git-store/webui
 :: XX this syntax is broken /=  webui=/app/git-store-webui
 ::
@@ -388,7 +388,7 @@
         u.body.request
       ?>  =('gzip' u.cen)
       ~&  %http-gzip-encoded
-      -:(expand:zlib (from-octs:bs u.body.request))
+      -:(decompress-zlib:zlib (from-octs:bs u.body.request))
     ~&  `@t`q.body
     =/  sea  (from-octs:bs body)
     ::  Extract command name

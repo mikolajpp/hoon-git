@@ -110,7 +110,7 @@
       ::  XX terrible complexity, use nested lists
       ::
       diff  %+  weld
-              (diff-tree repo tree.left-obj tree.right-obj [name.i.sa p])
+              (diff-tree repo tree-dir.left-obj tree-dir.right-obj [name.i.sa p])
             diff
       sa  t.sa
       sb  t.sb
@@ -124,12 +124,12 @@
         ?:  ?=(%tree -.left-obj)
           :-  [[name.i.sb p] 0x0 hash.i.sb]
           %+  weld
-            (tree-all-diff repo tree.left-obj p &)
+            (tree-all-diff repo tree-dir.left-obj p &)
           diff
         :-  [[name.i.sa p] hash.i.sa 0x0]
         ?>  ?=(%tree -.right-obj)
         %+  weld
-          (tree-all-diff repo tree.right-obj p |)
+          (tree-all-diff repo tree-dir.right-obj p |)
         diff
       sa  t.sa
       sb  t.sb
@@ -156,5 +156,5 @@
       [0x0 hash.i.tree]
     ?.  ?=(%tree -.obj)
       $(tree t.tree)
-    (tree-all-diff repo tree.obj [name.i.tree p] side)
+    (tree-all-diff repo tree-dir.obj [name.i.tree p] side)
 --

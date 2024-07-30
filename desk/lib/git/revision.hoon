@@ -23,7 +23,7 @@
   $:  repo=repository:git
       ::  Seed for a walk: pushes and hides
       ::  - a push is an interesting commit
-      ::  - a hide is a dull commit
+      ::  - a hide is an uninteresting commit
       ::
       ::  For objects that were reached,
       ::  the store will contain the commit.
@@ -35,13 +35,13 @@
       ::  only if the parent was stored as a full object.
       ::
       store=(map hash (unit commit))
-      ::  Seeds to grow from
+      ::  seed commits
       ::
       seed=seed-mop
       seed-stack=(list (pair hash commit))
       ::  Walk limits
       ::
-      dull=(set hash)
+      hide=(set hash)
       ::  Commits already processed
       ::
       done=(set hash)
@@ -53,16 +53,10 @@
 ::  from the seed list
 ::
 ++  walk
-  |=  [repo=repository:git want=(list hash) exclude=(list hash)]
-  ^-  (list (pair hash commit))
+  |=  [repo=repository:git push=(list hash) hide=(list hash)]
+  ^-  rev-walk
   =.  repo.state  repo
-  ::  XX prepare should also use want/exclude lists
-  ::
-  =/  seed=(list [hash ?])
-    %+  weld
-    (turn want |=(a=hash [a &]))
-    (turn exclude |=(a=hash [a |]))
-  (prepare seed)
+  (prepare push hide)
 ::  XX Shouldn't this just be named put-by-store?
 ::
 ++  put-unit-by-store
@@ -135,13 +129,13 @@
   ::  Mark parents of the commit as dull,
   ::  possibly adding grandparents to the stack
   ::
-  =^  stack  dull.state
+  =^  stack  hide.state
     |-
     ?~  parents
-      [stack dull.state]
+      [stack hide.state]
     =+  hash=i.parents
-    =.  dull.state
-      (~(put in dull.state) hash)
+    =.  hide.state
+      (~(put in hide.state) hash)
     =^  grands=(list ^hash)  state
       (mark-one-parent-dull hash)
     %=  $
@@ -161,10 +155,10 @@
     ^-  [(list ^hash) rev-walk]
     ::  Do not jump off the dull twice
     ::
-    ?:  (~(has in dull.state) hash)
+    ?:  (~(has in hide.state) hash)
       [~ state]
     :: ~&  mark-one-parent-dull+hash
-    =.  dull.state  (~(put in dull.state) hash)
+    =.  hide.state  (~(put in hide.state) hash)
     =^  mit  state  (got-unit-by-store hash)
     ?~  mit
       [~ state]
@@ -198,7 +192,7 @@
   =+  parents=parents.commit
   ::  dull commit
   ::
-  ?:  (~(has in dull.state) hash)
+  ?:  (~(has in hide.state) hash)
     |-
     ?~  parents
       state
@@ -214,31 +208,23 @@
   =^  mit  state  (got-by-store hash)
   =.  state  (put-on-seed hash mit)
   $(parents t.parents)
-::  XX Make (list (pair [hash commit] ?))
-::  the standard output of revision state.
-::  The flag indicates whether to state over the commit (&)
-::  or it is a dull object.
-::
 ++  prepare
-  |=  seed=(list [hash walk=?])
-  ^-  (list [hash commit])
-  =.  state
-    |-
-    ?~  seed
-      state
-    =+  hash=-.i.seed
-    =+  dull=!+.i.seed
-    :: ~&  prepare-commit+[hash dull]
-    ::  XX 1. Here we have a zipper focused at commit
-    ::
-    =^  mit=commit  state  (got-by-store hash)
-    =.  state  (put-on-seed hash mit)
-    ::  XX 2. Here we use the zipper to update flags
-    ::
-    =?  state  dull
-      =.  dull.state  (~(put in dull.state) hash)
-      (mark-parents-dull mit)
-    $(seed t.seed)
+  |=  [push=(list hash) hide=(list hash)]
+  ^-  rev-walk
+  =.  state  %+  roll  push 
+    |=  [=hash =_state]
+    =^  =commit  state  (got-by-store hash)
+    (put-on-seed hash commit)
+  =.  state  %+  roll  hide
+    |=  [=hash =_state]
+    =^  =commit  state  (got-by-store hash)
+    =.  hide.state  (~(put in hide.state) hash)
+    (mark-parents-dull commit)
+  state
+::    +step: walk one revision forward
+::
+++  step
+  ^-  [(unit [=hash =commit]) rev-walk]
   ::  Limit the list
   ::  (1) Pop the commit
   ::  (2) Handle max age (commit too old)
@@ -248,26 +234,37 @@
   ::  (6) Discard the commit if too old (if desired)
   ::  (7) Push the commit onto the stack
   ::
-  =|  commits=(list [hash commit])
-  =^  commits  state
-    |-
-    ::  XX typechecker goes haywire
-    ::
-    =+  seed=seed.state
-    ?~  seed
-      [commits state]
-    =^  [=hash mit=commit]  state  pop-on-seed
+  |-
+  ?:  =(~ seed.state)
+    [~ state]
+  =^  [=hash =commit]  state  pop-on-seed
+  =.  state  (process-parents hash commit)
+  =+  hide=(~(has in hide.state) hash)
+  =?  state  hide
+    (mark-parents-dull commit)
+  ?:  hide
+    $
+  :_  state
+  (some [hash commit])
+  :: =^  commits  state
+  ::   |-
+  ::   ::  XX typechecker goes haywire
+  ::   ::
+  ::   =+  seed=seed.state
+  ::   ?~  seed
+  ::     [commits state]
+  ::   =^  [=hash mit=commit]  state  pop-on-seed
     :: ~&  pop-seed+[hash parents.mit]
     ::  XX Handle max age
     ::  XX This modifies the seed mop
     ::
-    =.  state  (process-parents hash mit)
-    =?  state  (~(has in dull.state) hash)
-      (mark-parents-dull mit)
-    ::  XX Handle min age
-    ::  XX Handle max age as filter
-    $(commits [[hash mit] commits])
+    :: =.  state  (process-parents hash mit)
+    :: =?  state  (~(has in hide.state) hash)
+    ::   (mark-parents-dull mit)
+    :: ::  XX Handle min age
+    :: ::  XX Handle max age as filter
+    :: $(commits [[hash mit] commits])
   ::  XX Git shows dull commits when requested with arguments
   ::
-  (flop (skip commits |=([=hash mit=*] (~(has in dull.state) hash))))
+  :: (flop (skip commits |=([=hash mit=*] (~(has in hide.state) hash))))
 --

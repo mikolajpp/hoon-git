@@ -30,7 +30,8 @@
 ::  latest revision on the default branch.
 ::
 /+  server
-/+  git=git-repository, *git-hash
+/+  git=git-repository, *git-hash, *git-object, *git-refs
+/+  l=git-log
 ::  XX encourage migration to readme.udon
 ::
 /+  md=markdown
@@ -43,11 +44,11 @@
   =+  repo-name=i.t.site.request-line
   ::
   ?+  t.t.site.request-line  !!
-    ::  redirect / to /about
+    ::  redirect / to /code
     ::
     ~  %+  give-simple-payload:app:server  eyre-id
        :_  ~  =-  [308 ~[['location' -]]]
-              ;:((cury cat 3) repo-name '/' 'about')
+              ;:((cury cat 3) repo-name '/' 'code')
     ::
     [%about ~]  (about repo request-line)
   ==
@@ -56,6 +57,38 @@
   %-  some
   %-  as-octt:mimes
   (en-xml manx)
+++  cmp-txt
+  |=  [a=@t b=@t]
+  ^-  ?
+  =+  len=(met 3 a)
+  =+  lem=(met 3 b)
+  =+  i=0
+  |-
+  ?:  (gte i len)
+    &
+  ?:  (gte i lem)
+    |
+  =+  c=(cut 3 [0 i] a)
+  =+  d=(cut 3 [0 i] b)
+  ?:  (lth c d)
+    &
+  ?:  (gth c d)
+    |
+  $(i +(i))
+++  cmp-tree-entry
+  |=  [a=tree-entry b=tree-entry]
+  ^-  ?
+  ?:  =((file-type a) (file-type b))
+    (cmp-txt name.a name.b)
+  ?:  (is-dir a)
+    &
+  ?:  (is-dir b)
+    |
+  ?:  (is-gitlink a)
+    &
+  ?:  (is-gitlink b)
+    |
+  (cmp-txt name.a name.b)
 ++  about
   |=  [repo=repository:git =request-line:server]
   ^-  (list card:agent:gall)
@@ -63,47 +96,99 @@
   =+  repo-name=i.t.site.request-line
   %+  give-simple-payload:app:server  eyre-id
   :-  [200 ~]
-  ::  XX default branch should be saved in configuration on clone
   ::
-  ::  (got-file repo /refs/heads/main /readme/umd)
-  ::
-  =/  hash  (got:~(refs git repo) /refs/heads/main)
-  ::  XX got-commit, get-commit, etc.
-  ::
-  =/  obj  (got:~(store git repo) hash)
-  ?>  ?=(%commit -.obj)
-  =/  obj  (got:~(store git repo) tree.commit.obj)
-  ?>  ?=(%tree -.obj)
-  =+  dir=tree-dir.obj
-  =/  readme=(unit ^hash)
+  =/  branch  (need (resolve:~(refs git repo) head:refspace))
+  =/  hash  (got:~(refs git repo) branch)
+  =/  commit  (got-commit:~(store git repo) hash)
+  =/  tree-dir  (got-tree:~(store git repo) tree.commit)
+  =*  dir  tree-dir
+  =/  readme-hash=(unit ^hash)
     |-  ?~  dir  ~
-    ?:  =(name.i.dir 'README.md')
+    :: XX switch to 'readme.udon'
+    :: XX what about LICENSE? switch to license as well?
+    ::
+    ?:  ?|  =(name.i.dir 'README.md')
+            =(name.i.dir 'readme.md')
+        ==
       (some hash.i.dir)
     $(dir t.dir)
-  =/  obj  (got:~(store git repo) (need readme))
-  ?>  ?=(%blob -.obj)
-  =/  readme-md  (scan (trip q.data.obj) markdown:de:md:md)
+  =/  readme-octs=(unit octs)
+    %+  biff  readme-hash
+    get-blob:~(store git repo)
+  =/  readme
+    %+  bind  readme-octs
+    ;:  corl
+      sail-en:md:md
+      (curr scan markdown:de:md:md)
+      |=(=octs (trip q.octs))
+    ==
   %-  manx-as-octs
   ;body
     ;head
       ;meta(charset "utf-8");
-      ;style:"{(trip default:style)}"
-      ;style:"{(trip about:style)}"
+      ;style: {default:style}
+      ;style: {about:style}
     ==
-    ;h1: About {(trip repo-name)} repository
-    ;p: Current branch /refs/heads/master
-    ;h2: README
-    ;+  (sail-en:md:md readme-md)
-    ;+  code:icon
-    ;p: Hosted on {<our.bowl>}
+    ;header
+      ;h1: {<our.bowl>} / {(trip repo-name)}
+      ;h2: branch: {(spud branch)}
+      ;nav
+        ;a/"code": Code
+        ;a/"commit": Commit
+        ;a/"tree": Tree
+        ;a/"refs": Refs
+        ;a/"diff": Diff
+      ==
+    ==
+    ;+  (~(tree-dir ui repo) dir hash)
+    :: ;p: Current branch /refs/heads/master
+    :: ;h2: README
+    ;*  ?~(readme ~ ~[u.readme])
+    :: ;+  code:icon
+    :: ;p: Hosted on {<our.bowl>}
   ==
+++  ui
+  |_  repo=repository:git
+  ++  tree-entry
+    |=  entry=^tree-entry
+    ^-  manx
+    ;a/"tree/{(trip name.entry)}": {(trip name.entry)}
+  ++  tree-dir
+    |=  [dir=^tree-dir tip=hash]
+    ^-  manx
+    =/  dir  (sort dir cmp-tree-entry)
+    ;table(class "tree-view")
+      ;*  %+  turn  dir
+          |=  entry=^tree-entry
+          ^-  manx
+          =/  [last-hash=hash last-commit=commit]
+            %-  need
+            (tree-path-last-modified:l repo tip ~[name.entry])
+          =*  date  date.commit-time.last-commit
+          =/  last-date  `@dr`(sub now.bowl date)
+          ;tr  ;td  ;+  (tree-entry entry)
+               ==
+               ;td: {message.last-commit}
+               ;td: {<last-date>}
+          ==
+    ==
+  --
 ++  style
   |%
   ++  default
+    ^~
+    %-  trip
     '''
     * {font-family: monospace;}
+    .navigation { display: flex; }
+    header > nav {font-size: 2em;}
+    header > nav > a {margin: 10px;}
+    table.tree-view {font-size: 20px;}
     '''
-  ++  about  ''
+  ++  about  
+    ^~
+    %-  trip
+    ''
   --
 ++  icon
   |%

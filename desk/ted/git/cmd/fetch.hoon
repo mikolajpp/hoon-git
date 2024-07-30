@@ -157,7 +157,7 @@
   =+  hash-old=(print-short-hash 7 old)
   =+  hash-new=(print-short-hash 7 new)
   ~?  !=(old new)
-    fetch-update+"{<refname>}: {hash-old}..{hash-new}"
+    fetch-update+"{<refname>}: {(trip hash-old)}..{(trip hash-new)}"
   (~(put of refs) refname new)
 ::  XX verify presence of referenced objects
 (pure:m !>(`repo))

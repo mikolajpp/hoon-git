@@ -38,6 +38,7 @@
   =/  dat  %-  need
       (de:base64:mimes:html 'dHJlZSAzNwAxMDA2NDQgUkVBRE1FLm1kAL95WRuOpepZ7+j9i+LgSvK2czrM')
   =/  rob  (raw-from-octs dat)
+  =/  obj  (parse-raw hal rob)
   %+  expect-eq
   !>  :-  (txt-to-hash ~.47a237559adb6f5ca41621c8afcfcdb24ad4eadf)
       :-  %tree  :-  size=37
@@ -45,8 +46,7 @@
           :-  mode=~.100644
           (txt-to-hash ~.bf79591b8ea5ea59efe8fd8be2e04af2b6733acc)
       ==
-  !>  =/  obj  (parse-raw hal rob)
-      :_  obj
+  !>  :_  obj
       (hash-obj hal obj)
   ::
   ==

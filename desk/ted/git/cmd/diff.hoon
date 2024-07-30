@@ -43,10 +43,10 @@
   =-  ?>(?=(%commit -.-) commit.-)
   (got:~(store git repo) dst)
 =/  src-tree=tree-dir
-  =-  ?>(?=(%tree -.-) tree.-)
+  =-  ?>(?=(%tree -.-) tree-dir.-)
   (got:~(store git repo) tree.src-commit)
 =/  dst-tree=tree-dir
-  =-  ?>(?=(%tree -.-) tree.-)
+  =-  ?>(?=(%tree -.-) tree-dir.-)
   (got:~(store git repo) tree.dst-commit)
 :: ~&  src-tree
 :: ~&  dst-tree
@@ -75,7 +75,7 @@
       =/  obj
         (got:~(store git repo) hash)
       ?>  ?=(%blob -.obj)
-      =/  =wain  (mime:grab:txt /text/plain octs.obj)
+      =/  =wain  (mime:grab:txt /text/plain data.obj)
       :-  %mor
       :-  [%txt "{<path>}:"]
       (print-txt wain side)
@@ -89,8 +89,8 @@
       =/  right-obj  (got:~(store git repo) right)
       ?>  ?=(%blob -.left-obj)
       ?>  ?=(%blob -.right-obj)
-      =/  lain=wain  (mime:grab:txt /text/plain octs.left-obj)
-      =/  rain=wain  (mime:grab:txt /text/plain octs.right-obj)
+      =/  lain=wain  (mime:grab:txt /text/plain data.left-obj)
+      =/  rain=wain  (mime:grab:txt /text/plain data.right-obj)
       =/  diff=(urge:clay cord)
         (diff:~(grad txt lain) rain)
       :-  %mor

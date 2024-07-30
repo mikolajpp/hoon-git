@@ -59,5 +59,5 @@
   ~|  "Fast-forward merge failed"  !!
 =.  refs.repo
   (~(put of refs.repo) dst src-hash)
-~&  "{(print-short-hash 7 dst-hash)}..{(print-short-hash 7 src-hash)}"
+~&  "{(trip (print-short-hash 7 dst-hash))}..{(trip (print-short-hash 7 src-hash))}"
 (pure:m !>(`repo))

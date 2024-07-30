@@ -33,7 +33,8 @@
             $:  commit-header
                 message=tape
             ==
-+$  tree-entry  [name=@ta mode=@ta =hash]
+::  XX introduce octal aura @uo: mode=@uo
++$  tree-entry  [name=@ta mode=@ux =hash]
 +$  tree-dir  $+(git-tree (list tree-entry))
 +$  object  $+  git-object
   $%  [%commit size=@ud =commit]
@@ -225,7 +226,7 @@
   =+  hash-bytes=(hash-bytes hal)
   =/  tes=(list tree-entry)  ~
   |-
-  ?.  (is-empty:bs sea)
+  ?:  (is-empty:bs sea)
     tree+[size.rob tes]
   =/  pin  (find-byte:bs 0x0 sea)
   ?~  pin  !!
@@ -334,7 +335,41 @@
     ==
   ::  Tree rules
   ::
-  ++  tree-mode  (cook crip ;~(sfix (plus (shim '0' '9')) ace))
+  ++  parse-octal  (bass 8 (plus cit))
+  ++  tree-mode  ;~(sfix parse-octal ace)
   ++  tree-node  (cook crip (plus prn))
   --
+++  parse-octal
+  |=  txt=tape
+  (scan txt parse-octal:parse)
+++  ifinvalid  ^~  (parse-octal "0030000")
+++  ifmt    ^~  (parse-octal "0170000")
+++  ifsock  ^~  (parse-octal "0140000")
+++  iflnk   ^~  (parse-octal "0120000")
+++  ifreg   ^~  (parse-octal "0100000")
+++  ifblk   ^~  (parse-octal "0060000")
+++  ifdir   ^~  (parse-octal "0040000")
+++  ifchr   ^~  (parse-octal "0020000")
+++  ififo   ^~  (parse-octal "0010000")
+++  isuid   ^~  (parse-octal "0004000")
+++  isgid   ^~  (parse-octal "0002000")
+++  isvtx   ^~  (parse-octal "0001000")
+++  ifgitlink  ^~  (parse-octal "0160000")
+::
+++  file-type
+  |=  ent=tree-entry
+  ^-  @ux
+  (dis ifmt mode.ent)
+++  is-regular
+  |=  ent=tree-entry
+  ^-  ?
+  =(ifreg (dis ifreg mode.ent))
+++  is-dir
+  |=  ent=tree-entry
+  ^-  ?
+  =(ifdir (dis ifdir mode.ent))
+++  is-gitlink
+  |=  ent=tree-entry
+  ^-  ?
+  =(ifgitlink (dis ifgitlink mode.ent))
 --

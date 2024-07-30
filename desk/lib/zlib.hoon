@@ -1,11 +1,9 @@
 ::
-::::  gzip library
+::::  zlib compression library
   ::
 /+  *bytestream
-~%  %zlib  ..part  ~
-+|  arch
-|%
 ::
+|%
 +$  input  bits
 +$  output  octs
 +$  blocks-output  (list output)
@@ -13,6 +11,7 @@
 +$  codes  (map [size=@ud code=@ub] literal=@ud)
 --
 ::
+~%  %zlib  ..part  ~
 |%
 +|  %utils
 ++  swp-bits
@@ -294,8 +293,6 @@
   ::
   =?  block-output  (gth distance p.block-output)
     =.  blocks-output  [block-output blocks-output]
-    ::  XX This is really inefficient. Fix this 
-    ::  by search across blocks
     =/  canned-blocks  (can-octs (flop blocks-output))
     canned-blocks
   ?:  (gth distance p.block-output)
@@ -362,7 +359,7 @@
     code.distance
   $(block-output (cat-octs block-output backreference))
 +|  %block-expansion
-++  expand-block-type-0
+++  decompress-block-type-0
   |=  input=bits
   ^-  [=output =bits]
   :: =/  product  (dvr i 8)
@@ -376,7 +373,7 @@
   =^  data  bays.input  (read-octs len bays.input)
   :_  input
   data
-++  expand-block-type-1
+++  decompress-block-type-1
   |=  [=input =blocks-output]
   ^-  [=output bits]
   =/  litlen-codes  `codes`~
@@ -386,7 +383,7 @@
   =.  litlen-codes  (get-fixed-table litlen-codes 280 8 0b1100.0000 8)
   (parse-block input blocks-output litlen-codes ~)
 ::
-++  expand-block-type-2
+++  decompress-block-type-2
   |=  [=input =blocks-output]
   ^-  [=output bits]
   ::  Header
@@ -453,43 +450,43 @@
   ::
   (parse-block input blocks-output litlen-codes distance-codes)
 ::
-++  expand-blocks
+++  decompress-blocks
   |=  sea=bays
-  ^-  [blocks-output bays]
+  ^-  [output bays]
   =/  input=bits  (bits-from-bays sea)
   =|  =blocks-output
   ::
   |-
-  ^-  [result=octs bits]
   =.  input  (need-bits 3 input)
   =^  last-block  input  (read-bits 1 input)
   =/  is-last-block  =(1 last-block)
   =^  block-type  input  (read-bits 2 input)
   ::
-  =^  expanded-block=octs  input
+  =^  decompressed-block=octs  input
     ?:  =(block-type 0)
-      (expand-block-type-0 input)
+      (decompress-block-type-0 input)
     ?:  =(block-type 1)
-      (expand-block-type-1 input blocks-output)
+      (decompress-block-type-1 input blocks-output)
     ?:  =(block-type 2)
-      (expand-block-type-2 input blocks-output)
-    ~|  "Invalid block type {<block-type>} at {<pos.bays.input>}"  !!
+      (decompress-block-type-2 input blocks-output)
+    ~|  "invalid block type {<block-type>} at {<pos.bays.input>}"  !!
   ?:  is-last-block
-    =.  blocks-output  [expanded-block blocks-output]
+    =.  blocks-output  [decompressed-block blocks-output]
     =/  result=octs  (can-octs (flop blocks-output))
-    :_  (bays-from-bits input)
+    :_  bays.input
     ?:  =(p.result 0)
-      expanded-block
+      decompressed-block
     result
   %=  $
-    blocks-output  [expanded-block blocks-output]
+    blocks-output  [decompressed-block blocks-output]
   ==
-+|  %expansion
-++  expand-gzip 
++|  %decompression
+++  decompress-gzip 
+  ~/  %decompress-gzip
   |=  sea=bays
   ^-  [octs bays]
-  =+  beg=pos.sea
-  ::  Parse header
+  =+  start=pos.sea
+  ::  Parse gzip header
   ::
   ::  ID1
   =^  id1=@udD  sea  (read-byte sea)
@@ -560,17 +557,15 @@
     (some num)
   =/  mycrc16
     %^  cut  3  [0 2]
-    (crc32:crc (peek-octs-until (sub pos.sea 2) sea(pos beg)))
+    (crc32:crc (peek-octs-until (sub pos.sea 2) sea(pos start)))
   ?:  ?&  ?=(^ crc16)
           !=(u.crc16 mycrc16)
       ==
-    ~|  "CRC mismatch: wanted {<u.crc16>}, computed {<mycrc16>}"  !!
+    ~|  "crc mismatch: wanted {<u.crc16>}, computed {<mycrc16>}"  !!
   ::
-  ::  Expand data
-  =^  data  sea  (expand-blocks sea)
+  ::  Decompress data
+  =^  data=octs  sea  (decompress-blocks sea)
   ::  Parse footer
-  ::
-  =.  sea  bays.input
   ::
   =/  footer-length  (in-size sea)
   ?:  (lth footer-length 8)
@@ -582,85 +577,59 @@
   ::  ISIZE
   =^  isize  sea  (read-lsb 4 sea)
   ::
-  ?:  =(q.crc32 (crc32:crc expanded-data))
+  ?:  =(q.crc32 (crc32:crc data))
     :_  sea
     data
-  ~|  "incorrect CRC32 data check"  !!
-++  expand-zlib
-  ~/  %expand
+  ~|  "incorrect crc32 data check"  !!
+++  decompress-octs-gzip
+  |=  data=octs
+  ^-  octs
+  -:(decompress-gzip (from-octs data))
+++  decompress-zlib
+  ~/  %decompress-zlib
   |=  sea=bays
   ^-  [octs bays]
-  =+  beg=pos.sea
-  ::  Parse header
+  =+  start=pos.sea
+  ::  Parse zlib header
   ::
   ::  CMF
   =^  cmf=@ubD  sea  (read-byte sea)
   =/  cm  (cut 0 [0 4] cmf)
   ?>  =(cm 8)
   =/  cinfo  (cut 0 [4 4] cmf)
-  ::  FLAG
+  ::  FLAGS
   ::
-  =^  flag=@ubD  sea  (read-byte sea)
-  =/  fcheck  (cut 0 [0 5] flag)
-  =/  fdict  (cut 0 [5 1] flag)
-  =/  flevel  (cut 0 [6 2] flag)
-  ::  XX implement fcheck
+  =^  flg=@ubD  sea  (read-byte sea)
+  =/  fcheck  (cut 0 [0 5] flg)
+  =/  fdict  (cut 0 [5 1] flg)
+  =/  flevel  (cut 0 [6 2] flg)
   =^  dict=(unit @uxF)  sea
     ?:  =(fdict 1)
       =^  dict  sea  (read-lsb 4 sea)
       :_  sea
       (some dict)
     :_(sea ~)
-  ::  ----------------------------
-  :: expand COMPRESSED BLOCKS
-  ::  ----------------------------
+  ::  fcheck
   ::
-  =/  input=bits  (bits-from-bays sea)
-  =|  =blocks-output
-  =^  expanded-data  input
-    |-
-    ^-  [result=octs bits]
-    =.  input  (need-bits 3 input)
-    =^  last-block  input  (read-bits 1 input)
-    =/  is-last-block  =(1 last-block)
-    =^  block-type  input  (read-bits 2 input)
-    ::
-    =^  expanded-block=octs  input
-      ?:  =(block-type 0)
-        (expand-block-type-0 input)
-      ?:  =(block-type 1)
-        (expand-block-type-1 input blocks-output)
-      ?:  =(block-type 2)
-        (expand-block-type-2 input blocks-output)
-      ~|  "Invalid block type {<block-type>} at {<pos.bays.input>}"  !!
-    ?:  is-last-block
-      =.  blocks-output  [expanded-block blocks-output]
-      =/  result=octs  (can-octs (flop blocks-output))
-      ?:  =(p.result 0)
-        :_  input
-        expanded-block
-      :_  input
-      result
-    %=  $
-      blocks-output  [expanded-block blocks-output]
-    ==
+  ?>  =-  =(0 (mod - 31))
+      (add (lsh [3 1] cmf) flg)
   ::
-  ::  ----------------------------
-  ::  PARSE FOOTER
-  ::  ----------------------------
-  ::
-  ::
-  =.  sea  bays.input
+  ::  Decompress data
+  =^  data  sea  (decompress-blocks sea)
+  ::  Parse footer
   ::
   =/  footer-length  (in-size sea)
   ?:  (lth footer-length 4)
     ~|  "incorrect data check"  !!
-  ::  Adler32
+  ::  XX Verify adler32 checksum
   ::
-  =^  adler32  sea  (read-octs 4 sea)
-  ::  XX verify checksum
+  =^  adler32=@ux  sea  (read-msb 4 sea)
   :_  sea
-  expanded-data
+  data
+++  decompress-octs-zlib
+  |=  data=octs
+  ^-  octs
+  -:(decompress-zlib (from-octs data))
 ++  crc
   :: ~%  %crc  ..part  ~
   |%

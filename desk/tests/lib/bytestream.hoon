@@ -5,6 +5,65 @@
 /+  *test
 /+  *bytestream
 |%
+++  test-rip-octs
+  ;:  weld
+    %+  expect-eq
+    !>  ~
+    !>  (rip-octs [0 0])
+    ::
+    %+  expect-eq
+    !>  ~
+    !>  (rip-octs [0 0xcafe])
+    ::
+    %+  expect-eq
+    !>  ~[0xbe 0xba 0xfe 0xca]
+    !>  (rip-octs [4 0xcafe.babe])
+    ::
+    %+  expect-eq
+    !>  ~[0xbe 0xba]
+    !>  (rip-octs [2 0xcafe.babe])
+    ::
+  ==
+++  test-cat-octs
+  ;:  weld
+    %+  expect-eq
+    !>  [8 0xfade.bade.cafe.babe]
+    !>  %+  cat-octs  
+        [4 0xcafe.babe]
+        [4 0xfade.bade]
+    ::
+    %+  expect-eq
+    !>  [6 0xfade.bade.babe]
+    !>  %+  cat-octs  
+        [2 0xcafe.babe]
+        [4 0xfade.bade]
+    ::
+    %+  expect-eq
+    !>  [6 0xbade.cafe.babe]
+    !>  %+  cat-octs  
+        [4 0xcafe.babe]
+        [2 0xfade.bade]
+  ==
+++  test-can-octs
+  ;:  weld
+    %+  expect-eq
+    !>  [8 0xfade.bade.cafe.babe]
+    !>  %-  can-octs
+      :~  [2 0xbabe]
+          [1 0xfe]
+          [3 0xba.deca]
+          [2 0xfade]
+      ==
+    ::
+    %+  expect-eq
+    !>  [8 0xfade.bade.cafe.babe]
+    !>  %-  can-octs
+      :~  [1 0xbabe]
+          [2 0xfeba]
+          [2 0xba.deca]
+          [3 0xfa.deba]
+      ==
+  ==
 ++  test-convert
   ;:  weld
     ::
@@ -52,7 +111,6 @@
 ++  test-read-byte
   =/  sea=bays
     (from-octs [3 0xca.babe])
-  ~&  sea
   =^  bar  sea  (read-byte-maybe sea)
   =^  bas  sea  (read-byte sea)
   =^  bat  sea  (read-byte sea)

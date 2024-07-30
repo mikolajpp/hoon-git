@@ -1,4 +1,3 @@
-~%  %bytestream  ..part  ~
 |%
 ::  $bays: bytestream
 ::
@@ -7,12 +6,12 @@
 ::
 +$  bays  $+  bays
           $:  pos=@ud
-              data=octs  
+              data=octs
           ==
 ::    $bits: bitstream
 ::
 ::      .num: number of bits in the acculumalator
-::      .bit: bit accumulator
+::      .bit: accumulator
 ::      .bays: bytestream
 ::
 +$  bits  $+  bits
@@ -45,24 +44,28 @@
 ::  Each write advances the cursor by a corresponding
 ::  number of bytes written; append functions do not advance the stream.
 ::
+~%  %bytestream  ..part  ~
 |%
 ::    Utilities
 ::
 +|  %utilities
 ++  rip-octs
-  :: ~/  %rip-octs
+  ~/  %rip-octs
   |=  a=octs
+  ^-  (list @)
+  ?:  =(p.a 0)
+    ~
   =|  hun=(list @)
-  =+  i=0
+  =+  i=p.a
   |-
-  ?:  =(i p.a)
-    (flop hun)
+  ?:  =(i 0)
+    hun
   %=  $
-    i  +(i)
-    hun  :_(hun (cut 3 [i 1] q.a))
+    i  (dec i)
+    hun  :_(hun (cut 3 [(dec i) 1] q.a))
   ==
 ++  cat-octs
-  :: ~/  %cat-octs
+  ~/  %cat-octs
   |=  [a=octs b=octs]
   :-  (add p.a p.b)
   (can 3 ~[a b])
@@ -71,8 +74,10 @@
   ^-  octs
   [len (cut 3 [pin len] q.data)]
 ++  can-octs
+  ~/  %can-octs
   |=  a=(list octs)
   ^-  octs
+  ?:  =(~ a)  [0 0]
   =-  [- (can 3 a)]
   %+  reel  a
   |=  [=octs size=@ud]
@@ -399,9 +404,10 @@
 ::
 +|  %read-txt
 ::
-::    +read-line: read a line of text
-::  read bytes until newline is found, or until stream
-::  is exhausted.
+::  +read-line: read line of text
+::
+::    Read bytes until newline is found, or until stream
+::    is exhausted.
 ::
 ++  read-line
   :: ~/  %read-line
@@ -692,7 +698,7 @@
   [num=0 bit=0b0 sea]
 ++  bays-from-bits
   |=  pea=bits
-  ^-  bits
+  ^-  bays
   bays.pea
 ++  bits-is-empty
   |=  pea=bits
@@ -743,7 +749,7 @@
   ^-  bits
   =.  pea  (need-bits n pea)
   (drop-bits n pea)
-::  +peek-bits: peek low .n bits 
+::  +peek-bits: peek low .n bits
 ::
 ++  peek-bits
   |=  [n=@ud pea=bits]

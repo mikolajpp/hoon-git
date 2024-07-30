@@ -184,10 +184,51 @@
     ::
     %+  bind  (get-raw hash)
     (cury parse-raw %sha-1)
+  ++  get-commit
+    |=  =hash
+    ^-  (unit commit)
+    =+  obj=(get hash)
+    ?~  obj  ~
+    ?>  ?=(%commit -.u.obj)
+    (some commit.u.obj)
+  ++  get-tree
+    |=  =hash
+    ^-  (unit tree-dir)
+    =+  obj=(get hash)
+    ?~  obj  ~
+    ?>  ?=(%tree -.u.obj)
+    (some tree-dir.u.obj)
+  ++  get-blob
+    |=  =hash
+    ^-  (unit octs)
+    =+  obj=(get hash)
+    ?~  obj  ~
+    ?>  ?=(%blob -.u.obj)
+    (some data.u.obj)
+  ++  get-tag  !!
   ++  got
     |=  =hash
     ^-  object
     (need (get hash))
+  ++  got-commit
+    |=  =hash
+    ^-  commit
+    =+  obj=(got hash)
+    ?>  ?=(%commit -.obj)
+    commit.obj
+  ++  got-tree
+    |=  =hash
+    ^-  tree-dir
+    =+  obj=(got hash)
+    ?>  ?=(%tree -.obj)
+    tree-dir.obj
+  ++  got-blob
+    |=  =hash
+    ^-  octs
+    =+  obj=(got hash)
+    ?>  ?=(%blob -.obj)
+    data.obj
+  ++  got-tag  !!
   ++  get-header
     |=  =hash
     ^-  (unit object-header)
@@ -240,7 +281,8 @@
         ::  As we keep everything in memory, this will not
         ::  do for us -- we have to be smarter than git here.
         ::
-        (~(get-raw-thin git-pack pack) hash get-raw)
+        =+  rob=(~(get-raw-thin git-pack pack) hash get-raw)
+        rob
       obj
   ++  has
     |=  =hash
@@ -326,6 +368,14 @@
     ^-  ?
     :: XX rename to ref-store
     ?=(^ (~(get of refs.repo) refname))
+  ++  resolve
+    |=  =refname
+    ^-  (unit ^refname)
+    =+  fil=(~(get of refs.repo) refname)
+    ?~  fil  ~
+    ?@  u.fil
+      (some refname)
+    $(refname refname.u.fil)
   ++  get
     |=  =refname
     ^-  (unit hash)

@@ -2,7 +2,7 @@
 ::::  Git pack
   ::
 /-  spider
-/+  bs=bytestream, zlib
+/+  bs=bytestream, z=zlib
 /+  *git-hash, *git-object
 =,  strand=strand:spider
 |%
@@ -428,7 +428,7 @@
   =^  [type=pack-object-type size=@ud]  sea
     (read-pack-object-header sea)
   ?+  type
-    =^  data=octs  sea  (expand:zlib sea)
+    =^  data=octs  sea  (decompress-zlib:z sea)
     ?.  =(p.data size)
       ~|  "Object is corrupted: size mismatch (stated {<size>}b uncompressed {<p.data>}b)"  !!
     :_  sea
@@ -446,7 +446,7 @@
   |=  [pos=@ud sea=bays:bs]
   ^-  [pack-delta-object bays:bs]
   =^  =hash  sea  (read-hash sea)
-  =^  =octs  sea  (expand:zlib sea)
+  =^  =octs  sea  (decompress-zlib:z sea)
   :_  sea
   [%ref-delta pos hash octs]
 ++  read-hash
@@ -465,7 +465,7 @@
   ::  but, for instance, to a bundle file.
   ::
   ?<  |(=(0 base-offset) (gte base-offset pos))
-  =^  dat  sea  (expand:zlib sea)
+  =^  dat  sea  (decompress-zlib:z sea)
   :_  sea
   [%ofs-delta pos base-offset dat]
 ::
