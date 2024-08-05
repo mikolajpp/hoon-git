@@ -5,7 +5,7 @@
 ::
 /+  *git, *git-http
 /+  git=git-repository
-/+  git-rev-walk, git-pack, git-pack-objects, git-graph
+/+  git-revision, git-pack, git-pack-objects, git-graph
 /=  webui  /app/git-store/webui
 :: XX this syntax is broken /=  webui=/app/git-store-webui
 ::
@@ -321,7 +321,9 @@
     ::  Default to web view
     ::
     :_  state
-    (~(view webui bowl eyre-id) u.repo request-line)
+    =|  =route:webui
+    =.  base.route  'git'
+    (~(view webui [bowl eyre-id]) u.repo request-line)
     ::  Git server: handshake
     ::
     [%git @t %info %refs ~]

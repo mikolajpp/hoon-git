@@ -229,7 +229,7 @@
   ::       (compress:zlib octs.data.pob)
   ::   $(brick-list t.brick-list)
 ++  pack-objects
-  |=  [want=(list hash) exclude=(list hash)]
+  |=  [push=(list hash) hide=(list hash)]
   ^-  octs
   ::  Prepare packbuilder
   ::  (1) Walk over the exclude list, mark all trees and blobs as dull
@@ -239,28 +239,27 @@
   ::
   ::  (1)
   =.  walk-store
-    |-  ?~  exclude  walk-store
-    =+  hash=i.exclude
+    |-  ?~  hide  walk-store
+    =+  hash=i.hide
     ::  XX Use caching
     ::
     =+  obj=(got:~(store git repo) hash)
     ?>  ?=(%commit -.obj)
     %=  $
-      exclude  t.exclude
+      hide  t.hide
       walk-store  (mark-tree-dull tree.commit.obj)
     ==
   :: (2) & (3)
-  =+  commits=(walk:git-revision repo want exclude)
-  ~&  pack-objects-walk+"Inserting {<(lent commits)>} commits"
+  =/  walk   (walk:git-revision repo push hide)
   =.  state
-    |-  ?~  commits  state
-    =+  hash=-.i.commits
-    =+  commit=+.i.commits
-    ?:  (has-any-flag hash ~[%seen %dull])
-      $(commits t.commits)
-    =.  walk-store  (put-flag hash %seen)
-    =.  state  (insert-commit hash commit)
-    $(commits t.commits)
+    |-
+    =^  step=(unit [=hash =commit])  walk  ~(step git-revision walk)
+    ?~  step  state
+    ?:  (has-any-flag hash.u.step ~[%seen %dull])
+      $
+    =.  walk-store  (put-flag hash.u.step %seen)
+    =.  state  (insert-commit u.step)
+    $
   ::  Prepare deltas
   ::
   ::  Sort by type, size, name hash and recency

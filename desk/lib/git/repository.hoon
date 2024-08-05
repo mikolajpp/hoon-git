@@ -368,6 +368,8 @@
     ^-  ?
     :: XX rename to ref-store
     ?=(^ (~(get of refs.repo) refname))
+  ::  +resolve: resolve if .refname is a symlink
+  ::
   ++  resolve
     |=  =refname
     ^-  (unit ^refname)
@@ -375,7 +377,7 @@
     ?~  fil  ~
     ?@  u.fil
       (some refname)
-    $(refname refname.u.fil)
+    (some refname.u.fil)
   ++  get
     |=  =refname
     ^-  (unit hash)

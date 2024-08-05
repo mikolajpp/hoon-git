@@ -1,6 +1,7 @@
 /+  *git-hash, stream
 |%
 +$  refname  $+(refname (list @t))
+::  XX rename refname to symref
 +$  ref  $@(hash [%symref =refname])
 ::  XX Can you use an axal with ref-path instead
 ::  of path from the aura typesystem

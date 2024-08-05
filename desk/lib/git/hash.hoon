@@ -62,12 +62,20 @@
     (add (sub dit 'a') 10)
   (sub dit '0')
   $(a (rsh [3 1] a), hash (add (lsh [2 1] hash) val))
-::  +print-hash-sha-1: print hash
+::  +print-hash-sha-1: print sha-1 hash
 ::
 ++  print-hash-sha-1
   |=  =hash
   ^-  tape
   ((x-co:co hash-size-sha-1) hash)
+++  print-hash
+  |=  [hal=hash-algo =hash]
+  ^-  tape
+  ?-  hal
+    %sha-1  (print-hash-sha-1 hash)
+    %sha-256  !!
+  ==
+  
 ++  hex-dit
   |=  c=@C
   ^-  @
