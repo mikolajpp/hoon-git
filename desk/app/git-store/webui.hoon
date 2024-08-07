@@ -98,14 +98,18 @@
     :_  dir
     [%symref refname]
   ?+  page  !!
-    %tree  (view-tree repo-name repo ref dir ext)
     %commits  (view-commits repo-name repo ref dir ext args)
     %commit  (view-commit repo-name repo ref)
+    ::
+    %tree  (view-tree repo-name repo ref dir ext)
+    ::
+    %refs  (view-refs repo-name repo ref)
   ==
 ++  manx-as-octs
   |=  =manx
   %-  some
   %-  as-octt:mimes
+  %+  weld  "<!DOCTYPE html>\0a"
   (en-xml manx)
 ++  cmp-txt
   |=  [a=@t b=@t]
@@ -328,6 +332,55 @@
       ;+  (el-commit:ui commit-hash commit)
     ==
   ==
+++  view-refs
+  |=  $:  repo-name=@ta 
+          repo=repository:git 
+          =ref
+      ==
+  ^-  (list card:agent:gall)
+  %+  give-simple-payload:app:server  eyre-id
+  :-  [200 ~[['cache-control' 'no-cache']]]
+  =|  =route
+  =.  route
+    %=  route
+      base  'git'
+      repo-name  repo-name
+      page  %refs
+      ref  ref
+    ==
+  =*  hal  hash-algo.repo
+  =*  ui  ~(. ^ui repo route)
+  ::  Get reference and directory
+  ::
+  %-  manx-as-octs
+  ;html
+    ;+  head:ui
+    ;body
+      ;+  header:ui
+      ;+  (navigation:ui %refs)
+      ;h1: Branches
+      ;ul
+        ;*  %+  turn  (tap-prefix:~(refs git repo) /refs/heads)
+            |=  [=refname =hash]
+            ~&  [refname hash]
+            ;p
+              ; {(trip (print-refname refname))}
+              ;+  =-  ~&(- -)  (el-short-commit-hash:ui hash)
+            ==
+      ==
+      ;h1: Tags
+      ;ul
+        ;*  %+  turn  (tap-prefix:~(refs git repo) /refs/tags)
+            |=  [=refname =hash]
+            ~&  [refname hash]
+            ;p
+              ; {(trip (print-refname refname))}
+              ;+  =-  ~&(- -)  (el-short-commit-hash:ui hash)
+            ==
+      ==
+    ==
+  ==
+
 ++  ui
   |_  [repo=repository:git =route]
   +*  hal  hash-algo.repo
@@ -429,7 +482,7 @@
         ; Commits
       ==
       ;a  =class  ?:(=(page %refs) "select" "")
-          =href  "{(to-page:route %refs)}"
+          =href  "{(to-page-with-ref:route %refs)}"
         ; Refs
       ==
     ==
@@ -552,8 +605,8 @@
       ::  XX unify return type with +print-short-hash
       ::
       ;a/"{(to-page-ref:route %commit hash)}"
-        =style  "text-decoration:underline;"
-        {label}
+        =style  "text-decoration:underline; display:inline-block;"
+        ; {label}
       ==
     ++  el-commit
       |=  [=hash =commit]
@@ -566,7 +619,7 @@
         ==
       ;div.commit
         ;h1: {msg-header}
-        ;p: {msg-body}
+        ;pre: {msg-body}
         ;div.committer
           ;*  ?:  =(author.commit committer.commit)
                 ;=
@@ -625,6 +678,9 @@
         [header] 40px [navigation] 50px [content];
       
       font-family: Helvetica;
+    }
+    h1 {
+      font-size: 25px;
     }
     a {
       text-decoration: none;
