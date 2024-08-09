@@ -356,19 +356,20 @@
     =+  siz=(dis bat 0x7f)
     (read-octs:bs siz sea)
   ::  +copy-data: copy data from base
-  ::  bat = 1xxxxxxx
   ::
-  ::  copy bytes from base object at the specified offset
+  ::    bat = 1xxxxxxx
   ::
-  ::  4 low bits of bat specify the offset
-  ::  each bit set to 1 indicates position of the following
-  ::  byte as part of the LSB offset number
+  ::    copy bytes from base object at the specified offset
   ::
-  ::  3 higher bits of bat specify the size
+  ::    4 low bits of bat specify the offset
+  ::    each bit set to 1 indicates position of the following
+  ::    byte as part of the LSB offset number
   ::
-  ::  size is encoded in the same manner as offset.
-  ::  if size computed in this way is 0, it is
-  ::  replaced by 0x1.0000
+  ::    3 higher bits of bat specify the size
+  ::
+  ::    size is encoded in the same manner as offset.
+  ::    if size computed in this way is 0, it is
+  ::    replaced by 0x1.0000
   ::
   ++  read-cp-param
     |=  [var=@D [bat=@D bit=@D shift=@ud] sea=bays:bs]
@@ -524,14 +525,9 @@
     size  (add size (lsh [0 bits] (dis bat 0x7f)))
     bits  (add bits 7)
   ==
-::
 ++  to-object-type
   |=  ryt=@ud
   ^-  (unit pack-object-type)
-  ::  XX A case rune
-  ::  ?*  ryt  ~
-  ::  1  `%commit
-  ::  ...
   ::
   ?+  ryt  ~
     %1  `%commit

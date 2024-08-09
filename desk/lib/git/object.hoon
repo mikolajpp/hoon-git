@@ -95,7 +95,7 @@
   ?~  dir
     [%tree size=(size:bs data) (to-octs:bs data)]
   =.  data  %+  append-octs:bs  data
-    (as-octs:bs mode.i.dir)
+    (as-octt:bs (print-octal mode.i.dir))
   =.  data  %+  append-octs:bs  data
     [1 ' ']
   =.  data  %+  append-octs:bs  data
@@ -339,6 +339,8 @@
   ++  tree-mode  ;~(sfix parse-octal ace)
   ++  tree-node  (cook crip (plus prn))
   --
+++  print-octal
+  (em-co:co [8 0] |=([? b=@ c=tape] [(add '0' b) c]))
 ++  parse-octal
   |=  txt=tape
   (scan txt parse-octal:parse)

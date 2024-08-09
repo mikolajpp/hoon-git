@@ -63,6 +63,13 @@
           [2 0xba.deca]
           [3 0xfa.deba]
       ==
+    ::
+    %+  expect-eq
+    !>  [8 0x0]
+    !>  %-  can-octs
+      :~  [6 0x0]
+          [2 0x0]
+      ==
   ==
 ++  test-convert
   ;:  weld
@@ -542,6 +549,22 @@
     !>  1
     !>  pos.sea
   ==
+  ++  test-chunk
+    =/  sea=bays
+      (from-octs [5 0xfade.bade.cafe.babe])
+    ;:  weld
+      %+  expect-eq
+      !>  ~[[2 0xbabe] [2 0xcafe] [1 0xde]]
+      !>  (chunk 2 sea)
+      ::
+      %+  expect-eq
+      !>  ~[[3 0xfe.babe] [2 0xdeca]]
+      !>  (chunk 3 sea)
+      ::
+      %+  expect-eq
+      !>  ~
+      !>  (chunk 0 sea)
+    ==
   ++  test-extract
     =/  sea=bays
       (from-octs [4 0xcafe.babe])
