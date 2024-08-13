@@ -624,7 +624,7 @@
   ::  XX Verify adler32 checksum
   ::
   =^  adler32=@ux  sea  (read-msb 4 sea)
-  ?:  =(adler32 (adler32:adler data))
+  ?:  =(adler32 (adler32:adler:checksum data))
     :_  sea
     data
   ~|  "incorrect adler32 data check"  !!
@@ -657,73 +657,5 @@
     ?:  (gth (dis acc 1) 0)
       (mix 0xedb8.8320 (rsh [0 1] acc))
     (rsh [0 1] acc)
-  --
-::  +adler: adler32 checksum
-::
-::    Adler-32 checksum follows essentially the
-::    Fletcher checksum algorithm, except that the summation
-::    is performed modulo 65.521 (base).
-::
-::    The maximum number of additions that can be added without
-::    exceeding 32 bits is determined by n such that
-::    255*n(n+1)/2 + (n+1)*(base-1) < 2*32 - 1
-::
-::    This is valid for checksum with update, and works out to
-::    5.552. Although here we compuet the checksum without
-::    an update, we preserve this bound to follow the
-::    standard implementation and in anticipation of a more
-::    general checksum interface.
-::
-++  adler
-  |%
-  ::  +base: Adler-32 is computed modulo 65.521
-  ::
-  ++  base  65.521
-  ::  +nmax: maximum number of bytes that can be added without
-  ::  overflowing 32-bit word.
-  ::
-  ++  nmax  5.552
-  ::  +adler32: compute adler32 checksum
-  ::
-  ++  adler32
-  |=  a=octs
-  ^-  @uxF
-  ?:  =(0 p.a)
-    0x1
-  =/  adler=@uxE  0x1
-  =/  sum2=@uxE   0x0
-  ::
-  =+  i=0
-  |-
-  =*  len  (sub p.a i)
-  ::  Sum .nmax bytes
-  ::
-  ?:  (gth len nmax)
-    =/  [adler=@uxE sum2=@uxE]
-      (adler32-sum adler sum2 i nmax a)
-    %=  $
-      i  (add i nmax)
-      adler  (mod adler base)
-      sum2  (mod sum2 base)
-    ==
-  ::  Sum the remainder and finish
-  ::
-  =/  [adler=@uxE sum2=@uxE]
-    (adler32-sum adler sum2 i len a)
-  %+  add
-    (mod adler base)
-  (lsh [3 2] (mod sum2 base))
-  ::  +adler32-sum: perform adler32 summation for a run
-  ::  of .len bytes starting at .i.
-  ::
-  ++  adler32-sum
-    |=  [adler=@uxE sum2=@uxE i=@ud len=@ud a=octs]
-    =+  end=(add i len)
-    |-
-    ?:  =(end i)
-      [adler sum2]
-    =.  adler  (add adler (cut 3 [i 1] q.a))
-    =.  sum2  (add sum2 adler)
-    $(i +(i))
   --
 --

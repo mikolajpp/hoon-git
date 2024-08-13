@@ -1,6 +1,6 @@
 ::
-::  Commit graph utilities
-::
+::::  Commit graph utilities
+  ::
 /+  *git-hash
 /+  git=git-repository
 |_  repo=repository:git
@@ -32,18 +32,14 @@
     ::  would cache an object from the archive
     ::  in the loose map
     ::
-    =+  obj=(got:~(store git repo) hash)
-    ::  Not a commit object, do not worry about reachability
-    ::
-    ?.  ?=(%commit -.obj)
-      &
+    =+  commit=(got-commit:~(store git repo) hash)
     ::  XX Such accessess are too long. Move
     ::  commit stuff into /lib/git/commit/hoon
     ::  and provide compile-time accessors
     ::
-    ?:  (lth date.commit-time.commit.obj oldest-have)
+    ?:  (lth date.commit-time.commit oldest-have)
       |
-    %+  roll  parents.commit.obj
+    %+  roll  parents.commit
       |=  [=^hash reach=?]
       ^-  ?
       ?:  ?|(reach (~(has in have) hash))

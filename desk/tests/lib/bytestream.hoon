@@ -28,19 +28,19 @@
   ;:  weld
     %+  expect-eq
     !>  [8 0xfade.bade.cafe.babe]
-    !>  %+  cat-octs  
+    !>  %+  cat-octs
         [4 0xcafe.babe]
         [4 0xfade.bade]
     ::
     %+  expect-eq
     !>  [6 0xfade.bade.babe]
-    !>  %+  cat-octs  
+    !>  %+  cat-octs
         [2 0xcafe.babe]
         [4 0xfade.bade]
     ::
     %+  expect-eq
     !>  [6 0xbade.cafe.babe]
-    !>  %+  cat-octs  
+    !>  %+  cat-octs
         [4 0xcafe.babe]
         [2 0xfade.bade]
   ==
@@ -289,11 +289,11 @@
   ==
 ++  test-append-txt
   =/  sea=bays
-    (from-txt 'the lazy fox')
+    (from-txt 'the quick fox')
   =.  sea  (append-txt sea ' jumped over')
   =.  sea  (append-txt sea ' the lazy dog')
   %+  expect-eq
-  !>  'the lazy fox jumped over the lazy dog'
+  !>  'the quick fox jumped over the lazy dog'
   !>  (to-txt sea)
 ++  test-write-read-byte
   =/  sea=bays

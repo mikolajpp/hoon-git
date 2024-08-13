@@ -10,7 +10,7 @@
   ?:  =(name.i.dir name)
     (some hash.i.dir)
   $(dir t.dir)
-::    +tree-path-hash: find object hash at path in 
+::    +tree-path-hash: find object hash at path in
 ::    the tree object .tree-hash.
 ::
 ++  tree-path-hash
@@ -22,7 +22,7 @@
   ?~  entry-hash  ~
   $(tree-hash u.entry-hash, path t.path)
 ::  +pit-of: like +fit:of, but also return
-::  the matching prefix path. 
+::  the matching prefix path.
 ::
 ++  pit-of
   |*  [fat=(axal) pax=path]
