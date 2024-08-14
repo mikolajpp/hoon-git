@@ -18,7 +18,7 @@
 ::
 ++  parse
   |%
-  :: Like sym, but includes uppercase
+  :: like sym, but includes uppercase
   ++  hym
     %+  cook
       |=(a=tape (rap 3 ^-((list @) a)))
@@ -132,7 +132,7 @@
     |*  [cmd=@tas opt=rule pix=rule args=rule]
     |=  tub=nail
     ^-  (like [[_cmd _(wonk *args)] (list option)])
-    ::  Parse front options, command arguments
+    ::  parse front options, command arguments
     ::
     ::  XX using , somehow changes output of
     ::  compiler error.
