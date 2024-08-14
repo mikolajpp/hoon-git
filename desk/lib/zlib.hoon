@@ -621,8 +621,6 @@
   =/  footer-length  (in-size sea)
   ?:  (lth footer-length 4)
     ~|  "incorrect data check"  !!
-  ::  XX Verify adler32 checksum
-  ::
   =^  adler32=@ux  sea  (read-msb 4 sea)
   ?:  =(adler32 (adler32:adler:checksum data))
     :_  sea
