@@ -557,7 +557,7 @@
     (some num)
   =/  mycrc16
     %^  cut  3  [0 2]
-    (crc32:crc (peek-octs-until (sub pos.sea 2) sea(pos start)))
+    (crc32:crc:checksum (peek-octs-until (sub pos.sea 2) sea(pos start)))
   ?:  ?&  ?=(^ crc16)
           !=(u.crc16 mycrc16)
       ==
@@ -577,7 +577,7 @@
   ::  ISIZE
   =^  isize  sea  (read-lsb 4 sea)
   ::
-  ?:  =(q.crc32 (crc32:crc data))
+  ?:  =(q.crc32 (crc32:crc:checksum data))
     :_  sea
     data
   ~|  "incorrect crc32 data check"  !!
@@ -632,30 +632,4 @@
   |=  data=octs
   ^-  octs
   -:(decompress-zlib (from-octs data))
-++  crc
-  :: ~%  %crc  ..part  ~
-  |%
-  ++  crc32
-    :: ~/  %crc32
-    |=  data=octs
-    ^-  @ux
-    ?:  =(p.data 0)
-      0x0
-    =/  input-list  (weld (rip 3 q.data) (reap (sub p.data (met 3 q.data)) 0))
-    %+  mix  0xffff.ffff
-    %+  roll  input-list
-    |:  [a=1 acc=0xffff.ffff]
-    (mix (snag (dis (mix acc a) 0xff) crc32-table) (rsh [0 8] acc))
-  ::
-  ++  crc32-table
-    ^~
-    ^-  (list @ux)
-    %+  turn  (gulf 0 255)
-    |=  i=@
-    %+  roll  (gulf 0 7)
-    |:  [a=1 acc=i]
-    ?:  (gth (dis acc 1) 0)
-      (mix 0xedb8.8320 (rsh [0 1] acc))
-    (rsh [0 1] acc)
-  --
 --
