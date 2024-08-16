@@ -22,7 +22,7 @@
 --
 ::    bytestream: read and write sequence of bytes
 ::
-::  bytestream is a pair of a cursor and octs data.
+::  A bytestream is a pair of a cursor and octs data.
 ::  The cursor points at the next byte to be read or written.
 ::
 ::  There are three families of functions: for reading,
@@ -117,11 +117,12 @@
 ::    Check bytestream status
 ::
 +|  %status
+::  +exceed: whether .sea is out of bound
 ++  exceed
   |=  sea=bays
   ^-  ?
   (gte pos.sea p.data.sea)
-::  +exceed-at: whether .pos is out-of-bound
+::  +exceed-at: whether .pos is out of bound
 ::
 ++  exceed-at
   |=  [pos=@ud sea=bays]
@@ -207,7 +208,6 @@
   ^-  bays
   (back-by 1 sea)
 ::    +skip-line: advance to the beginning of next line
-::
 ++  skip-line
   ~/  %skip-line
   |=  sea=bays
@@ -351,10 +351,14 @@
   ^-  octs
   =+  len=(in-size sea)
   [len (cut 3 [pos.sea len] q.data.sea)]
+::  +peek-octs-until: peek octs until .pos
+::
 ++  peek-octs-until
   |=  [pos=@ud sea=bays]
   ^-  octs
-  ?<  (exceed-at (dec pos) sea)
+  ?:  =(pos 0)
+    [0 0]
+  ?>  (lte pos p.data.sea)
   =+  len=(sub pos pos.sea)
   [len (cut 3 [pos.sea len] q.data.sea)]
 ::    Read atom
@@ -588,6 +592,8 @@
   =|  hun=(list octs)
   |-
   =+  rem=(in-size sea)
+  ?:  =(0 rem)
+    (flop hun)
   ?:  (lth rem size)
     =^  octs  sea  (read-octs rem sea)
     (flop [octs hun])
@@ -703,14 +709,23 @@
   ~/  %need-bits
   |=  [n=@ud pea=bits]
   ^-  bits
-  |-
   ?:  (gte num.pea n)
+    pea
+  ::  how many bytes needed
+  ::  
+  =+  nib=(sub n num.pea)
+  =/  neb=@ud  (div nib 8)
+  =?  neb  !=(0 (mod nib 8))
+    +(neb)
+  |-
+  ?:  =(neb 0)
     pea
   =^  bat  bays.pea  (read-byte bays.pea)
   %=  $
     num.pea  (add num.pea 8)
     bit.pea
       (add bit.pea (lsh [0 num.pea] bat))
+    neb  (dec neb)
   ==
 ::  +drop-bits: drop low .n bits
 ::
@@ -718,6 +733,8 @@
   ~/  %drop-bits
   |=  [n=@ud pea=bits]
   ^-  bits
+  ?:  =(n 0)
+    pea
   %=  pea
     bit  (rsh [0 n] bit.pea)
     num
@@ -737,6 +754,8 @@
   |=  [n=@ud pea=bits]
   ^-  @
   ?>  (gte num.pea n)
+  ?:  =(n 0)
+    0
   %+  dis  bit.pea
   (sub (lsh [0 n] 1) 1)
 ::  +read-bits: read low .n bits, then drop
@@ -766,6 +785,8 @@
   |=  pea=bits
   ^-  bits
   =+  rem=(dis num.pea 0x7)
+  ?:  =(rem 0)
+    pea
   %=  pea
     num  (sub num.pea rem)
     bit  (rsh [0 rem] bit.pea)
