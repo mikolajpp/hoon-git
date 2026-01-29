@@ -1,5 +1,5 @@
 /-  *git-ted-sync, *git, spider
-/+  io=strandio, stream
+/+  io=strandio
 ::  XX *git-object, *git-refs
 ::  XX do we have to prefix with git?
 ::  It seems so, since this is a library that's going to be put in

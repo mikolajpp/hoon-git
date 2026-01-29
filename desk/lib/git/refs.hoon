@@ -1,4 +1,4 @@
-/+  *git-hash, stream
+/+  *git-hash, bytestream
 |%
 +$  refname  $+(refname (list @t))
 ::  XX rename refname to symref
@@ -26,7 +26,7 @@
   ^-  ?
   |-
   ?~  refname  |
-  ?^  (find-byte:stream '*' 0+(as-octs:stream i.refname))
+  ?^  (find-byte:bytestream '*' 0+(as-octs:bytestream i.refname))
     &
   $(refname t.refname)
 ::  Transform pattern refname to ls-refs prefix
@@ -43,7 +43,7 @@
   ?~  pat  (flop pix)
   ?:  =('*' i.pat)
     (flop pix)
-  =+  glob=(find-byte:stream '*' 0+(as-octs:stream i.pat))
+  =+  glob=(find-byte:bytestream '*' 0+(as-octs:bytestream i.pat))
   ?~  glob
     $(pat t.pat, pix [i.pat pix])
   (flop [(cut 3 [0 u.glob] i.pat) pix])

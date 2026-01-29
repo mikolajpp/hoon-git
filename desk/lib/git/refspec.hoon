@@ -1,4 +1,4 @@
-/+  *git-refs, stream
+/+  *git-refs
 ::  XX use /refs/heads/$ to indicated pattern match on /refs/heads/
 ::
 |%

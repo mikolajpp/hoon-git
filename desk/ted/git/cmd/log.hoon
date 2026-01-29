@@ -3,7 +3,7 @@
 ::
 /-  spider
 /-  *git, git-cmd
-/+  io=strandio, stream, *shoe
+/+  io=strandio, *shoe
 /+  git=git-repository, *git-refs, *git-refspec, git-pack
 /+  *git-cmd, *git-cmd-parser-log, git-http, git-clay
 ::

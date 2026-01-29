@@ -4,7 +4,7 @@
 :: XX Is /% defunct?
 :: /%  txt  %txt
 /-  spider, git-cmd
-/+  io=strandio, stream, *shoe
+/+  io=strandio, *shoe
 /+  git=git-repository, *git-refs, *git-refspec, git-pack
 /+  *git-cmd, *git-cmd-parser-diff, git-http, git-clay
 ::  XX solve shadowing of git $tree

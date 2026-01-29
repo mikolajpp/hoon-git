@@ -8,7 +8,7 @@
 ::
 /-  spider
 /-  *git, git-cmd, sole
-/+  io=strandio, stream
+/+  io=strandio
 /+  git=git-repository, *git-refs, *git-refspec, git-pack
 /+  git-http
 ::  XX git-cmd library is confusing with git-cmd sur

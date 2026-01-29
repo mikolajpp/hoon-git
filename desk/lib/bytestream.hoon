@@ -44,7 +44,7 @@
 ::  Each write advances the cursor by a corresponding
 ::  number of bytes written; append functions do not advance the stream.
 ::
-~%  %bytestream  ..part  ~
+~%  %bytestream-v0  ..part  ~
 |%
 ::    Utilities
 ::
