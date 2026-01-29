@@ -11,7 +11,7 @@
 +$  codes  (map [size=@ud code=@ub] literal=@ud)
 --
 ::
-~%  %zlib  ..part  ~
+~%  %zlib-v0  ..part  ~
 |%
 +|  %utils
 ++  swp-bits

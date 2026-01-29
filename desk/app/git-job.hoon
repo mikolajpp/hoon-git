@@ -1,7 +1,7 @@
 /-  ted-job=git-ted-job
 /+  default-agent, dbug
 /+  server, io=agentio
-/+  stream, zlib
+/+  zlib
 /+  *git-refs, *git-http
 /+  git=git-repository
 /+  git-revision, git-pack, git-pack-objects, git-graph
