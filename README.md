@@ -16,6 +16,11 @@ vere. This enables cloning of small-sized repositories, but for better performan
 is required at present. (This is primarily caused by the poor behavior of the runtime's garbage collector. It is likely to improve if road hints for running hoon computations 
 in a nested memory context are made available.)
 
+# Demo
+Hoon-git achieves self-hosting. Watch it clone its own repository, and then
+serve it from the %git-store git server over http.
+[![asciicast](https://asciinema.org/a/RbWGBBqiCVp9gV3e.svg)](https://asciinema.org/a/RbWGBBqiCVp9gV3e)
+
 # Talk at Lake Summit 2024
 
 Watch the talk about the project given by the author at the Lake Summit 2024: [link](https://www.youtube.com/watch?v=uPWJNQbqht4)
@@ -29,3 +34,4 @@ from antiquity helped the whole enterprise!
 # Acknowledgements
 
 This project received funding from the Urbit Foundation.
+Neal E. Davis [@sigilante](https://github.com/sigilante) was the grant mentor.
